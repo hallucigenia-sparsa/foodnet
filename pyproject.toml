@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "foodnet"
+version = "0.1.0"
+description = "Build taxon and metabolite networks (who produces and who consumes what) from mGrowthDB batch monocultures, with the parameters of a consumer-resource model."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+    { name = "KU Leuven, Lab of Molecular Bacteriology" },
+]
+keywords = ["metabolites", "cross-feeding", "consumer-resource-model", "mGrowthDB", "microbial-ecology", "open-science"]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/hallucigenia-sparsa/foodnet"
+Repository = "https://github.com/hallucigenia-sparsa/foodnet"
+
+[project.scripts]
+foodnet = "foodnet.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]

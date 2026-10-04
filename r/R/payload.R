@@ -1,0 +1,167 @@
+# The CRM payload foodnet sends, and the object it becomes in R.
+#
+# As in grownet's package, the caveats travel as data beside the numbers, and this file is where they
+# become part of the object rather than prose a reader may never open: `print` shows them every time, and
+# `crm_efficiency` and `as_miasim` act on them.
+
+CRM_FORMAT <- "foodnet.crm/v0"
+
+#' @noRd
+stop_foodnet <- function(...) stop(paste0(...), call. = FALSE)
+
+#' @noRd
+as_number <- function(x) {
+    if (is.null(x)) NA_real_ else as.numeric(x)
+}
+
+#' @noRd
+chr <- function(x, default = "") {
+    if (is.null(x) || !length(x)) default else as.character(x)[1]
+}
+
+#' @noRd
+chr_vector <- function(x) {
+    if (is.null(x) || !length(x)) character(0) else vapply(x, as.character, character(1))
+}
+
+# A list of rows (from JSON, never simplified, so a null stays a null) to a matrix with names.
+#' @noRd
+as_matrix <- function(rows, rownames, colnames, kind = "numeric") {
+    n <- length(rownames)
+    m <- length(colnames)
+    convert <- if (kind == "numeric") as_number else function(v) chr(v, NA_character_)
+    template <- if (kind == "numeric") numeric(1) else character(1)
+    cells <- if (n && m) vapply(unlist(rows, recursive = FALSE), convert, template) else template[0]
+    matrix(cells, nrow = n, ncol = m, byrow = TRUE, dimnames = list(rownames, colnames))
+}
+
+# A payload to the object this package works with.
+#' @noRd
+as_foodnet_crm <- function(payload) {
+    if (!is.list(payload) || is.null(payload$format)) {
+        stop_foodnet("this is not a foodnet CRM payload: it has no format field")
+    }
+    if (!identical(chr(payload$format), CRM_FORMAT)) {
+        warning("this payload says it is ", chr(payload$format), ", and this package reads ", CRM_FORMAT,
+                "; reading it anyway", call. = FALSE)
+    }
+    taxa <- chr_vector(payload$taxa)
+    resources <- chr_vector(payload$resources)
+    rates <- vapply(payload$growth_rates, as_number, numeric(1))
+    names(rates) <- taxa
+    initial <- vapply(payload$initial_concentrations, as_number, numeric(1))
+    names(initial) <- resources
+    caveats <- payload$caveats
+    presence <- caveats$presence_only
+    presence <- if (length(presence)) {
+        data.frame(taxon = vapply(presence, function(p) chr(p$taxon), character(1)),
+                   resource = vapply(presence, function(p) chr(p$resource), character(1)),
+                   direction = vapply(presence, function(p) chr(p$direction), character(1)),
+                   media = vapply(presence, function(p) paste(chr_vector(p$media), collapse = "; "),
+                                  character(1)),
+                   stringsAsFactors = FALSE)
+    } else {
+        data.frame(taxon = character(0), resource = character(0), direction = character(0),
+                   media = character(0), stringsAsFactors = FALSE)
+    }
+    structure(
+        list(taxa = taxa,
+             resources = resources,
+             consumed = as_matrix(payload$consumed, taxa, resources),
+             produced = as_matrix(payload$produced, taxa, resources),
+             evidence_consumed = as_matrix(payload$evidence_consumed, taxa, resources, "character"),
+             evidence_produced = as_matrix(payload$evidence_produced, taxa, resources, "character"),
+             growth_rates = rates,
+             growth_rate_unit = chr(payload$growth_rate_unit, "1/h"),
+             growth_rate_detail = payload$growth_rate_detail,
+             initial = initial,
+             phase = chr(payload$phase),
+             values = chr(payload$values, "mM"),
+             detection_limit = as_number(payload$detection_limit_mM),
+             caveats = list(presence_only = presence,
+                            conflicts = chr_vector(caveats$conflicts),
+                            duplicates = chr_vector(caveats$duplicates),
+                            without_a_rate = chr_vector(caveats$without_a_rate),
+                            media = chr_vector(caveats$media),
+                            value_rule = chr(caveats$value_rule),
+                            searched_both_phases = isTRUE(caveats$searched_both_phases)),
+             readme = chr(payload$readme),
+             tool = chr(payload$tool, "foodnet"),
+             tool_version = chr(payload$tool_version),
+             derived_at = chr(payload$derived_at),
+             source_db = chr(payload$source_db),
+             studies = chr_vector(payload$studies),
+             settings = payload$settings),
+        class = "foodnet_crm")
+}
+
+#' @noRd
+count_evidence <- function(x, word) {
+    sum(x$evidence_consumed == word, na.rm = TRUE) + sum(x$evidence_produced == word, na.rm = TRUE)
+}
+
+#' Print CRM parameters and their caveats
+#'
+#' The caveats are shown every time, because a cell that was never measured, or a link whose size is
+#' unknown, has to reach whoever simulates with it.
+#'
+#' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
+#' @param ... Ignored.
+#' @return `x`, invisibly.
+#' @export
+print.foodnet_crm <- function(x, ...) {
+    cat(sprintf("CRM parameters from %s %s, derived %s from %s\n",
+                x$tool, x$tool_version, x$derived_at, x$source_db))
+    cat(sprintf("  %d taxa, %d resources; %s phase; values in %s\n", length(x$taxa), length(x$resources),
+                x$phase, x$values))
+    cat(sprintf("  growth rates: %d of %d taxa (%s)\n", sum(!is.na(x$growth_rates)), length(x$taxa),
+                x$growth_rate_unit))
+    if (length(x$caveats$media)) {
+        cat("  values from: ", paste(x$caveats$media, collapse = " / "), "\n", sep = "")
+    }
+    cat("  Read before you simulate:\n")
+    not_assayed <- count_evidence(x, "not_assayed")
+    if (not_assayed) {
+        cat(sprintf("   * %d cell(s) were never assayed (NA): no evidence either way.\n", not_assayed))
+    }
+    presence <- x$caveats$presence_only
+    if (nrow(presence)) {
+        shown <- utils::head(presence, 6)
+        cat(sprintf("   * %d link(s) were seen only in another medium, so their size is unknown (NA):\n",
+                    nrow(presence)))
+        cat("       ", paste0(shown$taxon, " ", shown$direction, " ", shown$resource, collapse = ", "),
+            if (nrow(presence) > 6) paste0(" and ", nrow(presence) - 6, " more") else "", "\n", sep = "")
+    }
+    if (length(x$caveats$conflicts)) {
+        cat(sprintf("   * %d value(s) pool experiments that disagree: crm_readme(x) names them.\n",
+                    length(x$caveats$conflicts)))
+    }
+    if (length(x$caveats$without_a_rate)) {
+        cat(sprintf("   * %d taxon(s) have no growth rate: %s\n", length(x$caveats$without_a_rate),
+                    paste(x$caveats$without_a_rate, collapse = ", ")))
+        cat("       a simulation needs one from elsewhere; as_miasim() stops until you give it.\n")
+    }
+    if (x$caveats$searched_both_phases) {
+        cat("   * the search asked for both phases; a CRM describes growth, so these are the exponential phase.\n")
+    }
+    cat("   * the cells are measured amounts (net changes), not efficiencies: crm_efficiency(x) turns them\n")
+    cat("     into the E matrix a CRM takes, and how to scale it is your choice.\n")
+    cat("  crm_consumed(x), crm_produced(x), crm_rates(x), crm_resources(x); crm_readme(x) for the full text.\n")
+    invisible(x)
+}
+
+#' Summarize CRM parameters
+#'
+#' @param object CRM parameters from [foodnet_listen()] or [foodnet_crm()].
+#' @param ... Ignored.
+#' @return A list with the counts and the caveats, invisibly; printing it shows the same as [print()].
+#' @export
+summary.foodnet_crm <- function(object, ...) {
+    print(object)
+    invisible(list(taxa = length(object$taxa), resources = length(object$resources),
+                   with_a_rate = sum(!is.na(object$growth_rates)),
+                   not_assayed = count_evidence(object, "not_assayed"),
+                   presence_only = nrow(object$caveats$presence_only),
+                   conflicts = length(object$caveats$conflicts),
+                   without_a_rate = object$caveats$without_a_rate))
+}

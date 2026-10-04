@@ -1,0 +1,284 @@
+{
+  "schema": "foodnet.metabolite_network/v0",
+  "meta": {
+    "tool": "foodnet",
+    "tool_version": "0.1.0",
+    "derived_on": "2026-10-04",
+    "derived_at": "2026-10-04T19:05:46+02:00",
+    "source_db": "synthetic fixture (tests/conftest.py)",
+    "phase": "both",
+    "detection_limit_mM": 0.2,
+    "values": "mM"
+  },
+  "nodes": [
+    {
+      "id": "ncbi:1",
+      "kind": "taxon",
+      "name": "Alpha alpha A1",
+      "identity": "ncbi",
+      "taxon_id": "1",
+      "species": "alpha alpha",
+      "chebi_id": ""
+    },
+    {
+      "id": "ncbi:2",
+      "kind": "taxon",
+      "name": "Beta beta B1",
+      "identity": "ncbi",
+      "taxon_id": "2",
+      "species": "beta beta",
+      "chebi_id": ""
+    },
+    {
+      "id": "ncbi:3",
+      "kind": "taxon",
+      "name": "Gamma gamma C1",
+      "identity": "ncbi",
+      "taxon_id": "3",
+      "species": "gamma gamma",
+      "chebi_id": ""
+    },
+    {
+      "id": "chebi:30089",
+      "kind": "metabolite",
+      "name": "acetate",
+      "identity": "chebi",
+      "taxon_id": "",
+      "species": "",
+      "chebi_id": "30089"
+    },
+    {
+      "id": "chebi:17968",
+      "kind": "metabolite",
+      "name": "butyrate",
+      "identity": "chebi",
+      "taxon_id": "",
+      "species": "",
+      "chebi_id": "17968"
+    },
+    {
+      "id": "chebi:15740",
+      "kind": "metabolite",
+      "name": "formate",
+      "identity": "chebi",
+      "taxon_id": "",
+      "species": "",
+      "chebi_id": "15740"
+    },
+    {
+      "id": "chebi:17234",
+      "kind": "metabolite",
+      "name": "glucose",
+      "identity": "chebi",
+      "taxon_id": "",
+      "species": "",
+      "chebi_id": "17234"
+    }
+  ],
+  "edges": [
+    {
+      "source": "chebi:17234",
+      "target": "ncbi:1",
+      "direction": "consumed",
+      "phase": "exponential",
+      "evidence": "measured",
+      "amount": 8.0,
+      "change": -8.0,
+      "sd": 0.0,
+      "n": 2,
+      "p_value": 0.0,
+      "q_value": 0.0,
+      "window_start": 0.0,
+      "window_end": 12.0,
+      "medium": "Wilkins-Chalgren Anaerobe Broth (WC)",
+      "study_ids": [
+        "SMGDB00000001"
+      ],
+      "experiments": [
+        "EMGDB000000001"
+      ],
+      "cautions": [],
+      "notes": [],
+      "merged_arcs": null,
+      "merged_taxa": []
+    },
+    {
+      "source": "chebi:17234",
+      "target": "ncbi:1",
+      "direction": "consumed",
+      "phase": "stationary",
+      "evidence": "measured",
+      "amount": 0.5,
+      "change": -0.5,
+      "sd": 0.7071067811865476,
+      "n": 2,
+      "p_value": 0.5000000000000009,
+      "q_value": 0.6666666666666679,
+      "window_start": 12.0,
+      "window_end": 24.0,
+      "medium": "Wilkins-Chalgren Anaerobe Broth (WC)",
+      "study_ids": [
+        "SMGDB00000001"
+      ],
+      "experiments": [
+        "EMGDB000000001"
+      ],
+      "cautions": [],
+      "notes": [],
+      "merged_arcs": null,
+      "merged_taxa": []
+    },
+    {
+      "source": "ncbi:1",
+      "target": "chebi:30089",
+      "direction": "produced",
+      "phase": "exponential",
+      "evidence": "measured",
+      "amount": 4.0,
+      "change": 4.0,
+      "sd": 0.0,
+      "n": 2,
+      "p_value": 0.0,
+      "q_value": 0.0,
+      "window_start": 0.0,
+      "window_end": 12.0,
+      "medium": "Wilkins-Chalgren Anaerobe Broth (WC)",
+      "study_ids": [
+        "SMGDB00000001"
+      ],
+      "experiments": [
+        "EMGDB000000001"
+      ],
+      "cautions": [],
+      "notes": [],
+      "merged_arcs": null,
+      "merged_taxa": []
+    },
+    {
+      "source": "chebi:17234",
+      "target": "ncbi:2",
+      "direction": "consumed",
+      "phase": "exponential",
+      "evidence": "measured",
+      "amount": 6.0,
+      "change": -6.0,
+      "sd": null,
+      "n": 1,
+      "p_value": null,
+      "q_value": null,
+      "window_start": 0.0,
+      "window_end": 16.0,
+      "medium": "Wilkins-Chalgren Anaerobe Broth (WC)",
+      "study_ids": [
+        "SMGDB00000001"
+      ],
+      "experiments": [
+        "EMGDB000000002"
+      ],
+      "cautions": [
+        "single_replicate"
+      ],
+      "notes": [],
+      "merged_arcs": null,
+      "merged_taxa": []
+    },
+    {
+      "source": "ncbi:2",
+      "target": "chebi:17968",
+      "direction": "produced",
+      "phase": "exponential",
+      "evidence": "measured",
+      "amount": 3.0,
+      "change": 3.0,
+      "sd": null,
+      "n": 1,
+      "p_value": null,
+      "q_value": null,
+      "window_start": 0.0,
+      "window_end": 16.0,
+      "medium": "Wilkins-Chalgren Anaerobe Broth (WC)",
+      "study_ids": [
+        "SMGDB00000001"
+      ],
+      "experiments": [
+        "EMGDB000000002"
+      ],
+      "cautions": [
+        "single_replicate"
+      ],
+      "notes": [],
+      "merged_arcs": null,
+      "merged_taxa": []
+    },
+    {
+      "source": "ncbi:2",
+      "target": "chebi:15740",
+      "direction": "produced",
+      "phase": "exponential",
+      "evidence": "presence_only",
+      "amount": null,
+      "change": null,
+      "sd": null,
+      "n": 1,
+      "p_value": null,
+      "q_value": null,
+      "window_start": null,
+      "window_end": null,
+      "medium": "mMCB",
+      "study_ids": [
+        "SMGDB00000002"
+      ],
+      "experiments": [
+        "EMGDB000000003"
+      ],
+      "cautions": [],
+      "notes": [
+        "seen in mMCB (+5.00 mM over 1 replicate(s)); another medium than the values come from, so only its direction counts"
+      ],
+      "merged_arcs": null,
+      "merged_taxa": []
+    },
+    {
+      "source": "chebi:17234",
+      "target": "ncbi:3",
+      "direction": "consumed",
+      "phase": "exponential",
+      "evidence": "presence_only",
+      "amount": null,
+      "change": null,
+      "sd": null,
+      "n": 1,
+      "p_value": null,
+      "q_value": null,
+      "window_start": null,
+      "window_end": null,
+      "medium": "mMCB",
+      "study_ids": [
+        "SMGDB00000002"
+      ],
+      "experiments": [
+        "EMGDB000000004"
+      ],
+      "cautions": [],
+      "notes": [
+        "seen in mMCB (-5.00 mM over 1 replicate(s)); another medium than the values come from, so only its direction counts"
+      ],
+      "merged_arcs": null,
+      "merged_taxa": []
+    }
+  ],
+  "studies": [
+    {
+      "id": "SMGDB00000001",
+      "citation": "Synthetic study one",
+      "license": "",
+      "url": ""
+    },
+    {
+      "id": "SMGDB00000002",
+      "citation": "Synthetic study two",
+      "license": "",
+      "url": ""
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+"""The help page and the About page, as data keyed by the code's own names.
+
+`SETTINGS` has an entry for every key of `foodnet.search.DEFAULTS`, `EDGE_FIELDS` and `NODE_FIELDS` one for
+every field of the model, and `tests/test_help.py` requires both, so a new setting or field needs its help
+line in the same change (grownet's rule).
+"""
+from __future__ import annotations
+
+import html
+
+from . import __version__, brand, rbridge
+from .brand import COMMAND, NAME, REPOSITORY
+
+ISSUES = f"{REPOSITORY}/issues"
+MGROWTHDB = "https://mgrowthdb.gbiomed.kuleuven.be"
+GROWNET = "https://github.com/crossfeed-bio/crossfeed"
+MIASIM = "https://bioconductor.org/packages/release/bioc/html/miaSim.html"
+
+SETTINGS = {
+    "phase": "Which part of growth a change is measured over: the exponential phase (the default), the stationary "
+             "phase, or both, each as its own arcs and matrix columns.",
+    "window_start": "With a window end, replaces the phases with one window (hours since inoculation).",
+    "window_end": "The end of that window. A window that ends after the last metabolite sample uses the last "
+                  "sample and marks the value window_beyond_data.",
+    "fraction": "Exponential growth ends at the first sample where the culture reaches this share of its maximal "
+                "abundance (counted from its start): 90% by default.",
+    "no_growth_factor": "A culture that rose less than this many times did not grow and has no phases (1.5).",
+    "detection_limit": "A mean change smaller than this, in either direction, counts as no change (0.2 mM).",
+    "ignore_media": "Values from every medium, pooled, instead of only from the value medium.",
+    "booleans": "Report 1, 0 or NA instead of amounts; presence in another medium counts as 1.",
+    "report_rates": "Collect each taxon's maximum specific growth rate, which a consumer-resource model needs. "
+                    "CRM mode switches it on.",
+    "rate_method": "How a growth rate is computed: easylinear (as mGrowthDB reports rates) or baranyi.",
+    "rate_window": "With easylinear, the number of points in each fitted window (5).",
+    "merge_arcs": "One arc per taxon, metabolite, phase and direction across studies, instead of one per study.",
+    "min_studies": "Keep only arcs resting on at least this many studies (needs merged arcs above 1).",
+    "merge_genera": "One node per genus; a value is the median of its taxa's values.",
+    "conditions": "The second box: media, experiments or studies that give the values. Empty: the medium that "
+                  "holds data for the most taxa.",
+    "exclude_studies": "Study ids never read.",
+    "exclude_metabolites": "Metabolites left out by name, comma separated.",
+    "include_non_batch": "Command line only: also read chemostat and serial dilution monocultures. Their changes "
+                         "are not net changes in the vessel, so this is for exploring, not for values.",
+    "spike_factor": "A growth curve with one or two points this many times above both neighbors sets no phase "
+                    "boundary (100; 0 switches the check off).",
+    "correction": "How the reported q-values are corrected for multiple testing: Benjamini-Hochberg or "
+                  "Benjamini-Yekutieli.",
+}
+
+NODE_FIELDS = {
+    "id": "ncbi:<taxon id> for a strain, the genus and species for a strain without a usable id, genus:<name> "
+          "after merging, chebi:<id> for a metabolite (metabolite:<name> without one).",
+    "kind": "taxon or metabolite.",
+    "name": "The strain's current name in mGrowthDB, or the metabolite's name (acid and base forms are joined "
+            "under the base, for example acetic acid under acetate).",
+    "identity": "What the id rests on: ncbi, name, genus, chebi or metabolite_name.",
+    "taxon_id": "The strain's NCBI taxon id.",
+    "species": "Genus and species of a strain's name.",
+    "chebi_id": "A metabolite's ChEBI id.",
+}
+
+EDGE_FIELDS = {
+    "source": "Where the arc starts: the taxon for a produced arc, the metabolite for a consumed one.",
+    "target": "Where it ends.",
+    "direction": "produced or consumed.",
+    "phase": "exponential, stationary, or window.",
+    "evidence": "measured (a value from the value medium) or presence_only (seen only in another medium).",
+    "amount": "mM, the size of the mean net change in this direction. Missing for presence_only arcs and with "
+              "booleans; never 0.",
+    "change": "mM, the signed mean net change (positive = produced).",
+    "sd": "mM, the standard deviation over replicates.",
+    "n": "The replicates behind the value.",
+    "p_value": "A one-sample t-test of the replicate changes against zero; reported, not used to decide.",
+    "q_value": "The p-value corrected for multiple testing over the search.",
+    "window_start": "Hours: the mean start of the phase over the replicates.",
+    "window_end": "Hours: the mean end of the phase.",
+    "exponential_h": "Hours the cultures behind the arc grew exponentially, from their first growth sample to "
+                     "the end of exponential growth, averaged over replicates (also with a time window).",
+    "medium": "The medium (or media) the arc rests on.",
+    "study_ids": "The studies the arc rests on.",
+    "experiments": "The mGrowthDB experiments behind it.",
+    "cautions": "single_replicate, short_record, window_beyond_data, stationary_not_reached, conflict, "
+                "not_detected_in_value_medium, phase_from_other_replicates (see the legend).",
+    "notes": "Remarks in words: what disagreed, what another medium showed.",
+    "merged_arcs": "With merged arcs, how many studies the arc joins.",
+    "merged_taxa": "With merging to genus, the taxa behind the arc.",
+}
+
+SECTIONS = (("what", "What foodnet does"), ("phases", "Growth phases"), ("values", "Values, media and presence"),
+            ("matrices", "The two matrix formats"), ("crm", "Consumer-resource models and R"),
+            ("cytoscape", "Cytoscape and the downloads"), ("empty", "When a search gives nothing"),
+            ("settings", "Every setting"), ("fields", "Every field"), ("cli", "The command line"))
+
+
+def _e(x) -> str:
+    return html.escape(str(x), quote=True)
+
+
+def _dl(items: dict) -> str:
+    return "<dl>" + "".join(f"<dt><code>{_e(k).replace('_', '_<wbr>')}</code></dt><dd>{_e(v)}</dd>"
+                            for k, v in items.items()) + "</dl>"
+
+
+def _default(value) -> str:
+    if value is None:
+        return "not set"
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    return str(value) if value != "" else "empty"
+
+
+def render_help(token: str, defaults: dict, example: tuple, job: str = "") -> str:
+    toc = "".join(f"<li><a href=\"#{key}\">{_e(title)}</a></li>" for key, title in SECTIONS)
+    settings = {k: f"{v} Default: {_default(defaults.get(k))}." for k, v in SETTINGS.items()}
+    style_link = f"/foodnet_style.xml?token={_e(token)}"
+    return f"""<h2 class="page">Help</h2>
+<ul class="toc">{toc}</ul>
+<h2 id="what">What foodnet does</h2>
+<p>foodnet builds a bipartite network of taxa and metabolites from <a href="{MGROWTHDB}">mGrowthDB</a>: which taxon
+produces and which consumes which compound. It reads batch monocultures with metabolite measurements, and an arc's
+width is the amount produced or removed. It is the sister tool of <a href="{GROWNET}">grownet</a>, which builds
+interaction networks from co-cultures, and works the same way: two boxes, a button, and the results under them.</p>
+<p>Try the Example ({_e(", ".join(example))}), or type taxa: a species, a strain, a genus (all its species) or an
+NCBI taxon id, one per line.</p>
+<h2 id="phases">Growth phases</h2>
+<p>What a culture makes or takes up while it grows can differ from what it does once growth has stopped, so every
+value belongs to a phase. Exponential growth ends at the first sample at which the culture reaches 90% of its
+maximal abundance (an advanced setting); the stationary phase runs from there to the last metabolite sample. A
+value is the metabolite's concentration at the end of the phase minus its concentration at the start,
+interpolated between samples, averaged over replicates. Diauxic shifts are not detected: a second growth phase
+counts as stationary. A time window in Advanced settings replaces the phases. The growth curve is a per-strain
+count when the replicate has one, else the culture's own (cell counts before optical density).</p>
+<p>A metabolite series shorter than 24 h is still used, and its values carry the caution short_record; the page
+warns about it above the result.</p>
+<h2 id="values">Values, media and presence</h2>
+<p>Values come from one medium: the one that holds data for the most taxa, or the media, experiments or studies
+named in the second box. Every other medium only says whether a compound was produced or consumed: those arcs are
+presence_only (dashed) and their cells NA in the value matrices. Ignore media differences pools every medium.
+Studies in the value medium are pooled; when their experiments disagree on what happened, the value carries the
+caution conflict and the report names the experiments. The same experiment deposited under two studies is counted
+once.</p>
+<p>Acid and base forms of one compound are one metabolite (acetic acid and acetate), since an HPLC measures the
+pool whatever a record calls it. A compound that was not assayed for a taxon is never written as zero.</p>
+<h2 id="matrices">The two matrix formats</h2>
+<p><strong>Taxa x metabolites (CSV)</strong>: one matrix, rows taxa, columns metabolites, each cell the mean change in
+mM, positive when produced and negative when consumed. <strong>Consumed and produced matrices (zip)</strong>: two
+matrices of non-negative amounts, with an evidence matrix for each (measured, below_limit, presence_only,
+not_assayed) and a README. In both: a number is a change beyond the detection limit, 0 is measured without one, NA is
+no value. With the phase choice Both, each metabolite has a column per phase.</p>
+<h2 id="crm">Consumer-resource models and R</h2>
+<p>CRM mode collects growth rates: from the replicates whose metabolites gave the values, else from another
+monoculture in the same medium. Get CRM parameters then downloads the matrices, the rates and the initial medium
+concentrations with a README, or sends them to R. With Both, the CRM uses the exponential phase.</p>
+<p>The R companion package receives them. Install it once with <code>{_e(rbridge.INSTALL_R)}</code>
+({_e(rbridge.INSTALL_TROUBLE)}), then <code>library(foodnet); crm &lt;- foodnet_listen()</code> and press Send to R.
+<code>crm_efficiency(crm)</code> builds the efficiency matrix a CRM takes (positive for consumption, negative for
+production) and <code>as_miasim(crm)</code> the arguments of
+<a href="{MIASIM}">miaSim</a>'s <code>simulateConsumerResource</code>. Scaling is a modeling choice and is never made
+for you.</p>
+<h2 id="cytoscape">Cytoscape and the downloads</h2>
+<p>Send to Cytoscape puts the network into a running Cytoscape in the style of the legend. A downloaded GraphML can take
+the same style: <a href="{style_link}">foodnet_style.xml</a> (File, Import, Styles from File). JSON is the canonical
+format; GraphML is the same network for network tools.</p>
+<h2 id="empty">When a search gives nothing</h2>
+<ul><li>The taxa may have no batch monoculture with metabolites in mGrowthDB: the report lists every record left out
+and why.</li>
+<li>The second box may match nothing: a medium is matched as text, so a shorter word finds more spellings.</li>
+<li>A culture without a growth curve has no phases; a time window does not need one.</li>
+<li>Every change may be below the detection limit.</li></ul>
+<h2 id="settings">Every setting</h2>{_dl(settings)}
+<h2 id="fields">Every field</h2><p>Arcs:</p>{_dl(EDGE_FIELDS)}<p>Nodes:</p>{_dl(NODE_FIELDS)}
+<h2 id="cli">The command line</h2>
+<pre>{_e(COMMAND)} derive --taxa "Escherichia coli LF82" "Bacteroides fragilis" --out network.json
+{_e(COMMAND)} derive --taxa Roseburia --phase both --format matrices --out roseburia.zip
+{_e(COMMAND)} derive --taxa Blautia --conditions "Wilkins-Chalgren" --crm-mode --crm crm.zip
+{_e(COMMAND)} gui</pre>
+<p>Run <code>{_e(COMMAND)} derive --help</code> for every option. Problems and questions:
+<a href="{ISSUES}">{_e(ISSUES)}</a>.</p>"""
+
+
+def render_about() -> str:
+    return f"""<h2 class="page">About</h2>
+<p>{NAME} {_e(__version__)} builds taxon and metabolite networks from mGrowthDB batch monocultures. It is the sister
+tool of grownet and shares its structure: a thin client, no runtime dependencies, nothing hosted, nothing
+uploaded. It is developed at the KU Leuven Laboratory of Molecular Bacteriology.</p>
+<p>Source and issues: <a href="{REPOSITORY}">{_e(REPOSITORY)}</a>. Data: <a href="{MGROWTHDB}">mGrowthDB</a>, cited
+per arc.</p>
+<p class="muted">{_e(brand.NAME)} is released under the Apache License 2.0.</p>"""

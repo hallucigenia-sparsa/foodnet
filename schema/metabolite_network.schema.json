@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "foodnet.metabolite_network/v0",
+  "title": "foodnet metabolite network",
+  "description": "A bipartite network of taxa and metabolites: produced arcs run from a taxon to a metabolite, consumed arcs from a metabolite to a taxon, each in one growth phase, with the studies behind it.",
+  "type": "object",
+  "required": [
+    "schema",
+    "nodes",
+    "edges",
+    "studies"
+  ],
+  "properties": {
+    "schema": {
+      "enum": [
+        "foodnet.metabolite_network/v0"
+      ]
+    },
+    "meta": {
+      "type": "object"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "taxon",
+              "metabolite"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "identity": {
+            "enum": [
+              "",
+              "ncbi",
+              "name",
+              "genus",
+              "chebi",
+              "metabolite_name"
+            ]
+          },
+          "taxon_id": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string"
+          },
+          "chebi_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "direction",
+          "phase",
+          "evidence",
+          "study_ids"
+        ],
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "produced",
+              "consumed"
+            ]
+          },
+          "phase": {
+            "enum": [
+              "exponential",
+              "stationary",
+              "window"
+            ]
+          },
+          "evidence": {
+            "enum": [
+              "measured",
+              "presence_only"
+            ]
+          },
+          "amount": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "change": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "sd": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "n": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "p_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "q_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "window_start": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "window_end": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "exponential_h": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "medium": {
+            "type": "string"
+          },
+          "study_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "experiments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cautions": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "single_replicate",
+                "short_record",
+                "window_beyond_data",
+                "stationary_not_reached",
+                "conflict",
+                "not_detected_in_value_medium",
+                "phase_from_other_replicates"
+              ]
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "merged_arcs": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "merged_taxa": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "studies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "citation": {
+            "type": "string"
+          },
+          "license": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+# Agent notes (shared memory)
+
+The handoff file between agent sessions. Read it at the start of a session and update it in the same pull
+request as your change. Record what is not obvious from the code, the git history or the issues; edit in
+place; date each entry. Tasks go in GitHub Issues, not here. The repository is public and the house style
+gate applies.
+
+## Current state
+
+- 2026-10-04: 0.1.0 built in one session by Karoline's agent from Karoline's specification (her decisions
+  are in [docs/METHOD_NOTES.md](../METHOD_NOTES.md), in her words). Not released, not yet on GitHub: the
+  repository address `hallucigenia-sparsa/foodnet` is provisional and lives in one place,
+  `brand.REPOSITORY_SLUG` (plus the URLs in pyproject.toml, CITATION.cff, CONTRIBUTING.md,
+  packaging/windows/README.txt, r/DESCRIPTION and the READMEs).
+- The structure is grow**net** 0.2.0's (crossfeed-bio/crossfeed), copied and adapted: the mGrowthDB client,
+  the parallel prefetch, the species list, selection, rates, stats, the page frame, the Cytoscape transport,
+  the R transport, the gate and the packaging. The derivation, the model, the matrices, the page content,
+  the legend, the help and the R package's content are new.
+- Checked against Figure 3c of the community control paper (the comparison lives with the paper, not here,
+  since the figure is unpublished): with a 0 to 48 h window, every value of four of the five Wilkins-Chalgren
+  species equals the figure's to two decimals.
+- Verified live on 2026-10-04: the page (search, Example, CRM mode, every download), Send to Cytoscape against
+  Cytoscape 3.10.3 (node shapes and sizes by kind, arc colors, dashes, widths and phase transparency read back
+  from the view), and Send to R through miaSim's `simulateConsumerResource` on the test-case taxa. miaSim
+  needs `t_store` below its number of steps for a short `t_end` (documented in `as_miasim`).
+
+- 2026-10-04 (Karoline): the search button reads "Get taxon-metabolite network"; the matrices image comes
+  first in the result (`foodnet.figure`, SVG with no dependency; panels stack above `MAX_SIDE_BY_SIDE` px);
+  the result table reports the length of the exponential phase. `brand.in_prose` leaves `svg` alone, since
+  its name styling is HTML and broke the SVG caption. Tests quote her wording (tests/test_gui.py,
+  tests/test_figure.py).
+
+## Things learned about mGrowthDB while building
+
+- **Search misses culture-level monocultures.** `search.json?strainNcbiIds=` matches per-strain measurement
+  contexts only, so study SMGDB00000009 (E. coli LF82 and B. fragilis, culture-level OD and flow cytometry)
+  never comes back. `SpeciesIndex.where` (taxon id to studies, from the crawl) is used instead. grow**net**
+  may have the same gap for monoculture-only studies.
+- **Duplicate deposits.** Study 2 RI_WC equals study 7 ri2 (rounded); study 7 bt2 equals study 2 BT_WC.
+  RI_WC also holds one acetate series twice (replicates 1 and 2), so containment is tested one way.
+- **Acid and base names.** Studies 4 and 9 use the acids (acetic, butyric, formic, propionic, isobutyric,
+  isovaleric, (S)-lactic), the others the bases. `compounds.EQUIVALENT` joins them.
+- **Units.** mGrowthDB serves nearly every concentration in mM already (`techniqueUnits`). Study 19 records
+  a metabolite in "AUC", which is refused as not a concentration.
+- **Two spellings of Wilkins-Chalgren** ("... Broth (WC)" and "... Broth") are one medium key.
+- **Study 10** labels experiments "Roseburia intestinalis" and "Lachnospiraceae bacterium 7_1_58FAA" with the
+  same strain, and holds F. duncaniae in Db-MM: for Karoline's mGrowthDB list.
+- **Zeros as missing values** in study 9 (B. fragilis formate): see open decision 3 in METHOD_NOTES.
+
+## Conventions kept from grow**net**
+
+- A number never computed is missing, never 0 (JSON null, left out of GraphML and the Cytoscape payload,
+  NA in the matrices).
+- CyREST: styles and layouts are applied with GET; an existing style is updated in place; columns an arc may
+  lack are declared after the network is posted.
+- The name in running text is styled (`brand.in_prose`); in the READMEs it is written food**net**.
+- R: miaSim is suggested, never imported; the listener is base R sockets; `make rd` writes the help pages
+  from the `#'` comments (no roxygen2 needed); `make r-check` runs `R CMD check`.
+- The R package listens on 8794, grow**net**'s on 8793, so both can run in one R session.

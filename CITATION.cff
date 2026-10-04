@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+title: foodnet
+message: "If you use foodnet, please cite it using the metadata below."
+type: software
+authors:
+  - name: "KU Leuven, Laboratory of Molecular Bacteriology"
+abstract: >-
+  foodnet builds bipartite taxon and metabolite networks (which taxon produces and which consumes which
+  compound, per growth phase) from mGrowthDB batch monocultures, and the parameters of a consumer-resource
+  model.
+repository-code: "https://github.com/hallucigenia-sparsa/foodnet"
+url: "https://github.com/hallucigenia-sparsa/foodnet"
+license: Apache-2.0
+version: 0.1.0
+date-released: "2026-10-04"
+keywords:
+  - metabolites
+  - cross-feeding
+  - consumer-resource model
+  - mGrowthDB
+  - metabolic modeling
+  - open science
