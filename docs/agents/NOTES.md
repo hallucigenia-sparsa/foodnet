@@ -8,10 +8,9 @@ gate applies.
 ## Current state
 
 - 2026-10-04: 0.1.0 built in one session by Karoline's agent from Karoline's specification (her decisions
-  are in [docs/METHOD_NOTES.md](../METHOD_NOTES.md), in her words). Not released, not yet on GitHub: the
-  repository address `hallucigenia-sparsa/foodnet` is provisional and lives in one place,
-  `brand.REPOSITORY_SLUG` (plus the URLs in pyproject.toml, CITATION.cff, CONTRIBUTING.md,
-  packaging/windows/README.txt, r/DESCRIPTION and the READMEs).
+  are in [docs/METHOD_NOTES.md](../METHOD_NOTES.md), in her words). Public repository
+  hallucigenia-sparsa/foodnet created the same day (Karoline's choice of public); CI passed on every job.
+  Not released: PyPI trusted publishing and the `pypi` environment are still to set up (RELEASING.md).
 - The structure is grow**net** 0.2.0's (crossfeed-bio/crossfeed), copied and adapted: the mGrowthDB client,
   the parallel prefetch, the species list, selection, rates, stats, the page frame, the Cytoscape transport,
   the R transport, the gate and the packaging. The derivation, the model, the matrices, the page content,
