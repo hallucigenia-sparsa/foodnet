@@ -71,3 +71,9 @@ def test_the_caption_wraps_inside_the_image():
     from foodnet import figure as f
     lines = f._wrap("one two three four five six seven", 60, 11)
     assert len(lines) > 1 and all(f._text_width(x, 11) <= 60 or " " not in x for x in lines)
+
+
+def test_second_window_columns_carry_a_star_that_the_caption_explains(client):
+    texts = _texts(figure.matrices_svg(run(client, second_window_metabolites="glucose")))
+    assert "glucose *" in texts and "acetate" in texts          # no suffix on the columns of the phase
+    assert any("(* 0 h to the last sample)" in t for t in texts)

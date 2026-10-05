@@ -81,17 +81,34 @@ def matrices_svg(result: dict) -> str:
     vmax = max(values, default=0) or 1.0
     names = pair["taxa"]
     label_w = max((_text_width(n, 12) for n in names), default=60) + 12
-    col_label_h = max((_text_width(c, 11) for c in pair["columns"]), default=40) * 0.72 + 24
+    # short column labels: the metabolite, its phase only when the image holds several phases, and a star
+    # for the second time window, which the caption explains; the CSV files keep the full labels
+    second = set((result.get("second_window") or {}).get("metabolites") or ())
+    shown_phases = {ph for m, ph, _ in cols if m.id not in second}
+    short = []
+    for (m, ph, _), full in zip(cols, pair["columns"], strict=True):
+        base = full.split(" (")[0] if " (" in full and not full.startswith("(") else full
+        if m.id in second:
+            short.append(f"{base} *")
+        elif len(shown_phases) > 1:
+            short.append(f"{base} ({ph})")
+        else:
+            short.append(base)
+    col_label_h = max((_text_width(c, 11) for c in short), default=40) * 0.72 + 24
+    # the slanted labels lean right beyond the last column
+    right = max((_text_width(c, 11) * 0.77 - (len(cols) - 1 - j) * CELL_W for j, c in enumerate(short)),
+                default=0)
+    right = max(20, right)
     panel_w = len(cols) * CELL_W
     grid_h = len(taxa) * CELL_H
     # side by side, as in the figure, while that stays readable; one above the other when it would not
     stacked = label_w + 2 * panel_w + GAP > MAX_SIDE_BY_SIDE
     block_h = 34 + col_label_h + grid_h
     if stacked:
-        width = label_w + panel_w + 20
+        width = label_w + panel_w + right
         origins = [(label_w, 0), (label_w, block_h + 18)]
     else:
-        width = label_w + 2 * panel_w + GAP + 20
+        width = label_w + 2 * panel_w + GAP + right
         origins = [(label_w, 0), (label_w + panel_w + GAP, 0)]
     out = []
     unit = "" if booleans else " (mM)"
@@ -105,7 +122,7 @@ def matrices_svg(result: dict) -> str:
                            f'fill="{brand.INK}">{_taxon_label(name)}</text>')
         out.append(f'<text x="{x0:.0f}" y="{y0 + 20:.0f}" font-size="14" font-weight="600" fill="{brand.INK}">'
                    f'{direction.capitalize()}{unit}</text>')
-        for j, label in enumerate(pair["columns"]):
+        for j, label in enumerate(short):
             cx = x0 + j * CELL_W + CELL_W / 2
             out.append(f'<text transform="translate({cx:.1f},{top - 6:.1f}) rotate(-40)" font-size="11" '
                        f'fill="{brand.INK}">{html.escape(label)}</text>')
@@ -150,23 +167,23 @@ def matrices_svg(result: dict) -> str:
              ("#ffffff", "circle", "seen only in another medium")]
     x = label_w
     for fill, mark, text in items:
+        item_w = 22 + _text_width(text, 11) + 22
+        if x > label_w and x + item_w > width:
+            x, ky = label_w, ky + 20
         out.append(f'<rect x="{x:.0f}" y="{ky - 10}" width="16" height="12" fill="{fill}" stroke="{brand.LINE}"/>')
         if mark:
             out.append(f'<circle cx="{x + 8:.0f}" cy="{ky - 4}" r="3.6" fill="none" stroke="{brand.MUTED}" '
                        'stroke-width="1.2"/>')
         out.append(f'<text x="{x + 22:.0f}" y="{ky}" font-size="11" fill="{brand.MUTED}">{html.escape(text)}</text>')
-        x += 22 + _text_width(text, 11) + 22
-        if x > width - 160:
-            x, ky = label_w, ky + 20
+        x += item_w
     phase = net.meta.get("phase")
     window = net.meta.get("window")
     what = (f"window {window[0]:g} to {window[1]:g} h" if window else
             {"both": "both growth phases", "exponential": "exponential phase",
              "stationary": "stationary phase"}.get(phase, phase or ""))
-    second = result.get("second_window") or {}
-    if second.get("metabolites"):
-        named = ", ".join(n.name for n in result.get("metabolite_nodes", []) if n.id in second["metabolites"])
-        what += f" ({named}: {second['label']})"
+    second_info = result.get("second_window") or {}
+    if second_info.get("metabolites"):
+        what += f" (* {second_info['label']})"
     caption = (f"Net change over the {what}, mean over replicates. foodnet {net.meta.get('tool_version', '')}, "
                f"{net.meta.get('derived_on', '')}; mGrowthDB studies {', '.join(sorted(net.studies))}.")
     for line in _wrap(caption, width - label_w - 10, 11):
