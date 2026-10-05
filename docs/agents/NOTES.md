@@ -56,7 +56,9 @@ gate applies.
 - **Two spellings of Wilkins-Chalgren** ("... Broth (WC)" and "... Broth") are one medium key.
 - **Study 10** labels experiments "Roseburia intestinalis" and "Lachnospiraceae bacterium 7_1_58FAA" with the
   same strain, and holds F. duncaniae in Db-MM: for Karoline's mGrowthDB list.
-- **Zeros as missing values** in study 9 (B. fragilis formate): see open decision 3 in METHOD_NOTES.
+- **Zeros that look like missing values** in study 9 (B. fragilis and E. coli, one whole metabolite panel
+  at one time point each, plus B. fragilis formate at 4 h) are used as served: Karoline decided against
+  treating them as missing (METHOD_NOTES decision 15). Do not add a filter.
 
 ## Conventions kept from grow**net**
 

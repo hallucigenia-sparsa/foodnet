@@ -80,7 +80,10 @@ with metabolite data."
     metabolite or the name its study recorded it under. Columns, the image, the README and the report say
     which interval each value covers. With 0 to 48 h and trehalose to the end, every trehalose value of
     Figure 3c is reproduced.
-15. **Studies are found through the species list**, not mGrowthDB's search, which matches per-strain
+15. **Values are used as mGrowthDB serves them, zeros included.** Karoline, 2026-10-05, on the isolated
+    zeros in study SMGDB00000009 (B. fragilis formate at 4 h and 48 h): there is no reason to treat a zero
+    as a missing value. Formerly open decision 3.
+16. **Studies are found through the species list**, not mGrowthDB's search, which matches per-strain
     measurements only and so misses a monoculture measured at the culture level (study SMGDB00000009).
 
 ## Open decisions
@@ -88,10 +91,6 @@ with metabolite data."
 1. **The 90% boundary** (decision 2): the share, and linear against log scale.
 2. **"Both" for the CRM**: the exponential phase is used. Alternatives: the stationary phase, or both
    phases as separate parameter sets.
-3. **Zeros that look like missing values.** In study SMGDB00000009, B. fragilis formate reads 0.0 at 4 h in
-   one replicate and at 48 h in another, between values near 10 mM. Read as measurements, the 48 h one
-   turns a production of about 2 mM into a mean change near zero. food**net** uses the values as recorded;
-   whether to treat an isolated zero as missing is open, and probably a question for mGrowthDB.
-4. **Single replicates** are shown, flagged. Whether to hide them by default, as grow**net** once did.
-5. **The growth-rate fallback** takes any monoculture of the taxon in the value medium. Whether it should
+3. **Single replicates** are shown, flagged. Whether to hide them by default, as grow**net** once did.
+4. **The growth-rate fallback** takes any monoculture of the taxon in the value medium. Whether it should
    also require the same study.
