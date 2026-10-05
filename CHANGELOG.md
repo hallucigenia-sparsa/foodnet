@@ -22,7 +22,10 @@ semantic versioning.
 - The local page, the command line, the Windows program, and grownet's guardrail gate and release checks.
 - The consumed and produced matrices as an image (SVG), shown first among the results and downloadable.
 - The length of the exponential phase per arc, in the result table and every output.
-- A filled second box limits the search to the data matching it; the advanced option "Include supporting
-  evidence outside the second box" adds the rest as presence. An empty box considers all data.
+- A filled second box limits the search: study or experiment ids set the scope, a medium name the value
+  medium, and with ids alone the majority medium within them gives the values and their other media
+  presence. The advanced option "Include supporting evidence outside the second box" adds the rest as
+  presence. An empty box considers all data.
+- Strains are named by their current name in mGrowthDB, as in grownet.
 - A second box that matches none of the taxa's monocultures says so and lists the media they were grown in.
 - No metabolite is left out by default; "Leave out these metabolites" is an advanced setting.

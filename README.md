@@ -65,9 +65,10 @@ the downloads above them.
    24 h is used, and flagged.
 4. **Values from one medium, presence from the others.** With the second box empty, all data are
    considered: the values come from the medium that holds data for the most taxa, and every other medium
-   only says whether a compound was produced or consumed (`presence_only` arcs, NA matrix cells). With the
-   second box filled (media, study or experiment ids), only the data matching it are used; "Include
-   supporting evidence outside the second box" adds the rest as presence. "Ignore media differences" pools
+   only says whether a compound was produced or consumed (`presence_only` arcs, NA matrix cells). In the
+   second box, study or experiment ids limit the data to them, and a medium name chooses the value medium;
+   with ids and no medium, the majority rule runs within the ids. "Include supporting evidence outside the
+   second box" adds the rest as presence. "Ignore media differences" pools
    every medium; "Report everything as booleans" drops the amounts.
 5. **Pooling, with what does not agree reported.** Studies in the value medium are pooled. Experiments
    that disagree on what happened make a `conflict`, named in the report. The same experiment deposited

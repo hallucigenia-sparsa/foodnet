@@ -239,3 +239,32 @@ def test_study_ids_with_outside_evidence_read_the_other_studies_too(client):
     r = run(client, conditions="SMGDB00000002", outside_evidence=True)
     assert set(r["studies"]) == {"SMGDB00000001", "SMGDB00000002"}
     assert (A, GLC, "exponential") in r["presence"]
+
+
+def test_ids_set_the_scope_and_the_majority_rule_runs_inside_it(client):
+    # Karoline, 2026-10-05, reproducing Figure 3c from four study ids: the ids say which data, and within them
+    # the majority medium gives the values while the other media give presence, as in the figure
+    r = run(client, conditions="SMGDB00000001\nSMGDB00000002")
+    assert r["value_rule"]["rule"] == "majority_in_scope"
+    assert r["value_rule"]["keys"] == ["wilkins chalgren anaerobe broth"]
+    assert r["cells"][(A, AC, "exponential")]["mean"] == pytest.approx(4.0)
+    assert "produced" in r["presence"][(B, FOR, "exponential")]          # mMCB, inside the scope: presence
+
+
+def test_a_medium_name_chooses_the_value_medium_inside_the_ids(client):
+    # the four studies and "Wilkins-Chalgren": values from WC only, the studies' other media as presence
+    r = run(client, conditions="SMGDB00000001\nSMGDB00000002\nmMCB")
+    assert r["value_rule"]["rule"] == "selected" and r["value_rule"]["media"] == ["mMCB"]
+    assert r["cells"][(C, GLC, "exponential")]["mean"] == pytest.approx(-5.0)
+    assert "consumed" in r["presence"][(A, GLC, "exponential")]
+
+
+def test_a_strain_is_shown_by_its_current_name():
+    # the species list says taxon 2's current name is another than the one its studies record
+    from foodnet.search import run_query
+    from foodnet.taxonomy import SpeciesIndex
+    index = SpeciesIndex({"alpha alpha": {1: "Alpha alpha A1"}, "beta beta": {2: "Beta beta B1"}},
+                         current={2: "Betanova beta B1"}, studies=["SMGDB00000001", "SMGDB00000002"],
+                         where={1: {"SMGDB00000001"}, 2: {"SMGDB00000001", "SMGDB00000002"}})
+    r = run_query(FakeClient(), ["Alpha alpha", "Beta beta"], {}, index)
+    assert {n.name for n in r["taxa_nodes"]} == {"Alpha alpha A1", "Betanova beta B1"}

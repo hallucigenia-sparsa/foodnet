@@ -69,8 +69,10 @@ with metabolite data."
     results also included studies that were not in my list": "by default, when something is entered in the
     2nd field, only data matching what was entered are shown (I think this comes closer to what users want),
     but in advanced settings, we can switch on showing supporting evidence from other studies. By default,
-    when the 2nd field is left empty, always all data are considered as discussed." This holds for media,
-    studies and experiments alike; the growth-rate fallback stays inside the limit too.
+    when the 2nd field is left empty, always all data are considered as discussed." The growth-rate fallback
+    stays inside the limit too. Refined the same day, when four study ids pooled mMCB into the Wilkins-Chalgren
+    values while reproducing Figure 3c: ids set the scope (which data), a medium name the value medium within
+    it, and with ids alone the majority rule runs inside the scope, its other media giving presence.
 14. **Studies are found through the species list**, not mGrowthDB's search, which matches per-strain
     measurements only and so misses a monoculture measured at the culture level (study SMGDB00000009).
 

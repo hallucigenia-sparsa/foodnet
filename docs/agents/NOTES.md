@@ -32,7 +32,9 @@ gate applies.
 - 2026-10-05 (Karoline): a filled second box is a limit (only matching data, media and ids alike); the
   advanced option `outside_evidence` adds presence from everything else; an empty box considers all data.
   `search.run_query` reads every study of the taxa only when the box holds a medium (it cannot know the
-  matching studies before reading), and only the named studies when it holds ids alone.
+  matching studies before reading), and only the named studies when it holds ids alone. Refined the same
+  day: ids are the scope, a medium name the value medium inside it, and with ids alone the majority rule
+  runs inside the scope (rule `majority_in_scope`); this reproduces Figure 3c from studies 2, 4, 7 and 9.
 
 ## Things learned about mGrowthDB while building
 

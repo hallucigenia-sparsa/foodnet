@@ -35,9 +35,10 @@ SETTINGS = {
     "merge_arcs": "One arc per taxon, metabolite, phase and direction across studies, instead of one per study.",
     "min_studies": "Keep only arcs resting on at least this many studies (needs merged arcs above 1).",
     "merge_genera": "One node per genus; a value is the median of its taxa's values.",
-    "conditions": "The second box. Filled: only data matching it are used (a medium as text, a study or "
-                  "experiment by id), and they give the values. Empty: all data, with values from the medium that "
-                  "holds data for the most taxa and presence from the others.",
+    "conditions": "The second box. Study or experiment ids limit the data to them; a medium name chooses the "
+                  "value medium (and, alone, limits the data to it). With ids and no medium, the ids' majority "
+                  "medium gives the values and their other media presence. Empty: all data, values from the "
+                  "medium that holds data for the most taxa, presence from the others.",
     "outside_evidence": "With the second box filled, also take presence-only evidence from every other medium and "
                         "study holding the taxa; the values still come from the second box.",
     "exclude_studies": "Study ids never read.",
@@ -139,7 +140,10 @@ warns about it above the result.</p>
 <p>Values come from one medium: the one that holds data for the most taxa, or the media, experiments or studies
 named in the second box. With the second box empty, every other medium only says whether a compound was produced
 or consumed: those arcs are presence_only (dashed) and their cells NA in the value matrices. With the second box
-filled, only the data matching it are used, unless Include supporting evidence outside the second box is on.
+filled, study or experiment ids limit the data to them and a medium name chooses the value medium; with ids
+and no medium name, the medium holding most taxa within the ids gives the values and their other media
+presence, which is how Figure 3c of the community control paper was made. Include supporting evidence outside
+the second box adds presence from the rest.
 Ignore media differences pools every medium.
 Studies in the value medium are pooled; when their experiments disagree on what happened, the value carries the
 caution conflict and the report names the experiments. The same experiment deposited under two studies is counted

@@ -54,8 +54,10 @@ def report_text(result: dict) -> str:
     lines += ["", "Settings:"] + [f"  {k}: {_value(v)}" for k, v in sorted(s.items())]
     lines += ["", f"Studies read: {', '.join(result['studies']) or 'none'}",
               f"Replicates with metabolite data: {result['cultures']}, of which {result['value_cultures']} give values"]
-    if rule["rule"] == "majority":
-        lines.append("Values from the medium holding data for the most taxa: " + " / ".join(rule["media"] or ["none"]))
+    if rule["rule"] in ("majority", "majority_in_scope"):
+        where = " in the studies or experiments of the second box" if rule["rule"] == "majority_in_scope" else ""
+        lines.append(f"Values from the medium holding data for the most taxa{where}: "
+                     + " / ".join(rule["media"] or ["none"]))
     elif rule["rule"] == "selected":
         lines.append("Values from the second box: " + ", ".join(rule["media"] or ["nothing matched"]))
     else:

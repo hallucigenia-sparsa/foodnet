@@ -211,9 +211,10 @@ consumption are derived from mGrowthDB batch monocultures on this machine; nothi
 <label class="field" for="conditions">Media, experiments or studies for the values (optional)</label>
 <p class="examples">For example: {" &middot; ".join(_esc(x) for x in selecting.EXAMPLES)}</p>
 <textarea id="conditions" name="conditions" rows="5">{_esc(conditions)}</textarea>
-<p class="hint">One per line. Empty: all data are considered, with values from the medium holding data for the
-most taxa. Filled: only the data matching it are used, a medium matched as text ("wilkins" finds every
-spelling), a study or experiment by its id. Advanced settings can add evidence from outside it.</p>
+<p class="hint">One per line. Empty: all data, values from the medium holding data for the most taxa. Study or
+experiment ids limit the data to them; a medium (matched as text, "wilkins" finds every spelling) gives the
+values, and without one the ids' majority medium does, their other media giving presence. Advanced settings
+can add evidence from outside the box.</p>
 </div>
 </div>
 {_phase_choice(settings)}
@@ -402,6 +403,9 @@ def _value_note(result: dict) -> str:
             return f"Values from the second box: {_esc(media)}. Other media and studies give presence only."
         return f"Only data matching the second box: {_esc(media)}."
     n = rule["taxa_per_medium"].get(rule["keys"][0], 0) if rule["keys"] else 0
+    if rule["rule"] == "majority_in_scope":
+        return (f"Values from {_esc(media)}, the medium holding data for the most taxa ({n}) in the studies or "
+                "experiments of the second box. Their other media give presence only.")
     return (f"Values from {_esc(media)}, the medium holding data for the most taxa ({n}). Other media give "
             "presence only.")
 

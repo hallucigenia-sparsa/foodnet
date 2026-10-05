@@ -134,10 +134,20 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     read = read_cultures(client, studies, keep, excluded_metabolites, s["include_non_batch"], progress=say)
     cultures, skipped = read["cultures"], list(read["skipped"])
     grown_in = sorted({c.medium or "unnamed medium" for c in cultures})   # for the "nothing matched" note
+    # Two questions, kept apart (Karoline, 2026-10-05, reproducing Figure 3c from four study ids and
+    # Wilkins-Chalgren): ids set the SCOPE, the data looked at; a medium name chooses the VALUE MEDIUM
+    # within it. Without a medium name the majority rule runs inside the scope, so the scope's other media
+    # give presence, as in the figure. A medium name alone is a scope as well.
+    ids = {"studies": selection["studies"], "experiments": selection["experiments"], "media": []}
+    media = {"studies": [], "experiments": [], "media": selection["media"]}
+    scope = ids if not selecting.empty(ids) else media
+
+    def record(c):
+        return read["experiments"].get(c.experiment, {"id": c.experiment, "studyId": c.study})
+
     if limited:
         def named(c):
-            return selecting.matches(read["experiments"].get(c.experiment, {"id": c.experiment, "studyId": c.study}),
-                                     selection)
+            return selecting.matches(record(c), scope)
         left = [c for c in cultures if not named(c)]
         if left:
             skipped.append(("experiments outside the second box", ", ".join(sorted({c.experiment for c in left}))
@@ -156,8 +166,14 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     skipped += skips
     dropped, duplicate_lines = d.duplicates(cultures)
     rows = [r for r in rows if (cultures[r["culture"]].experiment, r["metabolite"]) not in dropped]
-    rule = d.value_set(cultures, read["experiments"], selection if not all_studies or s["conditions"] else None,
-                       s["ignore_media"])
+    # the value medium is chosen among the cultures inside the scope; with outside evidence on, the cultures
+    # outside it stay in the list and give presence only
+    inside = [i for i, c in enumerate(cultures) if selecting.empty(selection) or selecting.matches(record(c), scope)]
+    rule = d.value_set([cultures[i] for i in inside], read["experiments"],
+                       media if selection["media"] else None, s["ignore_media"])
+    rule["chosen"] = [inside[i] for i in rule["chosen"]]
+    if not selecting.empty(selection) and not selection["media"] and rule["rule"] == "majority":
+        rule["rule"] = "majority_in_scope"
     chosen = set(rule["chosen"])
     value_rows = [r for r in rows if r["culture"] in chosen]
     other_rows = [r for r in rows if r["culture"] not in chosen]
@@ -179,6 +195,13 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                 pooled = value_cells.get(key) or {}
                 cell["q_value"] = pooled.get("q_value") if pooled.get("studies") == [sid] else None
 
+    # a strain is shown by its current name, the one its most recent study uses (grownet #24): study
+    # SMGDB00000004 still calls taxon 411483 Faecalibacterium prausnitzii A2-165
+    for c in cultures + read["growth_only"]:
+        if c.taxon.get("identity") == "ncbi" and str(c.taxon.get("taxon_id", "")).isdigit():
+            name = current.get(int(c.taxon["taxon_id"]))
+            if name and name != c.taxon["name"]:
+                c.taxon = {**c.taxon, "name": name, "species": genus_species(name)}
     taxa = {c.taxon["id"]: c.taxon for c in cultures}
     metabolites = {}
     for c in cultures:

@@ -261,6 +261,10 @@ def readme(result: dict, which: str = "matrices") -> str:
     elif rule["rule"] == "selected":
         lines.append("Media: values come from the media, experiments or studies named in the second box: "
                      + ", ".join(rule["media"]) + ". Every other medium gives presence only.")
+    elif rule["rule"] == "majority_in_scope":
+        lines.append("Media: values come from the medium that holds data for the most taxa in the studies or "
+                     "experiments named in the second box, " + " / ".join(rule["media"])
+                     + ". Their other media give presence only.")
     else:
         lines.append("Media: values come from the medium that holds data for the most taxa, "
                      + " / ".join(rule["media"]) + ". Every other medium gives presence only.")
