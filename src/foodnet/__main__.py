@@ -46,8 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--taxa", nargs="+", default=[], help="species, strains, genera or NCBI taxon ids")
     d.add_argument("--all", dest="all_studies", action="store_true",
                    help="every batch monoculture with metabolites in mGrowthDB (the page's All)")
-    d.add_argument("--conditions", default="", help="media, experiments or studies that give the values "
-                   "(comma separated); empty: the medium holding data for the most taxa")
+    d.add_argument("--conditions", default="", help="media, experiments or studies to limit the search to "
+                   "(comma separated); empty: all data, values from the medium holding data for the most taxa")
     d.add_argument("--phase", choices=list(PHASE_LABELS), default=DEFAULTS["phase"])
     d.add_argument("--window", nargs=2, type=float, metavar=("START", "END"),
                    help="a time window in hours that replaces the phases")
@@ -56,6 +56,8 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--no-growth-factor", type=float, default=DEFAULTS["no_growth_factor"])
     d.add_argument("--detection-limit", type=float, default=DEFAULTS["detection_limit"], help="mM (default 0.2)")
     d.add_argument("--ignore-media", action="store_true", help="values from every medium, pooled")
+    d.add_argument("--outside-evidence", action="store_true",
+                   help="with --conditions, also take presence-only evidence from everything outside it")
     d.add_argument("--booleans", action="store_true", help="report 1, 0 or NA instead of amounts")
     d.add_argument("--report-rates", action="store_true", help="collect growth rates")
     d.add_argument("--crm-mode", action="store_true", help="what a consumer-resource model needs (growth rates on)")
@@ -97,6 +99,7 @@ def settings_from(a) -> dict:
     s = dict(DEFAULTS)
     s.update(phase=a.phase, fraction=a.fraction, no_growth_factor=a.no_growth_factor,
              detection_limit=a.detection_limit, ignore_media=a.ignore_media, booleans=a.booleans,
+             outside_evidence=a.outside_evidence,
              report_rates=a.report_rates or a.crm_mode, rate_method=a.rate_method, rate_window=a.rate_window,
              merge_arcs=a.merge_arcs, min_studies=a.min_studies, merge_genera=a.merge_genera,
              conditions="\n".join(x.strip() for x in a.conditions.split(",") if x.strip()),

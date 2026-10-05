@@ -22,7 +22,7 @@ def test_the_form_has_two_boxes_and_the_phase_choice_with_exponential_first():
     radios = [part.split('"')[0] for part in page.split('name="phase" value="')[1:]]
     assert radios == ["exponential", "stationary", "both"]
     assert 'value="exponential" checked' in page
-    assert page.index('name="conditions"') < page.index('name="phase"') < page.index("Advanced settings")
+    assert page.index('name="conditions"') < page.index('name="phase"') < page.index("<summary>Advanced settings")
 
 
 def test_the_advanced_settings_hold_the_window_the_limit_and_the_media_options():

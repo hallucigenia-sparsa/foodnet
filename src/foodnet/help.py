@@ -35,9 +35,11 @@ SETTINGS = {
     "merge_arcs": "One arc per taxon, metabolite, phase and direction across studies, instead of one per study.",
     "min_studies": "Keep only arcs resting on at least this many studies (needs merged arcs above 1).",
     "merge_genera": "One node per genus; a value is the median of its taxa's values.",
-    "conditions": "The second box. A medium gives the values, other media give presence; a study or experiment "
-                  "id limits the search to it, so nothing else is read. Empty: values from the medium that holds "
-                  "data for the most taxa.",
+    "conditions": "The second box. Filled: only data matching it are used (a medium as text, a study or "
+                  "experiment by id), and they give the values. Empty: all data, with values from the medium that "
+                  "holds data for the most taxa and presence from the others.",
+    "outside_evidence": "With the second box filled, also take presence-only evidence from every other medium and "
+                        "study holding the taxa; the values still come from the second box.",
     "exclude_studies": "Study ids never read.",
     "exclude_metabolites": "Metabolites left out by name, comma separated.",
     "include_non_batch": "Command line only: also read chemostat and serial dilution monocultures. Their changes "
@@ -135,10 +137,10 @@ count when the replicate has one, else the culture's own (cell counts before opt
 warns about it above the result.</p>
 <h2 id="values">Values, media and presence</h2>
 <p>Values come from one medium: the one that holds data for the most taxa, or the media, experiments or studies
-named in the second box. Every other medium only says whether a compound was produced or consumed: those arcs are
-presence_only (dashed) and their cells NA in the value matrices. Ignore media differences pools every medium.
-A study or experiment id in the second box is a limit: only those studies or experiments are read, and they
-give the values.
+named in the second box. With the second box empty, every other medium only says whether a compound was produced
+or consumed: those arcs are presence_only (dashed) and their cells NA in the value matrices. With the second box
+filled, only the data matching it are used, unless Include supporting evidence outside the second box is on.
+Ignore media differences pools every medium.
 Studies in the value medium are pooled; when their experiments disagree on what happened, the value carries the
 caution conflict and the report names the experiments. The same experiment deposited under two studies is counted
 once.</p>

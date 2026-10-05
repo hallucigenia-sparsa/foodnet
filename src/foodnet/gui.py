@@ -114,6 +114,12 @@ def _settings_block(settings: dict) -> str:
   <span class="muted">values from every medium, pooled. Off by default: values come from the medium that holds data
   for the most taxa (or the media in the second box), and other media only say whether a compound was produced
   or consumed</span></div>
+<div class="row"><label><input type="checkbox" name="outside_evidence" value="1"{_checked(s['outside_evidence'])}>
+  Include supporting evidence outside the second box</label>
+  <span class="muted">off by default: what is entered in the second box limits the search to the data matching it.
+  On, every other medium and study holding these taxa adds presence-only evidence (dashed arcs, NA in the
+  value matrices); the values still come from the second box. Without anything in the second box, all data
+  are considered anyway</span></div>
 <div class="row"><label><input type="checkbox" name="booleans" value="1"{_checked(s['booleans'])}>
   Report everything as booleans</label>
   <span class="muted">1 when a taxon produced or consumed a compound (in any medium), 0 when it was measured and
@@ -205,9 +211,9 @@ consumption are derived from mGrowthDB batch monocultures on this machine; nothi
 <label class="field" for="conditions">Media, experiments or studies for the values (optional)</label>
 <p class="examples">For example: {" &middot; ".join(_esc(x) for x in selecting.EXAMPLES)}</p>
 <textarea id="conditions" name="conditions" rows="5">{_esc(conditions)}</textarea>
-<p class="hint">One per line. Empty: values come from the medium holding data for the most taxa. A medium
-(matched as text, so "wilkins" finds every spelling) gives the values, and other media still say whether a
-compound was produced or consumed. A study or experiment id limits the search to it: nothing else is read.</p>
+<p class="hint">One per line. Empty: all data are considered, with values from the medium holding data for the
+most taxa. Filled: only the data matching it are used, a medium matched as text ("wilkins" finds every
+spelling), a study or experiment by its id. Advanced settings can add evidence from outside it.</p>
 </div>
 </div>
 {_phase_choice(settings)}
@@ -371,6 +377,9 @@ def _empty_reason(result: dict) -> str:
         return "None of the entries could be used; each one says why above."
     if not result["studies"]:
         return "mGrowthDB holds these strains, but no study grows them."
+    if result["settings"].get("conditions") and not result["value_cultures"]:
+        return ("Nothing these taxa were grown in matches the second box (the note above lists what they were "
+                "grown in). Change or empty it, or switch on Include supporting evidence outside the second box.")
     if not result["cultures"]:
         return ("The studies holding these taxa have no batch monoculture of them with metabolite data. "
                 + EMPTY_HELP)
@@ -389,7 +398,9 @@ def _value_note(result: dict) -> str:
     if rule["rule"] == "selected":
         if not rule["media"]:
             return "Values: none, since nothing in the second box matched (see the note below)."
-        return f"Values from the second box: {_esc(media)}. Other media give presence only."
+        if result["settings"].get("outside_evidence"):
+            return f"Values from the second box: {_esc(media)}. Other media and studies give presence only."
+        return f"Only data matching the second box: {_esc(media)}."
     n = rule["taxa_per_medium"].get(rule["keys"][0], 0) if rule["keys"] else 0
     return (f"Values from {_esc(media)}, the medium holding data for the most taxa ({n}). Other media give "
             "presence only.")
@@ -495,7 +506,7 @@ def parse_settings(form: dict) -> dict:
         s["rate_method"] = form["rate_method"][0]
     if form.get("correction", [""])[0] in ("bh", "by"):
         s["correction"] = form["correction"][0]
-    for key in ("ignore_media", "booleans", "report_rates", "merge_arcs", "merge_genera"):
+    for key in ("ignore_media", "booleans", "report_rates", "merge_arcs", "merge_genera", "outside_evidence"):
         s[key] = bool(form.get(key))
     for key in ("conditions", "exclude_studies", "exclude_metabolites"):
         s[key] = form.get(key, [""])[0].strip()

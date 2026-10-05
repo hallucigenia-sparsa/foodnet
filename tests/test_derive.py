@@ -67,12 +67,28 @@ def test_other_media_give_presence_only(client):
     assert arcs[(C, GLC, "consumed")].evidence == "presence_only"
 
 
-def test_the_second_box_chooses_the_value_medium(client):
+def test_a_filled_second_box_uses_only_the_data_matching_it(client):
+    # Karoline, 2026-10-05: "by default, when something is entered in the 2nd field, only data matching what
+    # was entered are shown"
     r = run(client, conditions="mMCB")
     assert r["value_rule"]["rule"] == "selected"
     assert r["cells"][(C, GLC, "exponential")]["mean"] == pytest.approx(-5.0)
-    # now WC gives presence only: A's glucose uptake is a presence arc
+    assert r["presence"] == {} and (A, GLC, "exponential") not in r["cells"]
+    assert {s for e in r["network"].edges for s in e.study_ids} == {"SMGDB00000002"}
+
+
+def test_outside_evidence_is_an_advanced_option(client):
+    # "... but in advanced settings, we can switch on showing supporting evidence from other studies"
+    r = run(client, conditions="mMCB", outside_evidence=True)
+    assert r["cells"][(C, GLC, "exponential")]["mean"] == pytest.approx(-5.0)
+    # WC gives presence only: A's glucose uptake is a presence arc
     assert r["presence"][(A, GLC, "exponential")]["consumed"][0]["medium"].startswith("Wilkins")
+
+
+def test_an_empty_second_box_considers_all_data(client):
+    # "By default, when the 2nd field is left empty, always all data are considered"
+    r = run(client)
+    assert set(r["studies"]) == {"SMGDB00000001", "SMGDB00000002"} and r["presence"]
 
 
 def test_ignoring_media_pools_every_medium(client):
@@ -197,7 +213,7 @@ def test_the_length_of_the_exponential_phase_reaches_the_arcs(client):
 
 def test_a_second_box_that_matches_nothing_says_so_and_names_the_media(client):
     r = run(client, conditions="Db-MM")
-    assert r["value_rule"]["rule"] == "selected" and r["value_cultures"] == 0
+    assert r["value_cultures"] == 0 and r["network"].edges == []
     warning = next(w for w in r["warnings"] if "Nothing in the second box" in w)
     assert "Wilkins-Chalgren Anaerobe Broth (WC)" in warning and "mMCB" in warning
 
@@ -219,7 +235,7 @@ def test_an_experiment_id_limits_the_search_to_that_experiment(client):
     assert any("limits the search" in reason for _, reason in r["skipped"])
 
 
-def test_a_medium_name_still_takes_presence_from_other_media(client):
-    r = run(client, conditions="mMCB")
+def test_study_ids_with_outside_evidence_read_the_other_studies_too(client):
+    r = run(client, conditions="SMGDB00000002", outside_evidence=True)
     assert set(r["studies"]) == {"SMGDB00000001", "SMGDB00000002"}
     assert (A, GLC, "exponential") in r["presence"]

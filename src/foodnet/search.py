@@ -29,6 +29,9 @@ DEFAULTS = {
     "report_rates": False, "rate_method": rates.DEFAULT_METHOD, "rate_window": rates.DEFAULT_WINDOW,
     "merge_arcs": False, "min_studies": 1, "merge_genera": False,
     "conditions": "", "exclude_studies": "",
+    # off: a filled second box limits the search to what matches it; on: everything else the taxa were grown
+    # in adds presence-only evidence (Karoline, 2026-10-05)
+    "outside_evidence": False,
     # nothing is left out by default: a metabolite with a known measurement problem is handled in mGrowthDB
     # (Karoline, 2026-10-04: "we don't want to skip any metabolites by default")
     "exclude_metabolites": "",
@@ -100,12 +103,13 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                 errors.append(f"search failed: {e}")
                 found = []
         studies = list(dict.fromkeys(studies + list(found)))
-    # Study and experiment ids in the second box are a limit, not only a choice of values: nothing outside
-    # them is read, not even as presence (Karoline, 2026-10-05: "when I gave a list of studies, the results
-    # also included studies that were not in my list. This is not desired behavior"). A medium name stays a
-    # choice of values, with the other media giving presence.
-    limited = bool(selection["studies"] or selection["experiments"])
-    if limited:
+    # What is entered in the second box is a limit: only data matching it are used (Karoline, 2026-10-05,
+    # after "when I gave a list of studies, the results also included studies that were not in my list":
+    # "by default, when something is entered in the 2nd field, only data matching what was entered are
+    # shown ... but in advanced settings, we can switch on showing supporting evidence from other studies").
+    # With the box empty, all data are considered. With ids only, only their studies need to be read.
+    limited = not selecting.empty(selection) and not s["outside_evidence"]
+    if limited and not selection["media"]:
         listed = set(selection["studies"])
         for eid in selection["experiments"]:
             try:
@@ -129,13 +133,16 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     excluded_metabolites = [m.strip() for m in s["exclude_metabolites"].split(",") if m.strip()]
     read = read_cultures(client, studies, keep, excluded_metabolites, s["include_non_batch"], progress=say)
     cultures, skipped = read["cultures"], list(read["skipped"])
+    grown_in = sorted({c.medium or "unnamed medium" for c in cultures})   # for the "nothing matched" note
     if limited:
         def named(c):
-            return c.study in selection["studies"] or c.experiment in selection["experiments"]
+            return selecting.matches(read["experiments"].get(c.experiment, {"id": c.experiment, "studyId": c.study}),
+                                     selection)
         left = [c for c in cultures if not named(c)]
         if left:
-            skipped.append(("experiments not in the second box", ", ".join(sorted({c.experiment for c in left}))
-                            + ": a study id or experiment id in the second box limits the search to them"))
+            skipped.append(("experiments outside the second box", ", ".join(sorted({c.experiment for c in left}))
+                            + ": left out, since the second box limits the search to what matches it (Advanced "
+                            "settings: Include supporting evidence outside the second box)"))
         cultures = [c for c in cultures if named(c)]
         read["growth_only"] = [c for c in read["growth_only"] if named(c)]
     failed = [x for x in skipped if x[1].startswith(UNREAD)]
@@ -238,7 +245,8 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     initial = crm.initial_concentrations([cultures[i] for i in sorted(chosen)])
     net.meta["initial_concentrations_mM"] = {k: round(v["mean"], 6) for k, v in initial.items()}
 
-    warnings = _warnings(value_cells, presence_cells, rule, window, cultures, chosen)
+    warnings = _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown_in,
+                         not selecting.empty(selection))
     say(len(studies), len(studies), "Preparing the result")
     return {"entries": names, "settings": dict(s), "resolved": resolved["resolved"],
             "reasons": resolved["reasons"], "suggestions": resolved["suggestions"], "genera": resolved["genera"],
@@ -263,16 +271,15 @@ def _genus_rates(found, missing, taxa):
     return out, gone
 
 
-def _warnings(value_cells, presence_cells, rule, window, cultures, chosen) -> list:
+def _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown_in=(), boxed=False) -> list:
     """What a reader must see above the result, not only in the report."""
     out = []
-    if rule["rule"] == "selected" and not chosen and cultures:
+    if boxed and not chosen and grown_in:
         # the second box matched none of these taxa's monocultures: say so, and what it could have matched,
         # rather than showing a result that looks like the previous one (Karoline, 2026-10-05: "the search
         # is not updated when I relaunch the same species but with another input in the medium field")
-        found = sorted({c.medium or "unnamed medium" for c in cultures})
-        out.append("Nothing in the second box matches a monoculture of these taxa, so no value comes from it and "
-                   "every arc is presence only. Their monocultures were grown in: " + " · ".join(found) + ".")
+        out.append("Nothing in the second box matches a monoculture of these taxa, so nothing gives a value. "
+                   "Their monocultures were grown in: " + " · ".join(grown_in) + ".")
     short = sorted({cultures[i].experiment_name or cultures[i].experiment for i in chosen
                     if any(phases.short_record(m["series"]) for m in cultures[i].metabolites.values())})
     if short:

@@ -29,6 +29,11 @@ gate applies.
   its name styling is HTML and broke the SVG caption. Tests quote her wording (tests/test_gui.py,
   tests/test_figure.py).
 
+- 2026-10-05 (Karoline): a filled second box is a limit (only matching data, media and ids alike); the
+  advanced option `outside_evidence` adds presence from everything else; an empty box considers all data.
+  `search.run_query` reads every study of the taxa only when the box holds a medium (it cannot know the
+  matching studies before reading), and only the named studies when it holds ids alone.
+
 ## Things learned about mGrowthDB while building
 
 - **Search misses culture-level monocultures.** `search.json?strainNcbiIds=` matches per-strain measurement
