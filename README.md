@@ -66,8 +66,8 @@ the downloads above them.
 4. **Values from one medium, presence from the others.** The values come from the medium that holds data
    for the most taxa, or from the media, experiments or studies named in the second box. Every other medium
    only says whether a compound was produced or consumed: those arcs are `presence_only` and their matrix
-   cells NA. "Ignore media differences" pools every medium; "Report everything as booleans" drops the
-   amounts.
+   cells NA. A study or experiment id in the second box is a limit instead: only those are read.
+   "Ignore media differences" pools every medium; "Report everything as booleans" drops the amounts.
 5. **Pooling, with what does not agree reported.** Studies in the value medium are pooled. Experiments
    that disagree on what happened make a `conflict`, named in the report. The same experiment deposited
    under two studies is counted once.

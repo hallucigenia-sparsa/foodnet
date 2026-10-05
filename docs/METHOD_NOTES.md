@@ -65,7 +65,11 @@ with metabolite data."
     we don't want to skip any metabolites by default" (on ethanol, whose HPLC channel in study
     SMGDB00000011 reads the ethanol used for cleaning). "Leave out these metabolites" stays as an advanced
     setting, empty by default.
-13. **Studies are found through the species list**, not mGrowthDB's search, which matches per-strain
+13. **Study and experiment ids in the second box are a limit.** Karoline, 2026-10-05: "when I gave a list
+    of studies, the results also included studies that were not in my list. This is not desired behavior."
+    With ids, only those studies (or experiments) are read; a medium name still chooses the values, with the
+    other media giving presence.
+14. **Studies are found through the species list**, not mGrowthDB's search, which matches per-strain
     measurements only and so misses a monoculture measured at the culture level (study SMGDB00000009).
 
 ## Open decisions

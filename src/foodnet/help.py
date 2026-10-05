@@ -35,8 +35,9 @@ SETTINGS = {
     "merge_arcs": "One arc per taxon, metabolite, phase and direction across studies, instead of one per study.",
     "min_studies": "Keep only arcs resting on at least this many studies (needs merged arcs above 1).",
     "merge_genera": "One node per genus; a value is the median of its taxa's values.",
-    "conditions": "The second box: media, experiments or studies that give the values. Empty: the medium that "
-                  "holds data for the most taxa.",
+    "conditions": "The second box. A medium gives the values, other media give presence; a study or experiment "
+                  "id limits the search to it, so nothing else is read. Empty: values from the medium that holds "
+                  "data for the most taxa.",
     "exclude_studies": "Study ids never read.",
     "exclude_metabolites": "Metabolites left out by name, comma separated.",
     "include_non_batch": "Command line only: also read chemostat and serial dilution monocultures. Their changes "
@@ -136,6 +137,8 @@ warns about it above the result.</p>
 <p>Values come from one medium: the one that holds data for the most taxa, or the media, experiments or studies
 named in the second box. Every other medium only says whether a compound was produced or consumed: those arcs are
 presence_only (dashed) and their cells NA in the value matrices. Ignore media differences pools every medium.
+A study or experiment id in the second box is a limit: only those studies or experiments are read, and they
+give the values.
 Studies in the value medium are pooled; when their experiments disagree on what happened, the value carries the
 caution conflict and the report names the experiments. The same experiment deposited under two studies is counted
 once.</p>

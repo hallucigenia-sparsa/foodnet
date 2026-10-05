@@ -205,9 +205,9 @@ consumption are derived from mGrowthDB batch monocultures on this machine; nothi
 <label class="field" for="conditions">Media, experiments or studies for the values (optional)</label>
 <p class="examples">For example: {" &middot; ".join(_esc(x) for x in selecting.EXAMPLES)}</p>
 <textarea id="conditions" name="conditions" rows="5">{_esc(conditions)}</textarea>
-<p class="hint">One per line. Empty: values come from the medium holding data for the most taxa. Named: values
-come from these, matched as text ("wilkins" finds every spelling) or by id. Other media still say whether a
-compound was produced or consumed.</p>
+<p class="hint">One per line. Empty: values come from the medium holding data for the most taxa. A medium
+(matched as text, so "wilkins" finds every spelling) gives the values, and other media still say whether a
+compound was produced or consumed. A study or experiment id limits the search to it: nothing else is read.</p>
 </div>
 </div>
 {_phase_choice(settings)}

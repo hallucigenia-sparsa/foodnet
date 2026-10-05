@@ -200,3 +200,26 @@ def test_a_second_box_that_matches_nothing_says_so_and_names_the_media(client):
     assert r["value_rule"]["rule"] == "selected" and r["value_cultures"] == 0
     warning = next(w for w in r["warnings"] if "Nothing in the second box" in w)
     assert "Wilkins-Chalgren Anaerobe Broth (WC)" in warning and "mMCB" in warning
+
+
+def test_study_ids_in_the_second_box_limit_what_is_read(client):
+    # Karoline, 2026-10-05: "when I gave a list of studies, the results also included studies that were not
+    # in my list. This is not desired behavior."
+    r = run(client, conditions="SMGDB00000002")
+    assert r["studies"] == ["SMGDB00000002"]
+    assert {s for e in r["network"].edges for s in e.study_ids} == {"SMGDB00000002"}
+    assert r["presence"] == {}                          # nothing from study 1, not even as presence
+    assert r["cells"][(B, FOR, "exponential")]["mean"] == pytest.approx(5.0)
+
+
+def test_an_experiment_id_limits_the_search_to_that_experiment(client):
+    r = run(client, conditions="EMGDB000000004")
+    assert r["studies"] == ["SMGDB00000002"]
+    assert {e.taxon for e in r["network"].edges} == {C}   # E3 (Beta beta in the same study) is left out
+    assert any("limits the search" in reason for _, reason in r["skipped"])
+
+
+def test_a_medium_name_still_takes_presence_from_other_media(client):
+    r = run(client, conditions="mMCB")
+    assert set(r["studies"]) == {"SMGDB00000001", "SMGDB00000002"}
+    assert (A, GLC, "exponential") in r["presence"]

@@ -100,6 +100,19 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                 errors.append(f"search failed: {e}")
                 found = []
         studies = list(dict.fromkeys(studies + list(found)))
+    # Study and experiment ids in the second box are a limit, not only a choice of values: nothing outside
+    # them is read, not even as presence (Karoline, 2026-10-05: "when I gave a list of studies, the results
+    # also included studies that were not in my list. This is not desired behavior"). A medium name stays a
+    # choice of values, with the other media giving presence.
+    limited = bool(selection["studies"] or selection["experiments"])
+    if limited:
+        listed = set(selection["studies"])
+        for eid in selection["experiments"]:
+            try:
+                listed.add(str(client.get_experiment(eid).get("studyId", "")))
+            except MGrowthDBError as e:
+                errors.append(f"{eid}: {e}")
+        studies = [sid for sid in dict.fromkeys(list(selection["studies"]) + studies) if sid in listed]
     excluded = {sid.strip().upper() for sid in s["exclude_studies"].split(",") if sid.strip()}
     left_out = [sid for sid in studies if sid.upper() in excluded]
     studies = [sid for sid in studies if sid.upper() not in excluded]
@@ -116,6 +129,15 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     excluded_metabolites = [m.strip() for m in s["exclude_metabolites"].split(",") if m.strip()]
     read = read_cultures(client, studies, keep, excluded_metabolites, s["include_non_batch"], progress=say)
     cultures, skipped = read["cultures"], list(read["skipped"])
+    if limited:
+        def named(c):
+            return c.study in selection["studies"] or c.experiment in selection["experiments"]
+        left = [c for c in cultures if not named(c)]
+        if left:
+            skipped.append(("experiments not in the second box", ", ".join(sorted({c.experiment for c in left}))
+                            + ": a study id or experiment id in the second box limits the search to them"))
+        cultures = [c for c in cultures if named(c)]
+        read["growth_only"] = [c for c in read["growth_only"] if named(c)]
     failed = [x for x in skipped if x[1].startswith(UNREAD)]
     if failed:
         errors.append(f"{len(failed)} record(s) could not be read from mGrowthDB (for example {failed[0][0]}: "
