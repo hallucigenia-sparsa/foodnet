@@ -224,7 +224,7 @@ def cultures_of_experiment(client, exp: dict, identities: dict, excluded_metabol
                     "name": compound["name"], "chebi_id": compound["chebi_id"], "series": points,
                     "recorded_as": f"{subject.get('name', '')} (CHEBI:{subject.get('chebiId')})"
                     if subject.get("chebiId") else subject.get("name", ""),
-                    "joined": compound["joined"]}
+                    "recorded_name": subject.get("name", ""), "joined": compound["joined"]}
             if not culture.metabolites:
                 continue
         elif culture.growth is None:

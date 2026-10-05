@@ -58,7 +58,8 @@ the downloads above them.
 2. **Growth phases.** Exponential growth ends at the first sample where the culture reaches 90% of its
    maximal abundance; the stationary phase runs from there to the last metabolite sample. Below the boxes,
    choose Exponential phase (the default), Stationary phase or Both. A time window in Advanced settings
-   replaces the phases. Diauxic shifts are not detected.
+   replaces the phases, and a second window can be given to metabolites named there (trehalose over the whole
+   run, for example), so no compound needs a window of its own. Diauxic shifts are not detected.
 3. **A change per phase.** For each replicate and metabolite, the concentration at the end of the phase
    minus the concentration at its start (interpolated between samples), averaged over replicates. A mean
    change below the detection limit (0.2 mM, a setting) is no change. A metabolite series shorter than

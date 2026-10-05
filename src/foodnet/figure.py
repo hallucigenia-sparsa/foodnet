@@ -163,6 +163,10 @@ def matrices_svg(result: dict) -> str:
     what = (f"window {window[0]:g} to {window[1]:g} h" if window else
             {"both": "both growth phases", "exponential": "exponential phase",
              "stationary": "stationary phase"}.get(phase, phase or ""))
+    second = result.get("second_window") or {}
+    if second.get("metabolites"):
+        named = ", ".join(n.name for n in result.get("metabolite_nodes", []) if n.id in second["metabolites"])
+        what += f" ({named}: {second['label']})"
     caption = (f"Net change over the {what}, mean over replicates. foodnet {net.meta.get('tool_version', '')}, "
                f"{net.meta.get('derived_on', '')}; mGrowthDB studies {', '.join(sorted(net.studies))}.")
     for line in _wrap(caption, width - label_w - 10, 11):

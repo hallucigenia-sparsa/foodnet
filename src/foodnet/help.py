@@ -22,6 +22,12 @@ SETTINGS = {
     "window_start": "With a window end, replaces the phases with one window (hours since inoculation).",
     "window_end": "The end of that window. A window that ends after the last metabolite sample uses the last "
                   "sample and marks the value window_beyond_data.",
+    "second_window_metabolites": "Metabolites measured over a second time window instead of the phases or the "
+                                 "main window, comma separated, by name (acid or base form alike); empty by "
+                                 "default. For a compound still being used when the phase ends, such as "
+                                 "trehalose in Figure 3c of the community control paper.",
+    "second_window_start": "The second window's start, in hours since inoculation.",
+    "second_window_end": "The second window's end, in hours; empty means until each culture's last sample.",
     "fraction": "Exponential growth ends at the first sample where the culture reaches this share of its maximal "
                 "abundance (counted from its start): 90% by default.",
     "no_growth_factor": "A culture that rose less than this many times did not grow and has no phases (1.5).",

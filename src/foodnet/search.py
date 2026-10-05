@@ -23,6 +23,9 @@ DEFAULTS = {
     # None: no time window; a window (start and end, in hours) overrides the phases
     "window_start": None, "window_end": None,
     "fraction": phases.FRACTION, "no_growth_factor": phases.NO_GROWTH_FACTOR,
+    # a second window for the metabolites named here (comma separated), from its start to its end in hours,
+    # an end of None meaning until the last sample (Karoline, 2026-10-05, for trehalose)
+    "second_window_metabolites": "", "second_window_start": 0.0, "second_window_end": None,
     "detection_limit": d.DETECTION_LIMIT,
     "ignore_media": False, "booleans": False,
     # off by default: a rate costs a fit per growth curve; CRM mode turns it on
@@ -38,6 +41,21 @@ DEFAULTS = {
     "include_non_batch": False, "spike_factor": phases.SPIKE_FACTOR, "correction": "bh",
 }
 EXAMPLE = ("Escherichia coli LF82", "Bacteroides fragilis", "Roseburia intestinalis")
+
+
+def second_window_of(s: dict) -> dict | None:
+    names = [n.strip() for n in (s.get("second_window_metabolites") or "").split(",") if n.strip()]
+    if not names:
+        return None
+    return {"names": names, "start": float(s.get("second_window_start") or 0.0),
+            "end": None if s.get("second_window_end") is None else float(s["second_window_end"])}
+
+
+def second_window_label(second: dict | None) -> str:
+    if not second:
+        return ""
+    end = "the last sample" if second["end"] is None else f"{second['end']:g} h"
+    return f"{second['start']:g} h to {end}"
 
 
 def window_of(s: dict) -> tuple | None:
@@ -162,7 +180,12 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
 
     say(len(studies), len(studies), "Deriving production and consumption")
     window = window_of(s)
-    rows, skips = d.changes(cultures, s["phase"], window, s["fraction"], s["no_growth_factor"], s["spike_factor"])
+    second = second_window_of(s)
+    rows, skips = d.changes(cultures, s["phase"], window, s["fraction"], s["no_growth_factor"], s["spike_factor"],
+                            second)
+    second_mids = sorted({r["metabolite"] for r in rows if r.get("second")})
+    unmatched = [n for n in (second or {}).get("names", [])
+                 if not any(d.second_window_matches(met, [n]) for c in cultures for met in c.metabolites.values())]
     skipped += skips
     dropped, duplicate_lines = d.duplicates(cultures)
     rows = [r for r in rows if (cultures[r["culture"]].experiment, r["metabolite"]) not in dropped]
@@ -268,14 +291,25 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     initial = crm.initial_concentrations([cultures[i] for i in sorted(chosen)])
     net.meta["initial_concentrations_mM"] = {k: round(v["mean"], 6) for k, v in initial.items()}
 
+    second_info = None if not second else {**second, "metabolites": second_mids, "label": second_window_label(second),
+                                           "unmatched": unmatched}
+    net.meta["second_window"] = None if not second_info else {
+        "metabolites": [metabolites[m][0] for m in second_mids if m in metabolites], "start": second["start"],
+        "end": second["end"]}
     warnings = _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown_in,
                          not selecting.empty(selection))
+    if unmatched:
+        warnings.append("The second time window names " + ", ".join(unmatched) + ", which no culture of these taxa "
+                        "measured; check the spelling (the report lists every metabolite read).")
+    if second_info and second_mids:
+        warnings.append(f"{', '.join(metabolites[m][0] for m in second_mids if m in metabolites)}: measured over the "
+                        f"second time window, {second_info['label']}, not over the phase or main window.")
     say(len(studies), len(studies), "Preparing the result")
     return {"entries": names, "settings": dict(s), "resolved": resolved["resolved"],
             "reasons": resolved["reasons"], "suggestions": resolved["suggestions"], "genera": resolved["genera"],
             "unresolved": resolved["unresolved"], "taxon_ids": resolved["taxon_ids"], "all": all_studies,
             "excluded": left_out, "studies": studies, "network": net, "cells": matrix_cells,
-            "taxa_nodes": taxa_nodes, "metabolite_nodes": metabolite_nodes,
+            "taxa_nodes": taxa_nodes, "metabolite_nodes": metabolite_nodes, "second_window": second_info,
             "presence": matrix_presence, "value_rule": rule, "duplicates": duplicate_lines,
             "rates": organism_rates, "without_a_rate": without_rate, "initial": initial,
             "cultures": len(cultures), "value_cultures": len(chosen), "warnings": warnings,

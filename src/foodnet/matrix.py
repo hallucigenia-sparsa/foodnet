@@ -60,14 +60,40 @@ def phases_of(result: dict) -> list:
     return [p for p in ("exponential", "stationary", "window") if p in found]
 
 
+def second_window_metabolites(result: dict) -> set:
+    return set((result.get("second_window") or {}).get("metabolites") or ())
+
+
+def interval(result: dict, met_id: str, phase: str) -> str:
+    """What a column's values were measured over, in words: the phase, the main window or the second one."""
+    second = result.get("second_window") or {}
+    if met_id in second_window_metabolites(result):
+        return second.get("label", "second window")
+    if phase == "window":
+        start, end = (result["network"].meta.get("window") or [None, None])
+        return f"{start:g} to {end:g} h" if start is not None else "window"
+    return phase
+
+
 def columns(net: FoodNetwork, result: dict, phases=None) -> list:
-    """(metabolite node, phase, label) for each column: metabolites by name, one column per phase."""
+    """(metabolite node, phase, label) for each column: metabolites by name, one column per phase.
+
+    A metabolite in the second time window has one column, its window (Karoline, 2026-10-05). When the
+    columns are measured over more than one interval, each label says its own: "acetate (exponential)",
+    "trehalose (0 h to the last sample)"."""
     phases = phases or phases_of(result) or ["exponential"]
+    second = second_window_metabolites(result)
     mets = metabolite_nodes(net, result)
     labels = _labels(mets)
-    if len(phases) == 1:
-        return [(m, phases[0], label) for m, label in zip(mets, labels, strict=True)]
-    return [(m, ph, f"{label} ({ph})") for m, label in zip(mets, labels, strict=True) for ph in phases]
+    cols = []
+    for m, label in zip(mets, labels, strict=True):
+        for ph in (["window"] if m.id in second else [p for p in phases if p != "window" or not second]
+                   or ["window"]):
+            cols.append((m, ph, label))
+    intervals = {interval(result, m.id, ph) for m, ph, _ in cols}
+    if len(intervals) == 1:
+        return cols
+    return [(m, ph, f"{label} ({interval(result, m.id, ph)})") for m, ph, label in cols]
 
 
 def _booleans(result: dict) -> bool:
@@ -219,8 +245,10 @@ def initial_csv(result: dict) -> str:
 
 def crm_phase(result: dict) -> str:
     """The one phase a CRM is parameterized from: the window when one is set, the exponential phase with
-    "Both" (a consumer-resource model describes growth), else the phase chosen."""
-    phases = phases_of(result) or ["exponential"]
+    "Both" (a consumer-resource model describes growth), else the phase chosen. The metabolites of the second
+    time window keep their own window."""
+    phases = [p for p in phases_of(result) if p != "window" or not second_window_metabolites(result)
+              or result["network"].meta.get("window")] or ["exponential"]
     return phases[0] if len(phases) == 1 else "exponential"
 
 
@@ -244,6 +272,11 @@ def readme(result: dict, which: str = "matrices") -> str:
         lines += [f"Phase: {phase}. Exponential growth ends at the first sample where the culture reaches "
                   f"{s['fraction']:.0%} of its maximal abundance; the stationary phase runs from there to the last "
                   "metabolite sample.", ""]
+    second = result.get("second_window") or {}
+    if second.get("metabolites"):
+        named = ", ".join(n.name for n in result.get("metabolite_nodes", []) if n.id in second["metabolites"])
+        lines += [f"Second time window: {named} measured from {second['label']}, not over the phase or main "
+                  "window; their columns say so.", ""]
     values = "booleans (1 = it happened, 0 = measured and it did not, NA = no evidence either way)" \
         if s["booleans"] else "mM, the mean net change over the phase across replicates"
     lines += [f"Values: {values}.",

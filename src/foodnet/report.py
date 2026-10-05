@@ -64,6 +64,9 @@ def report_text(result: dict) -> str:
         lines.append("Values from every medium (Ignore media differences)")
     for key, n in sorted(rule["taxa_per_medium"].items(), key=lambda kv: -kv[1]):
         lines.append(f"  {key}: {n} taxon(s)")
+    second = result.get("second_window") or {}
+    if second.get("names"):
+        lines.append(f"Second time window, {second['label']}: " + ", ".join(second["names"]))
     if result["warnings"]:
         lines += ["", "Warnings:"] + [f"  * {w}" for w in result["warnings"]]
     if result["errors"]:

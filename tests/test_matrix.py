@@ -95,3 +95,11 @@ def test_the_readme_lists_presence_the_matrices_lack(client):
     text = matrix.readme(r)
     assert "NA is never zero" in text
     assert "Beta beta B1 produced formate (exponential phase) in mMCB" in text
+
+
+def test_second_window_columns_say_what_they_were_measured_over(client):
+    r = run(client, second_window_metabolites="glucose")
+    header = _rows(matrix.signed_csv(r["network"], r))[0]
+    assert header == ["taxon", "acetate (exponential)", "butyrate (exponential)", "formate (exponential)",
+                      "glucose (0 h to the last sample)"]
+    assert _rows(matrix.signed_csv(r["network"], r))[1] == ["Alpha alpha A1", "4", "NA", "NA", "-8.5"]

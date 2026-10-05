@@ -51,6 +51,11 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--phase", choices=list(PHASE_LABELS), default=DEFAULTS["phase"])
     d.add_argument("--window", nargs=2, type=float, metavar=("START", "END"),
                    help="a time window in hours that replaces the phases")
+    d.add_argument("--second-window", nargs="+", metavar="NAME",
+                   help="metabolites measured over a second time window (see --second-window-from/--to)")
+    d.add_argument("--second-window-from", type=float, default=0.0, help="its start in hours (default 0)")
+    d.add_argument("--second-window-to", type=float, default=None,
+                   help="its end in hours (default: each culture's last sample)")
     d.add_argument("--fraction", type=float, default=DEFAULTS["fraction"],
                    help="exponential growth ends at this share of the maximal abundance (default 0.9)")
     d.add_argument("--no-growth-factor", type=float, default=DEFAULTS["no_growth_factor"])
@@ -100,6 +105,8 @@ def settings_from(a) -> dict:
     s.update(phase=a.phase, fraction=a.fraction, no_growth_factor=a.no_growth_factor,
              detection_limit=a.detection_limit, ignore_media=a.ignore_media, booleans=a.booleans,
              outside_evidence=a.outside_evidence,
+             second_window_metabolites=", ".join(a.second_window or []),
+             second_window_start=a.second_window_from, second_window_end=a.second_window_to,
              report_rates=a.report_rates or a.crm_mode, rate_method=a.rate_method, rate_window=a.rate_window,
              merge_arcs=a.merge_arcs, min_studies=a.min_studies, merge_genera=a.merge_genera,
              conditions="\n".join(x.strip() for x in a.conditions.split(",") if x.strip()),

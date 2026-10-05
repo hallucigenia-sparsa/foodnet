@@ -26,6 +26,8 @@ semantic versioning.
   medium, and with ids alone the majority medium within them gives the values and their other media
   presence. The advanced option "Include supporting evidence outside the second box" adds the rest as
   presence. An empty box considers all data.
+- A second time window for metabolites named in Advanced settings (an empty end means the last sample), so
+  a compound such as trehalose can be measured over the whole run while the rest use the phases or a window.
 - Strains are named by their current name in mGrowthDB, as in grownet.
 - A second box that matches none of the taxa's monocultures says so and lists the media they were grown in.
 - No metabolite is left out by default; "Leave out these metabolites" is an advanced setting.

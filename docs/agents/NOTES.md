@@ -36,6 +36,11 @@ gate applies.
   day: ids are the scope, a medium name the value medium inside it, and with ids alone the majority rule
   runs inside the scope (rule `majority_in_scope`); this reproduces Figure 3c from studies 2, 4, 7 and 9.
 
+- 2026-10-05 (Karoline): a second time window for named metabolites (`second_window_*` settings,
+  `derive.changes(second=...)`); their cells have phase "window" and `matrix.columns` gives each metabolite
+  only the phases it has, labelled by `matrix.interval` when intervals differ. Reproduces every trehalose
+  value of Figure 3c (studies 2, 4, 7, 9; 0 to 48 h; trehalose to the last sample).
+
 ## Things learned about mGrowthDB while building
 
 - **Search misses culture-level monocultures.** `search.json?strainNcbiIds=` matches per-strain measurement

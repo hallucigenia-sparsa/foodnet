@@ -89,16 +89,29 @@ def boundaries(cultures, fraction: float = phases.FRACTION, factor: float = phas
     return found, skipped
 
 
+def second_window_matches(met: dict, names) -> bool:
+    """Whether a metabolite is one the second window names: by its name, or the name its study recorded it
+    under (so "acetic acid" and "acetate" both name the joined acetate), ignoring case and spacing."""
+    wanted = {" ".join(n.casefold().split()) for n in names}
+    return any(" ".join((x or "").casefold().split()) in wanted
+               for x in (met.get("name"), met.get("recorded_name")))
+
+
 def changes(cultures, phase: str = "exponential", window: tuple | None = None,
             fraction: float = phases.FRACTION, factor: float = phases.NO_GROWTH_FACTOR,
-            spike_factor: float = phases.SPIKE_FACTOR) -> tuple:
+            spike_factor: float = phases.SPIKE_FACTOR, second: dict | None = None) -> tuple:
     """(rows, skipped): one row per culture, metabolite and phase.
 
     A row: {"culture" (index), "taxon", "metabolite", "metabolite_name", "chebi_id", "phase", "change",
     "start", "end", "initial", "exponential_h", "cautions"}. `window` (start, end) in hours replaces the
     phases. `exponential_h` is how long the culture grew exponentially, from its first growth sample to the
     end of exponential growth (Karoline, 2026-10-04: "report the duration of the exponential phase"); it is
-    reported with a time window too, where the boundary only describes the culture."""
+    reported with a time window too, where the boundary only describes the culture.
+
+    `second` is the second window, {"names", "start", "end"} with `end` None for "until the last sample":
+    the metabolites it names take it instead of the phases or the main window (Karoline, 2026-10-05, for
+    trehalose, which Figure 3c measures over the whole run). Their rows carry phase "window" and
+    "second": True."""
     rows, skipped = [], []
     bounds, skips = boundaries(cultures, fraction, factor, spike_factor)
     if window is None:
@@ -111,7 +124,13 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
         for mid, met in c.metabolites.items():
             series = met["series"]
             short = phases.short_record(series)
-            for name, (start, end, cautions) in phases.phase_windows(series, boundary, phase, window).items():
+            in_second = bool(second and second.get("names") and second_window_matches(met, second["names"]))
+            if in_second:
+                end = second["end"] if second.get("end") is not None else series[-1][0]
+                windows = phases.phase_windows(series, None, phase, (second.get("start") or 0.0, end))
+            else:
+                windows = phases.phase_windows(series, boundary, phase, window)
+            for name, (start, end, cautions) in windows.items():
                 cautions = list(cautions)
                 if short:
                     cautions.append("short_record")
@@ -129,7 +148,7 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                 rows.append({"culture": i, "taxon": c.taxon["id"], "metabolite": mid,
                              "metabolite_name": met["name"], "chebi_id": met["chebi_id"], "phase": name,
                              "change": d["change"], "start": start, "end": end, "initial": d["initial"],
-                             "exponential_h": duration, "cautions": cautions})
+                             "exponential_h": duration, "second": in_second, "cautions": cautions})
     return rows, skipped
 
 

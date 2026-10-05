@@ -101,6 +101,14 @@ def _settings_block(settings: dict) -> str:
   <input name="window_end" type="text" size="5" value="{_field(s['window_end'])}"> h</label>
   <span class="muted">replaces the phase choice above with one window: each metabolite's change from the start
   to the end, in hours since inoculation. Empty by default</span></div>
+<div class="row"><label>Another time window for these metabolites
+  <input name="second_window_metabolites" type="text" size="24"
+   value="{_esc(s['second_window_metabolites'])}"></label>
+  <label>from <input name="second_window_start" type="text" size="5" value="{_field(s['second_window_start'])}">
+  h to <input name="second_window_end" type="text" size="5" value="{_field(s['second_window_end'])}"> h</label>
+  <span class="muted">comma separated metabolite names, measured over this window instead of the phases or the
+  window above, for a compound still being used when they end (trehalose in Figure 3c). An empty end means until
+  each culture's last sample. Empty by default</span></div>
 <div class="row"><label>Exponential growth ends at
   <input name="fraction" type="text" size="5" value="{_esc(round(s['fraction'] * 100, 6))}"> % of the maximal
   abundance</label>
@@ -495,6 +503,10 @@ def parse_settings(form: dict) -> dict:
     start, end = _number(form, "window_start"), _number(form, "window_end")
     if start is not None and end is not None and end > start:
         s["window_start"], s["window_end"] = start, end
+    s["second_window_metabolites"] = form.get("second_window_metabolites", [""])[0].strip()
+    second_start, second_end = _number(form, "second_window_start"), _number(form, "second_window_end")
+    s["second_window_start"] = second_start if second_start is not None else 0.0
+    s["second_window_end"] = second_end if second_end is not None and second_end > s["second_window_start"] else None
     fraction = _number(form, "fraction")
     if fraction is not None and 0 < fraction <= 100:
         s["fraction"] = fraction / 100

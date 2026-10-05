@@ -268,3 +268,25 @@ def test_a_strain_is_shown_by_its_current_name():
                          where={1: {"SMGDB00000001"}, 2: {"SMGDB00000001", "SMGDB00000002"}})
     r = run_query(FakeClient(), ["Alpha alpha", "Beta beta"], {}, index)
     assert {n.name for n in r["taxa_nodes"]} == {"Alpha alpha A1", "Betanova beta B1"}
+
+
+def test_a_second_window_measures_the_metabolites_it_names_over_its_own_interval(client):
+    # Karoline, 2026-10-05: "2 time windows, with the option to add metabolites by name"; an empty end is
+    # the last sample. A's glucose over 0 h to the end (24 h): 10 to 2 and 10 to 1, mean -8.5; acetate
+    # keeps the exponential phase (+4)
+    r = run(client, second_window_metabolites="Glucose")
+    assert r["cells"][(A, GLC, "window")]["mean"] == pytest.approx(-8.5)
+    assert (A, GLC, "exponential") not in r["cells"]
+    assert r["cells"][(A, AC, "exponential")]["mean"] == pytest.approx(4.0)
+    assert any("second time window, 0 h to the last sample" in w for w in r["warnings"])
+
+
+def test_a_second_window_with_an_end_and_a_name_given_as_the_recorded_acid(client):
+    # "acetic acid" is how the study recorded acetate; 0 to 6 h: 0 to 1 in both replicates
+    r = run(client, second_window_metabolites="acetic acid", second_window_start=0.0, second_window_end=6.0)
+    assert r["cells"][(A, AC, "window")]["mean"] == pytest.approx(1.0)
+
+
+def test_a_second_window_name_that_matches_nothing_is_reported(client):
+    r = run(client, second_window_metabolites="trehalose")
+    assert any("trehalose, which no culture" in w for w in r["warnings"])
