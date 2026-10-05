@@ -387,6 +387,8 @@ def _value_note(result: dict) -> str:
     if rule["rule"] == "all":
         return f"Values from every medium (Ignore media differences): {_esc(', '.join(rule['media']))}."
     if rule["rule"] == "selected":
+        if not rule["media"]:
+            return "Values: none, since nothing in the second box matched (see the note below)."
         return f"Values from the second box: {_esc(media)}. Other media give presence only."
     n = rule["taxa_per_medium"].get(rule["keys"][0], 0) if rule["keys"] else 0
     return (f"Values from {_esc(media)}, the medium holding data for the most taxa ({n}). Other media give "

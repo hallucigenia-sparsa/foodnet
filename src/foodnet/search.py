@@ -244,6 +244,13 @@ def _genus_rates(found, missing, taxa):
 def _warnings(value_cells, presence_cells, rule, window, cultures, chosen) -> list:
     """What a reader must see above the result, not only in the report."""
     out = []
+    if rule["rule"] == "selected" and not chosen and cultures:
+        # the second box matched none of these taxa's monocultures: say so, and what it could have matched,
+        # rather than showing a result that looks like the previous one (Karoline, 2026-10-05: "the search
+        # is not updated when I relaunch the same species but with another input in the medium field")
+        found = sorted({c.medium or "unnamed medium" for c in cultures})
+        out.append("Nothing in the second box matches a monoculture of these taxa, so no value comes from it and "
+                   "every arc is presence only. Their monocultures were grown in: " + " · ".join(found) + ".")
     short = sorted({cultures[i].experiment_name or cultures[i].experiment for i in chosen
                     if any(phases.short_record(m["series"]) for m in cultures[i].metabolites.values())})
     if short:

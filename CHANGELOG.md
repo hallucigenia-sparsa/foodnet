@@ -22,4 +22,5 @@ semantic versioning.
 - The local page, the command line, the Windows program, and grownet's guardrail gate and release checks.
 - The consumed and produced matrices as an image (SVG), shown first among the results and downloadable.
 - The length of the exponential phase per arc, in the result table and every output.
+- A second box that matches none of the taxa's monocultures says so and lists the media they were grown in.
 - No metabolite is left out by default; "Leave out these metabolites" is an advanced setting.

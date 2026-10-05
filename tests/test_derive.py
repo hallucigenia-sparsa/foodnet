@@ -193,3 +193,10 @@ def test_the_length_of_the_exponential_phase_reaches_the_arcs(client):
     # with a time window the length is still reported: it describes the culture
     net = run(client, window_start=0.0, window_end=6.0)["network"]
     assert {e.exponential_h for e in net.edges if e.taxon == A} == {12.0}
+
+
+def test_a_second_box_that_matches_nothing_says_so_and_names_the_media(client):
+    r = run(client, conditions="Db-MM")
+    assert r["value_rule"]["rule"] == "selected" and r["value_cultures"] == 0
+    warning = next(w for w in r["warnings"] if "Nothing in the second box" in w)
+    assert "Wilkins-Chalgren Anaerobe Broth (WC)" in warning and "mMCB" in warning
