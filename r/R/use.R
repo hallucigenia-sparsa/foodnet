@@ -66,22 +66,24 @@ crm_resources <- function(x, missing = NULL) {
 #' builds one from the measured amounts.
 #'
 #' With `scale = "miasim"` (the default), `E` follows miaSim's own equations, read from its source
-#' (`consumerResourceModel`, miaSim 1.18): a taxon grows by `growth_rate * sum_j E[j] * R[j] / (R[j] + K[j])`
-#' per unit of its abundance, takes up each resource it consumes at `R / (R + K)` per unit of abundance
-#' whatever the size of `E`, and makes each by-product at `|E|` times its growth. So a positive entry is a
-#' yield, the biomass made per mM taken up, and a negative one the mM of a by-product made per unit of
-#' biomass divided by the growth rate. For each taxon, with its biomass change `dx` and growth rate `mu`
-#' over the phase, `E` is `dx / (mu * total consumed)` for every resource it consumed and
-#' `-produced * mu / dx` for every resource it produced, so that a taxon simulated alone gains its measured
-#' biomass from its measured uptake and makes its measured by-products. How its uptake splits between
-#' resources is set by the Monod constants, which foodnet does not measure; [crm_backcheck()] says how close
-#' a choice of them comes. The biomass is in the unit of each taxon's growth curve (`x$biomass_unit`), and so
-#' must be its starting abundance in a simulation.
+#' (`consumerResourceModel`, miaSim 1.18): a taxon of abundance `x` grows at
+#' `growth_rate * x * sum_j E[j] * R[j] / (R[j] + K[j])`, takes up each resource it consumes at
+#' `x * R / (R + K)` whatever the size of `E` (at most 1 mM per unit of abundance per hour), and makes each
+#' by-product at `|E|` times its growth (without the growth rate). miaSim has no uptake rate of its own, so
+#' its unit of abundance sets how fast a taxon eats: in cells/mL a culture would empty its medium within
+#' minutes. foodnet therefore gives each taxon a unit of its own, [crm_scale()]: `n * dx / (mu * C)` units
+#' of its growth curve, with `dx` its biomass change, `mu` its growth rate, `C` its total uptake and `n`
+#' the number of resources it consumed. In that unit, `E` is `1 / n` on each consumed resource (so a
+#' saturated taxon grows at its measured rate) and `-n * produced / C` on each produced one, and a taxon
+#' alone gains its measured biomass and makes its measured by-products in proportion to what it takes up,
+#' in about the measured time. The same data in another unit give the same simulation. How its uptake splits
+#' between resources follows the Monod constants, which foodnet does not measure; [crm_backcheck()] says how
+#' close a choice of them comes. [as_miasim()] puts the starting abundances into these units, and
+#' [crm_unscale()] turns a simulation's abundances back into each growth curve's unit.
 #'
 #' `scale = "shares"` is foodnet 0.1.0's matrix: each row divided by the total consumed, so consumed entries
-#' are shares of uptake and produced entries by-product per unit taken up. miaSim does not read `E` that way
-#' (it reads a positive entry as a yield), so a simulation from it does not reproduce the monocultures; it is
-#' kept for other models. `scale = "none"` is consumed minus produced, in mM.
+#' are shares of uptake and produced entries by-product per unit taken up; for other models.
+#' `scale = "none"` is consumed minus produced, in mM.
 #'
 #' `NA` cells have no size. With `na = "zero"` they count as 0, and a warning says how many of each kind
 #' were set to 0: never assayed, seen only in another medium (a real link), inconclusive (measured, but its
@@ -100,7 +102,29 @@ crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("zer
     stopifnot(inherits(x, "foodnet_crm"))
     scale <- match.arg(scale)
     na <- match.arg(na)
-    if (identical(x$values, "booleans") && scale != "none") {
+    m <- amounts(x, na, booleans_ok = scale == "none")
+    consumed <- m$consumed
+    produced <- m$produced
+    if (scale == "none") return(consumed - produced)
+    total <- rowSums(consumed)
+    none <- names(total)[total <= 0]
+    if (length(none)) {
+        warning("no measured uptake for ", paste(none, collapse = ", "), ": their consumption rows are 0, so a ",
+                "CRM gives them nothing to grow on", if (scale == "miasim") ", and in miaSim nothing to make by-products from",
+                call. = FALSE)
+    }
+    if (scale == "shares") {
+        return((consumed - produced) / ifelse(total > 0, total, 1))
+    }
+    crm_scale(x)        # stops, naming them, when a taxon lacks what the scale needs
+    eaten <- rowSums(consumed > 0)
+    (consumed > 0) * ifelse(eaten > 0, 1 / pmax(eaten, 1), 0) - produced * ifelse(total > 0, eaten / total, 0)
+}
+
+# The consumed and produced amounts with every NA set to 0 and counted by kind, or a stop.
+#' @noRd
+amounts <- function(x, na = "zero", booleans_ok = FALSE) {
+    if (identical(x$values, "booleans") && !booleans_ok) {
         stop_foodnet("these parameters are booleans (1 = it happened), not amounts: an efficiency matrix ",
                      "needs amounts. Run the search again without Report everything as booleans.")
     }
@@ -126,26 +150,50 @@ crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("zer
         warning(elsewhere, " amount(s) were measured in another medium than the values (foodnet's \"value\" ",
                 "setting for links seen only there) and enter E as they are", call. = FALSE)
     }
-    if (scale == "none") return(consumed - produced)
+    list(consumed = consumed, produced = produced)
+}
+
+#' Each taxon's unit of abundance in a miaSim simulation
+#'
+#' How many units of a taxon's growth curve (`x$biomass_unit`) one unit of its abundance in a simulation
+#' built by [crm_efficiency()] and [as_miasim()] stands for: `n * dx / (mu * C)`, with `dx` its biomass
+#' change over the phase, `mu` its growth rate, `C` its total uptake in mM and `n` the number of resources
+#' it consumed. In this unit miaSim's fixed uptake (1 mM per unit per hour at saturation) makes the taxon
+#' grow at its measured rate with its measured yield. Divide starting abundances by it ([as_miasim()] does)
+#' and multiply simulated ones by it ([crm_unscale()]).
+#'
+#' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
+#' @return A named numeric vector, one per taxon.
+#' @export
+crm_scale <- function(x) {
+    stopifnot(inherits(x, "foodnet_crm"))
+    consumed <- x$consumed
+    consumed[is.na(consumed)] <- 0
     total <- rowSums(consumed)
-    none <- names(total)[total <= 0]
-    if (length(none)) {
-        warning("no measured uptake for ", paste(none, collapse = ", "), ": their consumption rows are 0, so a ",
-                "CRM gives them nothing to grow on", call. = FALSE)
-    }
-    if (scale == "shares") {
-        return((consumed - produced) / ifelse(total > 0, total, 1))
-    }
+    eaten <- rowSums(consumed > 0)
     rates <- x$growth_rates
     dx <- x$biomass_change
-    lacking <- names(rates)[is.na(rates) | is.na(dx) | dx <= 0]
+    lacking <- names(rates)[is.na(rates) | is.na(dx) | dx <= 0 | total <= 0]
     if (length(lacking)) {
-        stop_foodnet("miaSim's yields need a growth rate and a positive biomass change for every taxon; ",
-                     paste(lacking, collapse = ", "), " lack one (see print(x)). Leave them out, or use ",
-                     "crm_efficiency(x, scale = \"shares\") for a model that reads E as shares.")
+        stop_foodnet("a miaSim simulation needs a growth rate, a positive biomass change and a measured uptake ",
+                     "for every taxon; ", paste(lacking, collapse = ", "), " lack one (see print(x)). Leave them ",
+                     "out, or use crm_efficiency(x, scale = \"shares\") for a model that reads E as shares.")
     }
-    yield <- ifelse(total > 0, dx / (rates * total), 0)
-    (consumed > 0) * yield - produced * (rates / dx)
+    out <- eaten * dx / (rates * total)
+    names(out) <- x$taxa
+    out
+}
+
+#' A simulation's abundances in each taxon's growth curve unit
+#'
+#' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
+#' @param abundance Abundances from a simulation built with [as_miasim()]: a vector with one value per
+#'   taxon, or a matrix with taxa as rows (as `SummarizedExperiment::assay()` of miaSim's result).
+#' @return The same, multiplied by [crm_scale()].
+#' @export
+crm_unscale <- function(x, abundance) {
+    scale <- crm_scale(x)
+    if (is.matrix(abundance)) abundance * scale[seq_len(nrow(abundance))] else abundance * scale
 }
 
 #' The README foodnet wrote with these numbers
@@ -191,7 +239,8 @@ crm_write <- function(x, dir) {
 #'
 #' Returns the arguments `miaSim::simulateConsumerResource` takes: the numbers of taxa and resources and
 #' their names, the efficiency matrix `E`, the initial resource concentrations, the growth rates, the
-#' starting abundances and the Monod constants. miaSim is not needed to call this, and no other simulator
+#' starting abundances and the Monod constants. With the default `E`, the starting abundances are put into
+#' each taxon's simulation unit ([crm_scale()]), and [crm_unscale()] turns the simulated abundances back. miaSim is not needed to call this, and no other simulator
 #' is assumed: the result is a plain list, so
 #' `do.call(miaSim::simulateConsumerResource, c(as_miasim(crm, x0 = ..., monod_constant = ...), list(t_end = 48, t_store = 480)))`
 #' runs it. miaSim stores `t_store` of its steps of 0.1 h, evenly spread; with `t_store = 10 * t_end` it
@@ -205,7 +254,8 @@ crm_write <- function(x, dir) {
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param x0 Starting abundances of the taxa, one per taxon in the order of `x$taxa` (or named), each in the
-#'   unit of that taxon's growth curve (`x$biomass_unit`); `x$biomass_start` is each taxon's own start.
+#'   unit of that taxon's growth curve (`x$biomass_unit`); `x$biomass_start` is each taxon's own start. With
+#'   your own `E`, they are passed as given.
 #' @param monod_constant Monod constants in mM: one number for all, or a taxa by resources matrix.
 #' @param E An efficiency matrix, by default [crm_efficiency()] of `x`.
 #' @param missing_rate A growth rate for the taxa that have none, or `NULL` to stop when any does.
@@ -215,9 +265,10 @@ crm_write <- function(x, dir) {
 #'   `resources`, `growth_rates` and `monod_constant`.
 #' @examples
 #' \dontrun{
-#' args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1)
+#' args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0)
 #' set.seed(1)
 #' tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
+#' cells <- crm_unscale(crm, SummarizedExperiment::assay(tse))
 #' }
 #' @export
 as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource = NULL,
@@ -257,7 +308,10 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
         stop_foodnet("no starting concentration for ", paste(names(resources)[is.na(resources)], collapse = ", "),
                      ": give as_miasim(x, missing_resource = ) a number (0 for a resource the medium lacks).")
     }
-    if (is.null(E)) E <- crm_efficiency(x)
+    if (is.null(E)) {
+        E <- crm_efficiency(x)
+        x0 <- as.numeric(x0) / crm_scale(x)       # into each taxon's own unit (crm_scale)
+    }
     list(n_species = n, n_resources = m, names_species = x$taxa, names_resources = x$resources, E = E,
          x0 = unname(as.numeric(x0)), resources = unname(resources), growth_rates = unname(rates),
          monod_constant = unname(K))
@@ -267,29 +321,29 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
 #'
 #' Runs miaSim's consumer-resource model for each taxon on its own, from its measured starting abundance
 #' and the medium's starting concentrations, over the length of its phase, and compares what it gains and
-#' what it takes up and makes with what its monoculture did. With [crm_efficiency()]'s default scale the
-#' biomass and the by-products follow the measurements by construction whenever the total uptake does; the
-#' uptake of each resource follows the Monod constants, so this is where a choice of them is tested.
+#' what it takes up and makes with what its monoculture did, and how long it takes to gain its measured
+#' biomass with the length of its phase. With [crm_efficiency()]'s default scale the biomass and the
+#' by-products follow the uptake by construction, so what this tests is the Monod constants: how much of
+#' each resource is taken up, and how fast.
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param monod_constant Monod constants in mM: one number, or a taxa by resources matrix.
-#' @param E An efficiency matrix, by default [crm_efficiency()] of `x`.
-#' @param x0 Starting abundances, by default each taxon's own (`x$biomass_start`).
 #' @param missing_resource A starting concentration for resources with none (default 0).
-#' @return A data frame: taxon, what (`"biomass"`, or a resource), direction, measured, simulated and their
-#'   ratio; printed in short.
+#' @return A data frame: taxon, what (`"biomass"`, `"hours to grow"`, or a resource), direction, measured,
+#'   simulated and their ratio. Biomass is in each growth curve's unit.
 #' @examples
 #' \dontrun{
 #' crm_backcheck(crm, monod_constant = 1)
 #' }
 #' @export
-crm_backcheck <- function(x, monod_constant, E = NULL, x0 = x$biomass_start, missing_resource = 0) {
+crm_backcheck <- function(x, monod_constant, missing_resource = 0) {
     stopifnot(inherits(x, "foodnet_crm"))
     if (!requireNamespace("miaSim", quietly = TRUE)) {
         stop_foodnet("crm_backcheck() runs miaSim: install it with BiocManager::install(\"miaSim\")")
     }
     if (missing(monod_constant)) stop_foodnet("give monod_constant, in mM; foodnet measures none")
-    if (is.null(E)) E <- crm_efficiency(x)
+    E <- crm_efficiency(x)
+    scale <- crm_scale(x)
     n <- length(x$taxa)
     m <- length(x$resources)
     K <- if (length(monod_constant) == 1) matrix(monod_constant, n, m) else as.matrix(monod_constant)
@@ -297,37 +351,42 @@ crm_backcheck <- function(x, monod_constant, E = NULL, x0 = x$biomass_start, mis
     consumed <- x$consumed
     produced <- x$produced
     rows <- list()
+    add <- function(...) rows[[length(rows) + 1]] <<- data.frame(..., stringsAsFactors = FALSE)
     for (i in seq_len(n)) {
         taxon <- x$taxa[i]
         hours <- x$phase_hours[[taxon]]
-        if (is.na(hours) || is.na(x0[i]) || is.na(x$growth_rates[[taxon]])) next
-        steps <- max(1L, round(hours / 0.1))
+        x0 <- x$biomass_start[[taxon]]
+        if (is.na(hours) || is.na(x0)) next
+        # three phase lengths, so a taxon that grows too slowly shows how slowly
+        steps <- max(10L, round(3 * hours / 0.1))
         tse <- miaSim::simulateConsumerResource(
             n_species = 1, n_resources = m, names_species = taxon, names_resources = x$resources,
-            E = E[i, , drop = FALSE], x0 = x0[[i]], resources = unname(start), growth_rates = x$growth_rates[[taxon]],
-            monod_constant = K[i, , drop = FALSE], t_end = (steps + 1) * 0.1, t_store = steps + 1)
-        abundance <- SummarizedExperiment::assay(tse)[1, ]
+            E = E[i, , drop = FALSE], x0 = x0 / scale[[i]], resources = unname(start),
+            growth_rates = x$growth_rates[[taxon]], monod_constant = K[i, , drop = FALSE],
+            t_end = (steps + 1) * 0.1, t_store = steps + 1)
+        abundance <- SummarizedExperiment::assay(tse)[1, ] * scale[[i]]
         times <- SummarizedExperiment::colData(tse)$time
-        last <- which.min(abs(times - hours))
-        left <- S4Vectors::metadata(tse)$resources[last, seq_len(m)]
-        change <- left - start
-        rows[[length(rows) + 1]] <- data.frame(taxon = taxon, what = "biomass", direction = "grown",
-                                               measured = x$biomass_change[[taxon]],
-                                               simulated = abundance[last] - abundance[1])
+        at <- which.min(abs(times - hours))
+        grown <- abundance - abundance[1]
+        reached <- which(grown >= x$biomass_change[[taxon]])
+        add(taxon = taxon, what = "biomass", direction = "grown", measured = x$biomass_change[[taxon]],
+            simulated = grown[at])
+        add(taxon = taxon, what = "hours to grow", direction = "grown", measured = hours,
+            simulated = if (length(reached)) times[reached[1]] else NA_real_)
+        change <- S4Vectors::metadata(tse)$resources[at, seq_len(m)] - start
         for (j in seq_len(m)) {
             for (direction in c("consumed", "produced")) {
                 measured <- if (direction == "consumed") consumed[i, j] else produced[i, j]
                 simulated <- if (direction == "consumed") max(0, -change[j]) else max(0, change[j])
                 if ((is.na(measured) || measured == 0) && simulated < 1e-6) next
-                rows[[length(rows) + 1]] <- data.frame(taxon = taxon, what = x$resources[j], direction = direction,
-                                                       measured = measured, simulated = simulated)
+                add(taxon = taxon, what = x$resources[j], direction = direction, measured = measured,
+                    simulated = simulated)
             }
         }
     }
     out <- do.call(rbind, rows)
-    if (is.null(out)) stop_foodnet("no taxon has a growth rate, a starting abundance and a phase length")
+    if (is.null(out)) stop_foodnet("no taxon has a starting abundance and a phase length")
     out$ratio <- out$simulated / out$measured
     rownames(out) <- NULL
     out
 }
-

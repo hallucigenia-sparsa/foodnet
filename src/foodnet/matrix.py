@@ -436,13 +436,13 @@ def readme(result: dict, which: str = "matrices") -> str:
                      "reads as growth. The R package refuses to build a CRM from them unless told to."]
                     if crm_phase(result) == "stationary" else []),
                   "",
-                  "These are measured amounts. miaSim's simulateConsumerResource takes an efficiency matrix E: "
-                  "a positive entry is the biomass made per mM of a resource taken up (a yield; the uptake itself "
-                  "is set by the Monod constants, not by E), and a negative one the mM of a by-product made per "
-                  "unit of growth. The foodnet R package's crm_efficiency() builds E that way from these amounts, "
-                  "the biomass changes and the growth rates, so that a taxon simulated alone gains its measured "
-                  "biomass and makes its measured by-products; crm_backcheck() simulates each taxon alone and "
-                  "says how close it comes. foodnet measures no Monod constants, and miaSim's uptake of each "
+                  "These are measured amounts. miaSim's simulateConsumerResource takes an efficiency matrix E and "
+                  "has no uptake rate: a taxon takes up each resource at up to 1 mM per unit of abundance per hour, "
+                  "so the unit of abundance decides how fast it eats. The foodnet R package's crm_efficiency() and "
+                  "as_miasim() give each taxon a unit of its own (crm_scale), from these amounts, the biomass "
+                  "changes and the growth rates, so that a taxon alone grows at its measured rate, gains its "
+                  "measured biomass and makes its measured by-products; crm_backcheck() simulates each taxon alone "
+                  "and says how close it comes. foodnet measures no Monod constants, and miaSim's uptake of each "
                   "resource follows them: choose them, and check them with crm_backcheck().", ""]
     return "\n".join(lines).rstrip() + "\n"
 

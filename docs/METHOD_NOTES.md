@@ -140,11 +140,16 @@ with metabolite data."
     linoleic acid, study SMGDB00000014; 0 to 5 mg/L pantothenate, study SMGDB00000019, formerly one medium).
 26. **CRM parameters follow miaSim's equations.** Karoline, 2026-10-06: "rebuild from miaSim". Read from
     miaSim 1.18's `consumerResourceModel`: a positive entry of E is a yield (uptake is `R/(R+K)` per unit
-    abundance whatever E is), a negative one the by-product per unit of growth. The payload (now
-    `foodnet.crm/v1`) carries each taxon's biomass change over the phase, in its growth curve's unit, and
-    `crm_efficiency()` sets E so that a taxon alone gains its measured biomass and makes its measured
-    by-products from its measured uptake; how uptake splits between resources follows the Monod constants,
-    which foodnet does not measure, and `crm_backcheck()` simulates each taxon alone to test a choice.
+    abundance whatever E is), a negative one the by-product per unit of growth. miaSim has no uptake rate,
+    so the unit of abundance sets how fast a taxon eats (a second round of the review found a first version,
+    with E as a yield in cells/mL, emptying the medium within 0.1 h, with the growth rates cancelling out).
+    So each taxon gets a unit of its own, `crm_scale()` = `n * dx / (mu * C)` growth curve units, in which E
+    is `1/n` on each consumed resource and `-n * produced / C` on each by-product: alone, a taxon grows at
+    its measured rate, gains its measured biomass and makes its measured by-products in proportion to its
+    uptake, and the simulation does not depend on the unit. The payload (now `foodnet.crm/v1`) carries each
+    taxon's biomass change over the phase, keyed by technique and unit; how uptake splits between resources
+    follows the Monod constants, which foodnet does not measure, and `crm_backcheck()` simulates each taxon
+    alone to test a choice, including how long it takes to grow.
     `as_miasim()` requires starting abundances and Monod constants (miaSim would draw them at random) and
     refuses pooled media and the stationary phase unless allowed. 0.1.0's uptake shares remain as
     `scale = "shares"`.

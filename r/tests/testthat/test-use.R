@@ -7,15 +7,18 @@ with_rate <- function() {
     foodnet:::as_foodnet_crm(payload)
 }
 
-test_that("E follows miaSim: yields per mM taken up, by-products per unit of growth", {
-    E <- suppressWarnings(crm_efficiency(with_rate()))
-    # A: yield 2 / (0.4 * 8) = 0.625 on glucose; acetate -4 * 0.4 / 2 = -0.8
-    expect_equal(unname(E["A", ]), c(0.625, -0.8, 0))
-    # B: yield 1 / (0.5 * 8) = 0.25 on glucose and acetate; butyrate -3 * 0.5 / 1 = -1.5
-    expect_equal(unname(E["B", ]), c(0.25, 0.25, -1.5))
+test_that("E follows miaSim: 1/n on each consumed resource, by-products scaled to the uptake", {
+    crm <- with_rate()
+    E <- suppressWarnings(crm_efficiency(crm))
+    # A consumed one resource (glucose 8) and made 4 acetate: 1, and -1 * 4 / 8
+    expect_equal(unname(E["A", ]), c(1, -0.5, 0))
+    # B consumed two (glucose 2, acetate 6; 8 in all) and made 3 butyrate: 1/2 each, and -2 * 3 / 8
+    expect_equal(unname(E["B", ]), c(0.5, 0.5, -0.75))
+    # each taxon's unit: n * dx / (mu * C); A 1 * 2 / (0.4 * 8), B 2 * 1 / (0.5 * 8)
+    expect_equal(unname(suppressWarnings(crm_scale(crm))), c(0.625, 0.5))
 })
 
-test_that("miaSim's yields need a rate and a biomass change for every taxon", {
+test_that("miaSim's units need a rate and a biomass change for every taxon", {
     crm <- foodnet:::as_foodnet_crm(example_payload())
     expect_error(suppressWarnings(crm_efficiency(crm)), "B lack one")
 })
@@ -49,7 +52,8 @@ test_that("as_miasim needs starting abundances and Monod constants, never drawn 
     expect_equal(args$n_species, 2)
     expect_equal(args$names_resources, c("glucose", "acetate", "butyrate"))
     expect_equal(args$growth_rates, c(0.4, 0.5))
-    expect_equal(args$x0, c(0.5, 0.2))
+    expect_equal(args$x0, c(0.5 / 0.625, 0.2 / 0.5))         # into each taxon's unit (crm_scale)
+    expect_equal(crm_unscale(crm, args$x0), c(A = 0.5, B = 0.2))
     expect_equal(dim(args$monod_constant), c(2, 3))
     expect_equal(args$resources, c(10, 2, 0))
 })
@@ -90,4 +94,9 @@ test_that("a taxon simulated alone gains its biomass and makes its by-products w
     # whatever the uptake, biomass and acetate are in the measured proportion to it
     expect_equal(b$simulated[b$what == "biomass"] / taken, 2 / 8, tolerance = 0.02)
     expect_equal(b$simulated[b$what == "acetate"] / taken, 4 / 8, tolerance = 0.02)
+    # and it grows at its measured rate: from 0.5 to 2.5 at 0.4/h takes about log(5) / 0.4 = 4 h when
+    # glucose stays saturating (K = 5 mM slows it), never minutes
+    hours <- b$simulated[b$what == "hours to grow"]
+    expect_gt(hours, 3)
+    expect_lt(hours, 12)
 })

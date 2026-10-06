@@ -3,22 +3,21 @@
 \alias{crm_backcheck}
 \title{Simulate each taxon alone and compare with its monoculture}
 \usage{
-crm_backcheck(x, monod_constant, E = NULL, x0 = x$biomass_start, missing_resource = 0)
+crm_backcheck(x, monod_constant, missing_resource = 0)
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
 \item{monod_constant}{Monod constants in mM: one number, or a taxa by resources matrix.}
-\item{E}{An efficiency matrix, by default \code{\link{crm_efficiency}} of \code{x}.}
-\item{x0}{Starting abundances, by default each taxon's own (\code{x$biomass_start}).}
 \item{missing_resource}{A starting concentration for resources with none (default 0).}
 }
-\value{A data frame: taxon, what (\code{"biomass"}, or a resource), direction, measured, simulated and their ratio; printed in short.}
+\value{A data frame: taxon, what (\code{"biomass"}, \code{"hours to grow"}, or a resource), direction, measured, simulated and their ratio. Biomass is in each growth curve's unit.}
 \description{
 Runs miaSim's consumer-resource model for each taxon on its own, from its measured starting abundance
 and the medium's starting concentrations, over the length of its phase, and compares what it gains and
-what it takes up and makes with what its monoculture did. With \code{\link{crm_efficiency}}'s default scale the
-biomass and the by-products follow the measurements by construction whenever the total uptake does; the
-uptake of each resource follows the Monod constants, so this is where a choice of them is tested.
+what it takes up and makes with what its monoculture did, and how long it takes to gain its measured
+biomass with the length of its phase. With \code{\link{crm_efficiency}}'s default scale the biomass and the
+by-products follow the uptake by construction, so what this tests is the Monod constants: how much of
+each resource is taken up, and how fast.
 }
 \examples{
 \dontrun{

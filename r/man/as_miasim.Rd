@@ -7,7 +7,7 @@ as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
-\item{x0}{Starting abundances of the taxa, one per taxon in the order of \code{x$taxa} (or named), each in the unit of that taxon's growth curve (\code{x$biomass_unit}); \code{x$biomass_start} is each taxon's own start.}
+\item{x0}{Starting abundances of the taxa, one per taxon in the order of \code{x$taxa} (or named), each in the unit of that taxon's growth curve (\code{x$biomass_unit}); \code{x$biomass_start} is each taxon's own start. With your own \code{E}, they are passed as given.}
 \item{monod_constant}{Monod constants in mM: one number for all, or a taxa by resources matrix.}
 \item{E}{An efficiency matrix, by default \code{\link{crm_efficiency}} of \code{x}.}
 \item{missing_rate}{A growth rate for the taxa that have none, or \code{NULL} to stop when any does.}
@@ -18,7 +18,8 @@ as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource
 \description{
 Returns the arguments \code{miaSim::simulateConsumerResource} takes: the numbers of taxa and resources and
 their names, the efficiency matrix \code{E}, the initial resource concentrations, the growth rates, the
-starting abundances and the Monod constants. miaSim is not needed to call this, and no other simulator
+starting abundances and the Monod constants. With the default \code{E}, the starting abundances are put into
+each taxon's simulation unit (\code{\link{crm_scale}}), and \code{\link{crm_unscale}} turns the simulated abundances back. miaSim is not needed to call this, and no other simulator
 is assumed: the result is a plain list, so
 \code{do.call(miaSim::simulateConsumerResource, c(as_miasim(crm, x0 = ..., monod_constant = ...), list(t_end = 48, t_store = 480)))}
 runs it. miaSim stores \code{t_store} of its steps of 0.1 h, evenly spread; with \code{t_store = 10 * t_end} it
@@ -32,8 +33,9 @@ real medium) or come from the stationary phase (uptake without growth), unless \
 }
 \examples{
 \dontrun{
-args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1)
+args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0)
 set.seed(1)
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
+cells <- crm_unscale(crm, SummarizedExperiment::assay(tse))
 }
 }

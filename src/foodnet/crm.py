@@ -102,7 +102,8 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
     """{taxon: {"change", "start", "unit", "hours", "n"}}: the growth of each taxon over `phase`, from the
     value-set cultures' growth curves, interpolated at the start and end of the window their metabolite
     values cover (one culture's rows share it), averaged over the cultures. A taxon whose curves come in
-    several units takes the unit most of its cultures use; one without a curve or a window is absent."""
+    several techniques or units takes the one most of its cultures use (n says how many); one without a
+    curve or a window is absent."""
     windows = {}
     for r in rows:
         if r["phase"] == phase and r["change"] is not None and not r.get("second"):
@@ -115,7 +116,10 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         series = list(zip(c.growth["times"], c.growth["values"], strict=True))
         x0, _ = value_at(series, start)
         x1, _ = value_at(series, end)
-        by_taxon[c.taxon["id"]].append({"unit": c.growth.get("unit") or c.growth.get("technique") or "",
+        # the unit is the technique and its unit together: qPCR gene copies and flow cytometry events can both
+        # be "Cells/mL" and still measure different things (DNA from lysed cells counts in one, not the other)
+        unit = " ".join(x for x in (c.growth.get("technique") or "", c.growth.get("unit") or "") if x)
+        by_taxon[c.taxon["id"]].append({"unit": unit,
                                         "start": x0, "change": x1 - x0, "hours": end - start})
     out = {}
     for taxon, found in by_taxon.items():

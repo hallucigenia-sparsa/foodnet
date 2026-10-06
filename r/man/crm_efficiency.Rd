@@ -17,22 +17,24 @@ taxa by resources, positive where a taxon consumes a resource and negative where
 builds one from the measured amounts.
 
 With \code{scale = "miasim"} (the default), \code{E} follows miaSim's own equations, read from its source
-(\code{consumerResourceModel}, miaSim 1.18): a taxon grows by \code{growth_rate * sum_j E[j] * R[j] / (R[j] + K[j])}
-per unit of its abundance, takes up each resource it consumes at \code{R / (R + K)} per unit of abundance
-whatever the size of \code{E}, and makes each by-product at \code{|E|} times its growth. So a positive entry is a
-yield, the biomass made per mM taken up, and a negative one the mM of a by-product made per unit of
-biomass divided by the growth rate. For each taxon, with its biomass change \code{dx} and growth rate \code{mu}
-over the phase, \code{E} is \code{dx / (mu * total consumed)} for every resource it consumed and
-\code{-produced * mu / dx} for every resource it produced, so that a taxon simulated alone gains its measured
-biomass from its measured uptake and makes its measured by-products. How its uptake splits between
-resources is set by the Monod constants, which foodnet does not measure; \code{\link{crm_backcheck}} says how close
-a choice of them comes. The biomass is in the unit of each taxon's growth curve (\code{x$biomass_unit}), and so
-must be its starting abundance in a simulation.
+(\code{consumerResourceModel}, miaSim 1.18): a taxon of abundance \code{x} grows at
+\code{growth_rate * x * sum_j E[j] * R[j] / (R[j] + K[j])}, takes up each resource it consumes at
+\code{x * R / (R + K)} whatever the size of \code{E} (at most 1 mM per unit of abundance per hour), and makes each
+by-product at \code{|E|} times its growth (without the growth rate). miaSim has no uptake rate of its own, so
+its unit of abundance sets how fast a taxon eats: in cells/mL a culture would empty its medium within
+minutes. foodnet therefore gives each taxon a unit of its own, \code{\link{crm_scale}}: \code{n * dx / (mu * C)} units
+of its growth curve, with \code{dx} its biomass change, \code{mu} its growth rate, \code{C} its total uptake and \code{n}
+the number of resources it consumed. In that unit, \code{E} is \code{1 / n} on each consumed resource (so a
+saturated taxon grows at its measured rate) and \code{-n * produced / C} on each produced one, and a taxon
+alone gains its measured biomass and makes its measured by-products in proportion to what it takes up,
+in about the measured time. The same data in another unit give the same simulation. How its uptake splits
+between resources follows the Monod constants, which foodnet does not measure; \code{\link{crm_backcheck}} says how
+close a choice of them comes. \code{\link{as_miasim}} puts the starting abundances into these units, and
+\code{\link{crm_unscale}} turns a simulation's abundances back into each growth curve's unit.
 
 \code{scale = "shares"} is foodnet 0.1.0's matrix: each row divided by the total consumed, so consumed entries
-are shares of uptake and produced entries by-product per unit taken up. miaSim does not read \code{E} that way
-(it reads a positive entry as a yield), so a simulation from it does not reproduce the monocultures; it is
-kept for other models. \code{scale = "none"} is consumed minus produced, in mM.
+are shares of uptake and produced entries by-product per unit taken up; for other models.
+\code{scale = "none"} is consumed minus produced, in mM.
 
 \code{NA} cells have no size. With \code{na = "zero"} they count as 0, and a warning says how many of each kind
 were set to 0: never assayed, seen only in another medium (a real link), inconclusive (measured, but its

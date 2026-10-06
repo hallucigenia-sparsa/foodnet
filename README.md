@@ -138,18 +138,22 @@ then:
 ```r
 library(foodnet)
 crm <- foodnet_listen()                      # and press Send to R on the page
-E <- crm_efficiency(crm)                     # miaSim's yields and by-products per unit of growth
+E <- crm_efficiency(crm)                     # miaSim's efficiency matrix, in each taxon's own unit
 crm_backcheck(crm, monod_constant = 1)       # each taxon alone against its own monoculture
-args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1)
+args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0)
 set.seed(1)
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
+abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse))   # back in each growth curve's unit
 ```
 
-The matrices are measured amounts. miaSim reads a positive entry of its efficiency matrix as a yield (the
-biomass made per mM taken up; uptake itself follows the Monod constants) and a negative one as a by-product
-per unit of growth, so `crm_efficiency()` builds E from the amounts, the biomass changes and the growth
-rates such that a taxon alone gains its measured biomass and makes its measured by-products. foodnet
-measures no Monod constants: choose them, and check the choice with `crm_backcheck()`. `as_miasim()` never
+The matrices are measured amounts. miaSim has no uptake rate: a taxon takes up each resource at up to 1 mM
+per unit of abundance per hour, so the unit of abundance decides how fast it eats. `crm_efficiency()` and
+`as_miasim()` therefore give each taxon a unit of its own (`crm_scale()`), chosen from its biomass change,
+growth rate and uptake so that, alone, it grows at its measured rate, gains its measured biomass and makes
+its measured by-products in proportion to what it takes up; the same data in another unit give the same
+simulation. foodnet measures no Monod constants, and uptake of each resource follows them: choose them, and
+check the choice with `crm_backcheck()`, which also compares the time each taxon takes to grow with its
+phase. `as_miasim()` never
 lets miaSim draw starting abundances or Monod constants at random, and refuses pooled media and the
 stationary phase unless allowed. With the phase choice Both, the CRM parameters use the exponential phase,
 since a consumer-resource model describes growth. See [r/README.md](r/README.md).

@@ -227,9 +227,9 @@ concentrations and each taxon's biomass change over the phase with a README, or 
 CRM uses the exponential phase.</p>
 <p>The R companion package receives them. Install it once with <code>{_e(rbridge.INSTALL_R)}</code>
 ({_e(rbridge.INSTALL_TROUBLE)}), then <code>library(foodnet); crm &lt;- foodnet_listen()</code> and press Send to R.
-<code>crm_efficiency(crm)</code> builds <a href="{MIASIM}">miaSim</a>'s efficiency matrix from its equations: a
-positive entry is a yield (biomass per mM taken up), a negative one a by-product per unit of growth, so a taxon
-alone gains its measured biomass and makes its measured by-products. Uptake of each resource follows the Monod
+<code>crm_efficiency(crm)</code> builds <a href="{MIASIM}">miaSim</a>'s efficiency matrix from its equations, in a
+unit of abundance chosen per taxon (<code>crm_scale</code>) so that, alone, it grows at its measured rate, gains its
+measured biomass and makes its measured by-products. Uptake of each resource follows the Monod
 constants, which foodnet does not measure: <code>crm_backcheck(crm, monod_constant = 1)</code> simulates each taxon
 alone against its monoculture. <code>as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1)</code> gives the
 arguments of <code>simulateConsumerResource</code>, and never lets it draw starting abundances or Monod constants at
