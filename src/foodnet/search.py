@@ -35,6 +35,9 @@ DEFAULTS = {
     # off: a filled second box limits the search to what matches it; on: everything else the taxa were grown
     # in adds presence-only evidence (Karoline, 2026-10-05)
     "outside_evidence": False,
+    # how a matrix cell seen only in another medium is written: "na" (cautious), "true", or "value" (the change
+    # measured there, drawn on its own background in the image) (Karoline, 2026-10-06)
+    "presence_entries": "na",
     # nothing is left out by default: a metabolite with a known measurement problem is handled in mGrowthDB
     # (Karoline, 2026-10-04: "we don't want to skip any metabolites by default")
     "exclude_metabolites": "",

@@ -64,6 +64,8 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--outside-evidence", action="store_true",
                    help="with --conditions, also take presence-only evidence from everything outside it")
     d.add_argument("--booleans", action="store_true", help="report 1, 0 or NA instead of amounts")
+    d.add_argument("--presence-entries", choices=["na", "true", "value"], default=DEFAULTS["presence_entries"],
+                   help="how a cell seen only in another medium is written in the matrices (default na)")
     d.add_argument("--report-rates", action="store_true", help="collect growth rates")
     d.add_argument("--crm-mode", action="store_true", help="what a consumer-resource model needs (growth rates on)")
     d.add_argument("--rate-method", choices=list(rates.METHODS), default=DEFAULTS["rate_method"])
@@ -104,7 +106,7 @@ def settings_from(a) -> dict:
     s = dict(DEFAULTS)
     s.update(phase=a.phase, fraction=a.fraction, no_growth_factor=a.no_growth_factor,
              detection_limit=a.detection_limit, ignore_media=a.ignore_media, booleans=a.booleans,
-             outside_evidence=a.outside_evidence,
+             outside_evidence=a.outside_evidence, presence_entries=a.presence_entries,
              second_window_metabolites=", ".join(a.second_window or []),
              second_window_start=a.second_window_from, second_window_end=a.second_window_to,
              report_rates=a.report_rates or a.crm_mode, rate_method=a.rate_method, rate_window=a.rate_window,

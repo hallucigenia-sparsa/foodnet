@@ -91,3 +91,11 @@ def test_every_cell_names_its_source_studies_on_mouseover(client):
     assert "not assayed" in formate and "Seen in mMCB (+5 mM, 1 replicate(s)): SMGDB00000002" in formate
     # one title per cell: 3 taxa x 4 metabolites x 2 matrices
     assert len(titles) == 24
+
+
+def test_a_value_from_another_medium_has_its_own_background(client):
+    root = ET.fromstring(figure.matrices_svg(run(client, presence_entries="value")))
+    fills = [r.get("fill") for r in root.iter(f"{SVG}rect")]
+    assert fills.count(figure.OTHER_MEDIUM) == 3       # B's formate, C's glucose, and the key
+    texts = _texts(figure.matrices_svg(run(client, presence_entries="value")))
+    assert "5.0" in texts and "value from another medium, not comparable with the gray scale" in texts

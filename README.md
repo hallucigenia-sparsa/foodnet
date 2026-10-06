@@ -102,7 +102,9 @@ Every arc also says how long its cultures grew exponentially (`exponential_h`, i
 table and in every file.
 
 In every matrix a number is a change beyond the detection limit, 0 is measured without one, and NA is no
-value. With Both, each metabolite has a column per phase.
+value. A change seen only in another medium is NA by default; Advanced settings can write it as TRUE or as
+the amount measured there (drawn on a background of its own in the image), and the evidence matrices mark
+it `presence_only` either way. With Both, each metabolite has a column per phase.
 
 ## Consumer-resource models in R
 

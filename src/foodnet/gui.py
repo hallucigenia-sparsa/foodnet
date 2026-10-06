@@ -92,6 +92,9 @@ def _settings_block(settings: dict) -> str:
     s = {**DEFAULTS, **settings}
     rate_methods = "".join(f"<option value=\"{m}\"{' selected' if s['rate_method'] == m else ''}>{m}</option>"
                            for m in rates.METHODS)
+    presence_options = "".join(
+        f"<option value=\"{k}\"{' selected' if s['presence_entries'] == k else ''}>{label}</option>"
+        for k, label in (("na", "NA"), ("true", "TRUE"), ("value", "Value from the other medium")))
     corrections = "".join(f"<option value=\"{c}\"{' selected' if s['correction'] == c else ''}>{label}</option>"
                           for c, label in (("bh", "Benjamini-Hochberg"), ("by", "Benjamini-Yekutieli")))
     return f"""<details>
@@ -128,6 +131,11 @@ def _settings_block(settings: dict) -> str:
   On, every other medium and study holding these taxa adds presence-only evidence (dashed arcs, NA in the
   value matrices); the values still come from the second box. Without anything in the second box, all data
   are considered anyway</span></div>
+<div class="row"><label>Entries seen only in another medium
+  <select name="presence_entries">{presence_options}</select></label>
+  <span class="muted">how a matrix cell is written whose change was seen only in another medium than the values come
+  from: NA (default, the cautious choice), TRUE, or the amount measured there, which the image shows on a
+  background of its own. The evidence matrices mark these cells presence_only whatever is chosen</span></div>
 <div class="row"><label><input type="checkbox" name="booleans" value="1"{_checked(s['booleans'])}>
   Report everything as booleans</label>
   <span class="muted">1 when a taxon produced or consumed a compound (in any medium), 0 when it was measured and
@@ -520,6 +528,8 @@ def parse_settings(form: dict) -> dict:
             s[key] = max(low, value)
     if form.get("rate_method", [""])[0] in rates.METHODS:
         s["rate_method"] = form["rate_method"][0]
+    if form.get("presence_entries", [""])[0] in matrix.PRESENCE_ENTRIES:
+        s["presence_entries"] = form["presence_entries"][0]
     if form.get("correction", [""])[0] in ("bh", "by"):
         s["correction"] = form["correction"][0]
     for key in ("ignore_media", "booleans", "report_rates", "merge_arcs", "merge_genera", "outside_evidence"):

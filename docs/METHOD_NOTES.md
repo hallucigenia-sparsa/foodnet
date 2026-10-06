@@ -83,7 +83,12 @@ with metabolite data."
 15. **Values are used as mGrowthDB serves them, zeros included.** Karoline, 2026-10-05, on the isolated
     zeros in study SMGDB00000009 (B. fragilis formate at 4 h and 48 h): there is no reason to treat a zero
     as a missing value. Formerly open decision 3.
-16. **Studies are found through the species list**, not mGrowthDB's search, which matches per-strain
+16. **Entries seen only in another medium are NA by default, TRUE or their value on request.** Karoline,
+    2026-10-06: NA "is a cautious default. I'd like to have an option to set them to TRUE and another option
+    to show the value but with a different background color in the image". The value is the mean over the
+    other media's replicates; the image draws it outside the gray scale, since it is not comparable with the
+    value medium's amounts. A CRM takes TRUE entries as missing.
+17. **Studies are found through the species list**, not mGrowthDB's search, which matches per-strain
     measurements only and so misses a monoculture measured at the culture level (study SMGDB00000009).
 
 ## Open decisions

@@ -27,6 +27,9 @@ from .matrix import columns, pair_rows, taxa_rows
 
 CELL_W, CELL_H = 44, 24
 NOT_ASSAYED = "#F6D9B8"
+# a value taken from another medium (Advanced settings: entries seen only in another medium, "value"): a
+# background of its own, outside the gray scale and apart from the not-assayed orange
+OTHER_MEDIUM = "#E4DCF1"
 GAP = 36              # between the two panels
 MAX_SIDE_BY_SIDE = 1000   # px; wider, the panels stack
 FONT = "system-ui, -apple-system, 'Segoe UI', sans-serif"
@@ -116,7 +119,10 @@ def matrices_svg(result: dict) -> str:
     cols = columns(net, result)
     booleans = bool(result["settings"].get("booleans"))
     limit = result["settings"].get("detection_limit", 0.2)
-    values = [v for d in ("consumed", "produced") for row in pair[d] for v in row if isinstance(v, (int, float))]
+    # the gray scale is set by the value medium's measurements only; a value from another medium is not
+    # comparable with them and is drawn on its own background
+    values = [v for d in ("consumed", "produced") for row, ev in zip(pair[d], pair[f"evidence_{d}"], strict=True)
+              for v, e in zip(row, ev, strict=True) if e == "measured" and isinstance(v, (int, float))]
     vmax = max(values, default=0) or 1.0
     names = pair["taxa"]
     label_w = max((_text_width(n, 12) for n in names), default=60) + 12
@@ -183,6 +189,12 @@ def matrices_svg(result: dict) -> str:
                                    f'text-anchor="middle" fill="{ink}">{_number(v)}</text>')
                     out.append("</g>")
                     continue
+                if evidence == "presence_only" and isinstance(v, float) and not booleans:
+                    out.append(f'<rect x="{x}" y="{y}" width="{CELL_W}" height="{CELL_H}" fill="{OTHER_MEDIUM}"/>')
+                    out.append(f'<text x="{x + CELL_W / 2:.1f}" y="{y + CELL_H / 2 + 4:.1f}" font-size="10.5" '
+                               f'text-anchor="middle" fill="{brand.INK}">{_number(v)}</text>')
+                    out.append("</g>")
+                    continue
                 cell = result["cells"].get((t.id, m.id, ph))
                 assayed = cell is not None and cell["n"]
                 fill = "#ffffff" if assayed else NOT_ASSAYED
@@ -210,6 +222,9 @@ def matrices_svg(result: dict) -> str:
              ("#ffffff", "", f"measured, no change beyond {limit:g} mM"),
              (NOT_ASSAYED, "", "not assayed"),
              ("#ffffff", "circle", "seen only in another medium")]
+    if any(isinstance(v, float) and e == "presence_only" for d in ("consumed", "produced")
+           for row, ev in zip(pair[d], pair[f"evidence_{d}"], strict=True) for v, e in zip(row, ev, strict=True)):
+        items[-1] = (OTHER_MEDIUM, "", "value from another medium, not comparable with the gray scale")
     x = label_w
     for fill, mark, text in items:
         item_w = 22 + _text_width(text, 11) + 22

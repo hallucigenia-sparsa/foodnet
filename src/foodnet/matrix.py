@@ -100,6 +100,24 @@ def _booleans(result: dict) -> bool:
     return bool(result["settings"].get("booleans"))
 
 
+PRESENCE_ENTRIES = ("na", "true", "value")
+TRUE = "TRUE"
+
+
+def presence_entries(result: dict) -> str:
+    """How a cell seen only in another medium is written (Karoline, 2026-10-06): "na" (the cautious default),
+    "true", or "value", the change measured there."""
+    choice = result["settings"].get("presence_entries", "na")
+    return choice if choice in PRESENCE_ENTRIES else "na"
+
+
+def presence_value(entries) -> float:
+    """The change seen in other media, in mM: the mean over all their replicates (each medium's mean weighted
+    by its replicates)."""
+    n = sum(e["n"] for e in entries)
+    return sum(e["mean"] * e["n"] for e in entries) / n
+
+
 def entry(result: dict, taxon: str, met: str, ph: str, direction: str) -> tuple:
     """(value, evidence) of one cell of the consumed or the produced matrix."""
     cell = result["cells"].get((taxon, met, ph))
@@ -112,7 +130,14 @@ def entry(result: dict, taxon: str, met: str, ph: str, direction: str) -> tuple:
             return 1, "presence_only"
         return 0, "below_limit"
     if seen:
-        return (1 if booleans else None), "presence_only"
+        if booleans:
+            return 1, "presence_only"
+        choice = presence_entries(result)
+        if choice == "true":
+            return TRUE, "presence_only"
+        if choice == "value":
+            return abs(presence_value(seen)), "presence_only"
+        return None, "presence_only"
     return None, "not_assayed"
 
 
@@ -132,12 +157,22 @@ def signed_entry(result: dict, taxon: str, met: str, ph: str):
     seen = result["presence"].get((taxon, met, ph)) or {}
     if booleans and len(seen) == 1:
         return 1 if "produced" in seen else -1
+    if len(seen) == 1 and not booleans:
+        # one direction seen in other media: written as the setting says. TRUE carries no sign, so the
+        # direction is read from the consumed and produced matrices; both directions seen stays NA
+        choice = presence_entries(result)
+        if choice == "true":
+            return TRUE
+        if choice == "value":
+            return presence_value(next(iter(seen.values())))
     return None
 
 
 def _number(value) -> str:
     if value is None:
         return NA
+    if isinstance(value, str):
+        return value
     if isinstance(value, int):
         return str(value)
     return f"{value:.6g}"
@@ -285,8 +320,14 @@ def readme(result: dict, which: str = "matrices") -> str:
               "never negative; in the signed matrix a produced compound is positive and a consumed one negative.",
               "",
               "NA is never zero. A cell is NA when the compound was not assayed for that taxon in the value "
-              "medium, or when its change was seen only in another medium (presence only). The evidence_*.csv "
-              "files say which, cell by cell: measured, below_limit, presence_only, not_assayed.",
+              "medium" + {"na": ", or when its change was seen only in another medium (presence only)",
+                          "true": "; a change seen only in another medium is written TRUE (Advanced settings), "
+                                  "and its direction is the matrix it stands in",
+                          "value": "; a change seen only in another medium is written as the amount measured "
+                                   "there (Advanced settings), not comparable with the value medium's amounts"
+                          }[presence_entries(result)]
+              + ". The evidence_*.csv files say which, cell by cell: measured, below_limit, presence_only, "
+              "not_assayed.",
               f"Cells: {tally['measured']} measured, {tally['below_limit']} measured below the limit or the other "
               f"way, {tally['presence_only']} presence only, {tally['not_assayed']} not assayed.", ""]
     if rule["rule"] == "all":
@@ -312,6 +353,9 @@ def readme(result: dict, which: str = "matrices") -> str:
         lines += ["Growth rates: each taxon's maximum specific growth rate in monoculture (1/h), the median over "
                   "the replicates whose metabolites gave the values, or else over another monoculture in the same "
                   "medium. growth_rates.csv says which, per taxon. A taxon without a rate needs one from elsewhere.",
+                  *(["Entries seen only in another medium were set to TRUE in the matrices; a CRM needs amounts, "
+                     "so they are missing here (their evidence says presence_only)."]
+                    if presence_entries(result) == "true" else []),
                   "Initial concentrations: each metabolite's concentration at the first sample of the value-medium "
                   "cultures, averaged (initial_concentrations.csv), in mM.",
                   "",
@@ -337,6 +381,10 @@ def pair_package(result: dict) -> bytes:
         z.writestr("matrices.svg", matrices_svg(result))
         z.writestr("README.txt", readme(result))
     return buffer.getvalue()
+
+
+def _numbers(rows) -> list:
+    return [[None if isinstance(v, str) else v for v in row] for row in rows]
 
 
 def crm_payload(result: dict) -> dict:
@@ -365,7 +413,9 @@ def crm_payload(result: dict) -> dict:
         "detection_limit_mM": result["settings"]["detection_limit"],
         "taxa": pair["taxa"], "taxon_ids": [t.id for t in taxa],
         "resources": [m.name for m in mets], "resource_ids": [m.id for m in mets],
-        "consumed": pair["consumed"], "produced": pair["produced"],
+        # a CRM takes numbers: a TRUE entry is no amount, so it is sent as missing (the evidence matrices
+        # still say presence_only)
+        "consumed": _numbers(pair["consumed"]), "produced": _numbers(pair["produced"]),
         "evidence_consumed": pair["evidence_consumed"], "evidence_produced": pair["evidence_produced"],
         "growth_rates": rates, "growth_rate_unit": "1/h",
         "growth_rate_detail": {pair["taxa"][i]: result["rates"][t.id] for i, t in enumerate(taxa)

@@ -33,6 +33,10 @@ SETTINGS = {
     "no_growth_factor": "A culture that rose less than this many times did not grow and has no phases (1.5).",
     "detection_limit": "A mean change smaller than this, in either direction, counts as no change (0.2 mM).",
     "ignore_media": "Values from every medium, pooled, instead of only from the value medium.",
+    "presence_entries": "How a matrix cell seen only in another medium is written: NA (the cautious default), "
+                        "TRUE, or the amount measured there (shown on its own background in the image; not "
+                        "comparable with the value medium's amounts). CRM parameters take numbers, so TRUE "
+                        "cells reach them as missing.",
     "booleans": "Report 1, 0 or NA instead of amounts; presence in another medium counts as 1.",
     "report_rates": "Collect each taxon's maximum specific growth rate, which a consumer-resource model needs. "
                     "CRM mode switches it on.",

@@ -39,3 +39,12 @@ test_that("the parameters can be written as files", {
     expect_true(all(file.exists(paths)))
     expect_equal(read.csv(paths[3])$growth_rate, c(0.4, NA))
 })
+
+test_that("a link that arrives with an amount from another medium is not warned about", {
+    payload <- example_payload()
+    payload$produced[[2]][[2]] <- 1.5                  # B's acetate, seen elsewhere, now with its value
+    crm <- foodnet:::as_foodnet_crm(payload)
+    expect_no_warning(E <- crm_efficiency(crm))
+    # B: consumed 2 + 6 = 8, produced acetate 1.5 and butyrate 3: acetate 0.75 - 1.5/8 = 0.5625
+    expect_equal(unname(E["B", "acetate"]), 0.5625)
+})

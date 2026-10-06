@@ -95,6 +95,15 @@ crm_efficiency <- function(x, normalize = c("consumed", "none"), na = c("zero", 
                          "only in another medium). Fill them, or use crm_efficiency(x, na = \"zero\").")
         }
         presence <- x$caveats$presence_only
+        # only the links that reach R without an amount count as 0; with foodnet's "value from the other
+        # medium" they arrive with one
+        if (nrow(presence)) {
+            missing <- mapply(function(taxon, resource, direction) {
+                m <- if (direction == "consumed") x$consumed else x$produced
+                is.na(m[taxon, resource])
+            }, presence$taxon, presence$resource, presence$direction)
+            presence <- presence[missing, , drop = FALSE]
+        }
         if (nrow(presence)) {
             warning(nrow(presence), " link(s) seen only in another medium count as 0 here, though they are ",
                     "real: ", paste0(utils::head(presence$taxon, 6), " ", utils::head(presence$direction, 6),

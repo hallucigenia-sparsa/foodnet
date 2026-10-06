@@ -103,3 +103,26 @@ def test_second_window_columns_say_what_they_were_measured_over(client):
     assert header == ["taxon", "acetate (exponential)", "butyrate (exponential)", "formate (exponential)",
                       "glucose (0 h to the last sample)"]
     assert _rows(matrix.signed_csv(r["network"], r))[1] == ["Alpha alpha A1", "4", "NA", "NA", "-8.5"]
+
+
+def test_entries_seen_only_in_another_medium_are_na_true_or_their_value(client):
+    # Karoline, 2026-10-06: NA "is a cautious default. I'd like to have an option to set them to TRUE and another
+    # option to show the value but with a different background color in the image"
+    # B's formate rose 5 mM in mMCB only; C's glucose fell 5 mM in mMCB only (conftest.py)
+    na = run(client)
+    assert _rows(matrix.signed_csv(na["network"], na))[2][3] == "NA"
+    true = run(client, presence_entries="true")
+    assert _rows(matrix.signed_csv(true["network"], true))[2][3] == "TRUE"
+    assert _rows(matrix.signed_csv(true["network"], true))[3] == ["Gamma gamma C1", "NA", "NA", "NA", "TRUE"]
+    value = run(client, presence_entries="value")
+    assert _rows(matrix.signed_csv(value["network"], value))[2][3] == "5"
+    assert _rows(matrix.signed_csv(value["network"], value))[3][4] == "-5"
+    pair = matrix.pair_rows(value["network"], value)
+    assert pair["consumed"][2][3] == 5.0 and pair["evidence_consumed"][2][3] == "presence_only"
+
+
+def test_true_entries_reach_a_crm_as_missing(client):
+    r = run(client, presence_entries="true", report_rates=True)
+    p = matrix.crm_payload(r)
+    assert p["produced"][1][2] is None and p["evidence_produced"][1][2] == "presence_only"
+    assert "set to TRUE in the matrices" in p["readme"]
