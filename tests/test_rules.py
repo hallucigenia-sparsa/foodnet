@@ -164,7 +164,7 @@ def test_a_culture_that_did_not_grow_gives_no_value(client):
     from foodnet import matrix
     assert matrix.entry(r, "ncbi:3", GLC, "exponential", "consumed") == (None, "not_grown")
     assert not [e for e in r["network"].edges if e.taxon == "ncbi:3"]
-    assert any("did not grow" in w for w in r["warnings"])
+    assert any("show no growth" in w and "Gamma" in w for w in r["warnings"])
 
 
 def test_a_taxon_with_more_data_in_another_medium_is_named():
@@ -267,3 +267,19 @@ def test_a_taxon_with_phase_cultures_takes_its_biomass_from_them_only():
             {"culture": 1, "phase": "exponential", "change": 1.0, "start": 0, "end": 12, "cautions": ["whole_run"]}]
     found = crm.biomass_changes([(0, grew), (1, flat)], rows, "exponential")["t1"]
     assert found["n"] == 1 and found["change"] == pytest.approx(0.9) and found["unit"] == "od"
+
+
+def test_a_culture_that_shows_no_growth_but_metabolizes_gives_its_whole_run_change():
+    curve = {"times": [0, 4, 8, 12], "technique": "od", "level": "", "unit": "od", "values": [0.63, 0.62, 0.63, 0.62]}
+    c = _culture("E1", [0, 1, 2, 3], growth=[curve])
+    c.metabolites = {"lactate": {"name": "lactate", "chebi_id": "", "series": [(0, 1.0), (12, 0.0)]},
+                     "butyrate": {"name": "butyrate", "chebi_id": "", "series": [(0, 1.2), (12, 3.8)]}}
+    rows, _ = derive.changes([c], "exponential")
+    assert all(r["cautions"][:2] == ["whole_run", "growth_unclear"] and r["change"] is not None for r in rows)
+    assert c.not_grown
+
+
+def test_a_fold_on_near_blank_od_is_no_growth():
+    with pytest.raises(phase.NoBoundary, match="rose by"):
+        phase.exponential_end([0, 4, 8, 12, 16, 24], [0.020, 0.024, 0.019, 0.031, 0.027, 0.022], min_rise=0.05)
+    assert phase.exponential_end([0, 4, 8, 12], [0.01, 0.03, 0.08, 0.08], min_rise=0.05)["end"] == 8

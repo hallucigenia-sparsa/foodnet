@@ -53,6 +53,9 @@ NO_GROWTH_FACTOR = 1.5       # below this rise (maximum over start) the culture 
 # ... unless its optical density rose by this much: an OD read without its blank starts high, so a culture that
 # grew can rise less than 1.5-fold (study SMGDB00000010 starts near 0.7 and rises by 0.3; Karoline, 2026-10-06)
 OD_RISE = 0.1
+# and an OD that grew by the fold rule must still rise by this much: near the blank, a fold is noise (a
+# culture from 0.020 to 0.031 is 1.55-fold; Karoline, 2026-10-06)
+OD_MIN_RISE = 0.05
 SHORT_RECORD_H = 24.0        # a metabolite series shorter than this is flagged (Karoline, 2026-10-04)
 
 # time units to hours
@@ -97,7 +100,8 @@ def rate_end(times, values, fraction: float = RATE_FRACTION) -> float | None:
     return None
 
 
-def exponential_end(times, values, fraction: float = FRACTION, factor: float = NO_GROWTH_FACTOR) -> dict:
+def exponential_end(times, values, fraction: float = FRACTION, factor: float = NO_GROWTH_FACTOR,
+                    min_rise: float = 0.0) -> dict:
     """{"end": time, "index": i, "last": bool, "coarse": bool, "by": "90%" or "rate"}: where exponential
     growth ends on one growth curve: the earlier of the 90% rule and `rate_end`.
 
@@ -121,6 +125,8 @@ def exponential_end(times, values, fraction: float = FRACTION, factor: float = N
     top = max(v for _, v in pairs)
     if top < factor * start:
         raise NoBoundary(f"did not grow: the maximum is {top / start:.2g} times the start, below {factor:g}")
+    if top - start < min_rise:
+        raise NoBoundary(f"did not grow: it rose by {top - start:.3g}, below {min_rise:g}")
     threshold = start + fraction * (top - start)
     end, by = next(t for t, v in pairs if v >= threshold), "90%"
     times = [t for t, _ in pairs]

@@ -65,7 +65,9 @@ def _own_boundary(c, fraction, factor, spike_factor) -> tuple:
             reasons.append(f"its {curve['technique'] or 'growth'} curve spikes ({ratio:.0f} times its neighbors)")
             continue
         try:
-            found = phases.exponential_end(curve["times"], curve["values"], fraction, factor)
+            od = (curve.get("technique") or "").casefold() == "od"
+            found = phases.exponential_end(curve["times"], curve["values"], fraction, factor,
+                                           phases.OD_MIN_RISE if od else 0.0)
         except phases.NoBoundary as e:
             reasons.append(f"{curve['technique'] or 'growth'} curve: {e}")
             flat.append(str(e).startswith("did not grow") and not phases.grown_by_od(curve))
@@ -183,8 +185,9 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
             if in_second:
                 end = second["end"] if second.get("end") is not None else series[-1][0]
                 windows = phases.phase_windows(series, None, phase, (second.get("start") or 0.0, end))
-            elif window is None and boundary is None and c.not_grown:
-                # it did not grow by either rule: no value, so drift or a dead inoculum is never an arc
+            elif window is None and boundary is None and c.not_grown and not active(c):
+                # it did not grow by either rule, and its compounds did not move as metabolism moves them:
+                # no value, so drift or a dead inoculum is never an arc
                 windows = {ph: (None, None, ["not_grown"]) for ph in
                            (("exponential", "stationary") if phase == "both" else (phase,))}
             elif window is None and boundary is None:
@@ -193,7 +196,9 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                 # marked whole_run, rather than nothing (Karoline, 2026-10-06). With Both it fills the
                 # exponential column and the stationary one says no_phase
                 column = "stationary" if phase == "stationary" else "exponential"
-                windows = {column: (series[0][0], series[-1][0], ["whole_run"])}
+                why = ("growth_unclear" if c.not_grown else "growth_unknown" if not (c.curves or c.growth)
+                       else None)
+                windows = {column: (series[0][0], series[-1][0], ["whole_run"] + ([why] if why else []))}
                 if phase == "both":
                     windows["stationary"] = (None, None, ["no_phase"])
             else:
@@ -231,6 +236,15 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                              "exponential_h": duration, "second": in_second, "cautions": cautions,
                              "after": after if not in_second and window is None else None})
     return rows, skipped
+
+
+def active(culture, limit: float = DETECTION_LIMIT) -> bool:
+    """Whether a culture's compounds moved as metabolism moves them over its run: one used up beyond the limit
+    and another made beyond it. A culture whose growth curve shows no growth can still do this (A. soehngenii in
+    study SMGDB00000010, on an optical density read without its blank, turns glucose and lactate into butyrate;
+    Karoline, 2026-10-06: "Activity counts"), and drift, evaporation or a dead inoculum cannot."""
+    moved = [s[-1][1] - s[0][1] for s in (m["series"] for m in culture.metabolites.values()) if len(s) > 1]
+    return any(d <= -limit for d in moved) and any(d >= limit for d in moved)
 
 
 def exponential_hours(culture, boundary) -> float | None:

@@ -31,7 +31,9 @@ CAUTION_TEXT = {
     "still_changing": "the compound kept changing right after growth slowed (a slow-down, or a second substrate)",
     "growth_rate_boundary": "growth ended where its rate fell, more than a sample before 90% of its maximum",
     "whole_run": "no end of growth was found, so the change is over the whole run, not a phase",
-    "not_grown": "the culture did not grow (neither 1.5-fold nor, in OD, by 0.1): no value, no arc",
+    "not_grown": "the culture did not grow (neither 1.5-fold nor, in OD, by 0.1) nor metabolize: no value, no arc",
+    "growth_unclear": "its curve shows no growth (often an OD read without its blank), but it metabolized",
+    "growth_unknown": "no growth curve at all: whole-run change, growth never checked",
     "start_differs": "the replicates' metabolite samples start apart, so they cover different stretches of the phase",
     "pair_decided": "decided on two replicates (a change, or no change); a pair errs more readily than three",
 }

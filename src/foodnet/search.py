@@ -439,9 +439,10 @@ def _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window) -
                        if r["culture"] in chosen and "not_grown" in r["cautions"]
                        and cultures[r["culture"]].taxon["id"] in taxa})
         if dead:
-            out.append(", ".join(dead) + ": their cultures did not grow (neither 1.5-fold nor, in optical density, by "
-                       f"{phases.OD_RISE:g}), so their metabolite changes give no value (not_grown): drift or a dead "
-                       "inoculum is never an arc. A time window in Advanced settings still gives their changes.")
+            out.append(", ".join(dead) + ": their growth curves show no growth (neither 1.5-fold nor, in optical "
+                       f"density, by {phases.OD_RISE:g}) and their compounds did not move as metabolism moves them "
+                       "(none used up and another made), so their changes give no value (not_grown). A time window in "
+                       "Advanced settings still gives them.")
         lost = defaultdict(set)
         for r in rows:
             if r["culture"] in chosen and "whole_run" in r["cautions"]:
@@ -451,9 +452,9 @@ def _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window) -
         if whole:
             out.append(", ".join(whole) + ": no end of exponential growth was found on their growth curves (they "
                        "did not rise by the no-growth factor, as an optical density read without its blank can make "
-                       "it, or the curve is too short), so their values are the change over the whole run, not a "
-                       "phase (evidence whole_run, arcs in phase whole_run). A CRM built on them takes in stationary "
-                       "uptake too.")
+                       "it, the curve is too short or missing, or it shows no growth while the culture metabolized: "
+                       "growth_unclear), so their values are the change over the whole run, not a phase (evidence "
+                       "whole_run, arcs in phase whole_run). A CRM built on them takes in stationary uptake too.")
     return out
 
 

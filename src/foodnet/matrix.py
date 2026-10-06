@@ -233,10 +233,15 @@ def _csv(header, rows) -> str:
 
 
 def row_labels(result: dict, taxa) -> list:
-    """The taxa's row labels, with " [whole run]" for a taxon whose values span the whole run, so a CSV read
-    on its own still says that its row is no phase's (a tenth review round)."""
-    whole = {t for (t, _, _), c in result["cells"].items() if c.get("whole_run")}
-    return [f"{label} [whole run]" if t.id in whole else label for label, t in zip(_labels(taxa), taxa, strict=True)]
+    """The taxa's row labels: their names, the same in every file, so files join on them (the whole-run taxa
+    are named in the first header cell instead, `corner`; an eleventh review round)."""
+    return _labels(taxa)
+
+
+def whole_run_taxa(result: dict) -> list:
+    """The names of the taxa whose values span the whole run (no end of exponential growth was found)."""
+    names = result.get("names") or {}
+    return sorted({names.get(t, t) for (t, _, _), c in result["cells"].items() if c.get("whole_run")})
 
 
 def signed_rows(net: FoodNetwork, result: dict, phases=None) -> tuple:
@@ -274,8 +279,10 @@ def corner(result: dict) -> str:
     media = " / ".join(rule.get("media") or []) or "no medium"
     which = "every medium" if rule.get("rule") == "all" else media
     meta = result["network"].meta
+    whole = whole_run_taxa(result)
     return (f"taxon [{'INCOMPLETE; ' if result.get('errors') else ''}values from {which}; "
-            f"foodnet {meta.get('tool_version', '')} on {str(meta.get('derived_at', ''))[:10]}]")
+            + (f"over the whole run, no phase: {', '.join(whole)}; " if whole else "")
+            + f"foodnet {meta.get('tool_version', '')} on {str(meta.get('derived_at', ''))[:10]}]")
 
 
 def _matrix_csv(taxa, header, rows, fmt=_number, first: str = "taxon") -> str:
@@ -564,8 +571,7 @@ def crm_payload(result: dict) -> dict:
                     "stationary_phase": ph == "stationary",
                     # taxa whose values span the whole run (no end of exponential growth found): stationary
                     # uptake is in them
-                    "whole_run": sorted({pair["taxa"][i] for i, t in enumerate(taxa) for m in mets
-                                         if (result["cells"].get((t.id, m.id, ph)) or {}).get("whole_run")}),
+                    "whole_run": whole_run_taxa(result),
                     "incomplete": bool(result.get("errors")), "errors": list(result.get("errors") or []),
                     "warnings": list(result.get("warnings") or []),
                     # per value: what the evidence matrices cannot hold (cautions.csv in the zip)

@@ -185,8 +185,9 @@ value carries the caution boundaries_differ (a time window is then the safer cho
 than three growth samples carries coarse_sampling. The growth curve only places the boundary between the
 phases: a culture whose curve gives none (one that did not rise by the no-growth factor, as an optical density
 read without its blank can make it) gives its change over the whole run instead, marked whole_run, in the
-column of the phase asked for, as long as its optical density rose by 0.1 or more; a culture that grew by
-neither rule gives no value (not_grown), so drift or a dead inoculum never becomes an arc. A time window in
+column of the phase asked for, as long as its optical density rose by 0.1 or more, or it used up one compound
+and made another beyond the limit (growth_unclear); a culture that did neither gives no value (not_grown), so
+drift or a dead inoculum never becomes an arc. A time window in
 Advanced settings replaces the phases. The growth curve is a per-strain count when the replicate has one, else
 the culture's own (cell counts before optical density); a curve that gives no boundary gives way to the
 replicate's next one.</p>

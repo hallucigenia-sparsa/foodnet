@@ -211,8 +211,14 @@ with metabolite data."
     inoculum, evaporation or abiotic drift as a "consumed" arc), since the 1.5-fold rule cannot tell them
     from unblanked OD. Karoline, 2026-10-06 ("Absolute OD rise"): an OD curve that rose by 0.1 or more still
     counts as grown and gives its whole-run change; a culture that grew by neither rule gives no value
-    (`not_grown`, no arc, named in a warning). On study SMGDB00000010 this keeps C. catus, E. siraeum and S.
-    variabile as whole-run, and reads A. soehngenii (an OD rise under 0.1) as not grown.
+    (`not_grown`, no arc, named in a warning). An eleventh round (the physiologist and the critic, separately)
+    showed that this threw away A. soehngenii, whose unblanked OD did not rise but whose replicates turned
+    glucose and lactate into butyrate. Karoline, 2026-10-06 ("Activity counts"; "Yes, 0.05 OD"): a culture
+    whose growth curve shows no growth still gives its whole-run change, marked `growth_unclear`, when a
+    compound was used up beyond the limit and another made beyond it; `not_grown` is kept for cultures whose
+    compounds did not move so. An OD curve that grew by the fold rule must also rise by 0.05, since near the
+    blank a fold is noise; a culture without any growth curve is marked `growth_unknown`. The whole-run
+    taxa are named in the first header cell of every matrix, and their names stay the same in every file.
 27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
     this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
     be read says `incomplete` in its files and the command line exits 3; the page never serves another

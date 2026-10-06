@@ -200,6 +200,8 @@
                 "growth_rate_boundary",
                 "whole_run",
                 "not_grown",
+                "growth_unclear",
+                "growth_unknown",
                 "start_differs",
                 "pair_decided"
               ]

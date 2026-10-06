@@ -275,6 +275,11 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     p <- x$caveats$presence_only
     x$caveats$presence_only <- p[p$taxon %in% kept & p$resource %in% x$resources, , drop = FALSE]
     x$caveats$without_a_rate <- intersect(x$caveats$without_a_rate, kept)
+    x$caveats$whole_run <- intersect(x$caveats$whole_run, kept)
+    for (name in c("cautions", "inconclusive")) {
+        rows <- x$caveats[[name]]
+        if (NROW(rows)) x$caveats[[name]] <- rows[rows$taxon %in% kept & rows$resource %in% x$resources, , drop = FALSE]
+    }
     x
 }
 

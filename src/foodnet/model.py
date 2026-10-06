@@ -52,6 +52,8 @@ CAUTIONS = (
     "growth_rate_boundary",    # the growth-rate rule ended growth more than one sample before the 90% rule
     "whole_run",               # no end of exponential growth was found: the change over the whole run
     "not_grown",               # the culture grew by neither the fold rule nor an OD rise of 0.1: no value
+    "growth_unclear",          # whole_run: the curve shows no growth, but its compounds moved as metabolism does
+    "growth_unknown",          # whole_run: the culture has no growth curve at all
     "start_differs",           # the replicates' windows start more than a quarter of the phase apart
     "pair_decided",            # an experiment of two replicates decided it (a change or no change), no interval
 )
