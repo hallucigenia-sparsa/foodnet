@@ -123,8 +123,9 @@ def _settings_block(settings: dict) -> str:
   <span class="muted">a mean change smaller than this, either way, counts as no change; 0.2 by default</span></div>
 <div class="row"><label><input type="checkbox" name="judge_confidence" value="1"{_checked(s['judge_confidence'])}>
   Judge changes on a confidence interval</label>
-  <span class="muted">a change needs a one-sided 90% confidence interval on the mean beyond the limit, and
-  experiments must not contradict each other; otherwise it is inconclusive (NA, no arc). On by default</span></div>
+  <span class="muted">three or more replicates: a one-sided 90% confidence interval on the mean beyond the limit;
+  two: both beyond it; one decides nothing; and experiments must not contradict each other. Otherwise
+  inconclusive (NA, no arc). On by default</span></div>
 <div class="row"><label>Detection limits of their own
   <input name="compound_limits" type="text" size="30" value="{_esc(s['compound_limits'])}"></label>
   <span class="muted">for compounds measured at another scale, as name=mM, comma separated: thiamine=0.01</span></div>

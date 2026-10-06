@@ -18,7 +18,7 @@ def test_exponential_phase_values_are_the_mean_net_change(client):
     assert r["cells"][(A, GLC, "exponential")]["direction"] == "consumed"
     assert r["cells"][(A, AC, "exponential")]["mean"] == pytest.approx(4.0)       # acetic acid, joined
     assert r["cells"][(B, BUT, "exponential")]["mean"] == pytest.approx(3.0)
-    assert r["cells"][(B, BUT, "exponential")]["cautions"] == ["single_replicate"]
+    assert r["cells"][(B, BUT, "exponential")]["cautions"] == [] and r["cells"][(B, BUT, "exponential")]["n"] == 2
 
 
 def test_the_stationary_phase_starts_at_the_boundary(client):
@@ -119,9 +119,10 @@ def test_one_arc_per_study_by_default_and_one_across_studies_merged():
     conftest.STUDIES["SMGDB00000003"] = {"id": "SMGDB00000003", "name": "three", "url": "",
                                          "experiments": [{"id": "EMGDB000000005", "name": "B_WC2"}]}
     conftest.EXPERIMENTS["EMGDB000000005"] = conftest._experiment(
-        "EMGDB000000005", "SMGDB00000003", 2, "Wilkins-Chalgren Anaerobe Broth", ["b3"])
+        "EMGDB000000005", "SMGDB00000003", 2, "Wilkins-Chalgren Anaerobe Broth", ["b3", "b3b"])
     series = dict(conftest.SERIES)
-    series["b3"] = {"growth": ("od", conftest.SLOW), "glucose": [(0, 10), (8, 9), (16, 6), (24, 6)]}
+    series["b3"] = {"growth": ("od", conftest.SLOW), "glucose": [(0, 10), (8, 9), (16, 6.1), (24, 6.1)]}
+    series["b3b"] = {"growth": ("od", conftest.SLOW), "glucose": [(0, 10), (8, 9), (16, 5.9), (24, 5.9)]}
     try:
         client = FakeClient(series)
         per_study = [e for e in run(client)["network"].edges if e.taxon == B and e.metabolite == GLC]
@@ -191,8 +192,8 @@ def test_growth_rates_come_from_the_metabolite_replicates_first(client):
 
 def test_initial_concentrations_are_the_value_medium_first_samples(client):
     r = run(client)
-    # glucose starts at 10 in all three WC replicates
-    assert r["initial"][GLC]["mean"] == pytest.approx(10.0) and r["initial"][GLC]["n"] == 3
+    # glucose starts at 10 in all five WC replicates
+    assert r["initial"][GLC]["mean"] == pytest.approx(10.0) and r["initial"][GLC]["n"] == 5
 
 
 def test_every_tested_arc_carries_its_q_value_and_identical_replicates_none(client):
@@ -200,10 +201,9 @@ def test_every_tested_arc_carries_its_q_value_and_identical_replicates_none(clie
     arc = next(e for e in net.edges if e.taxon == A and e.metabolite == GLC)
     # A's stationary glucose (0 and -1) is tested, and corrected within the family of the per-study arcs
     assert arc.q_value is not None and arc.p_value is not None
-    net = run(client)["network"]
-    arc = next(e for e in net.edges if e.taxon == A and e.metabolite == GLC)
-    # its exponential glucose is -8 and -8: identical replicates are no certainty, so no test
-    assert arc.p_value is None and "no_variance" in arc.cautions
+    from foodnet import stats
+    # identical values are no certainty: no test
+    assert stats.paired([0.21, 0.21], [0.0, 0.0])["p"] is None
 
 
 def test_the_length_of_the_exponential_phase_reaches_the_arcs(client):
@@ -301,11 +301,12 @@ def _with_mucin_variant():
     """Study one gains Alpha alpha in WC plus mucin beads, where it takes up 2 mM of glucose more."""
     import conftest
     conftest.STUDIES["SMGDB00000001"]["experiments"].append({"id": "EMGDB000000006", "name": "A_MUCIN"})
-    exp = conftest._experiment("EMGDB000000006", "SMGDB00000001", 1, "Wilkins-Chalgren Anaerobe Broth", ["a3"])
+    exp = conftest._experiment("EMGDB000000006", "SMGDB00000001", 1, "Wilkins-Chalgren Anaerobe Broth", ["a9", "a9b"])
     exp["description"] = "Alpha with WC plus mucin beads"
     conftest.EXPERIMENTS["EMGDB000000006"] = exp
     series = dict(conftest.SERIES)
-    series["a3"] = {"growth": ("fc", conftest.FAST), "glucose": [(0, 10), (6, 6), (12, 0), (24, 0)]}
+    series["a9"] = {"growth": ("fc", conftest.FAST), "glucose": [(0, 10), (6, 6), (12, 0.1), (24, 0)]}
+    series["a9b"] = {"growth": ("fc", conftest.FAST), "glucose": [(0, 10), (6, 6), (12, -0.1), (24, 0)]}
     return FakeClient(series)
 
 
@@ -324,11 +325,11 @@ def test_a_medium_altered_in_its_description_gives_presence_not_values():
         assert r["cells"][(A, GLC, "exponential")]["mean"] == pytest.approx(-8.0)
         assert r["value_rule"]["also_matched"] == ["Wilkins-Chalgren Anaerobe Broth (+mucin)"]
         assert any("also matched" in w for w in r["warnings"])
-        # switched off, the mucin variant pools into the values: experiments at -8 (two replicates) and -10
-        # (one), each counted once, mean -9
+        # switched off, the mucin variant pools into the values: experiments at -8 (three replicates) and -10
+        # (two), each counted once, mean -9
         r = run(client, conditions="Wilkins", strict_media=False)
         assert r["cells"][(A, GLC, "exponential")]["mean"] == pytest.approx(-9.0)
-        assert r["cells"][(A, GLC, "exponential")]["n"] == 3
+        assert r["cells"][(A, GLC, "exponential")]["n"] == 5
         assert r["cells"][(A, GLC, "exponential")]["n_experiments"] == 2
     finally:
         _drop_mucin_variant()

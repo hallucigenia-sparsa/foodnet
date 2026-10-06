@@ -108,23 +108,30 @@ with metabolite data."
 
 20. **The experiment is the unit, and a change must be pinned down.** Karoline, 2026-10-06, after a review
     of 0.1.0 showed a study with ten replicates outvoting one with two, and +0.84 +/- 1.04 mM on a 27 mM
-    background drawn as production: "experiment level + inconclusive". Each experiment is judged on a
-    one-sided 90% t-interval on its replicates' mean: a change needs the near bound beyond the limit, no
-    change needs the whole interval inside it, anything else is `inconclusive` (NA with its own evidence,
-    never an arc and never a 0). Across experiments, those that decide must say the same (else `conflict`);
-    an inconclusive experiment whose mean lies beyond the limit on the other side is a conflict too, and one
-    that does not contradict is left out and named (`experiment_left_out`). The value is the mean of the
-    deciding experiments' means; `n`, `n_experiments`, the spread and the test are over them; amounts more
-    than twofold apart are the caution `amounts_differ`. One replicate is decided by itself, with the
-    evidence `single_replicate`. Two rules came first and were dropped on review: the mean plus and minus one
-    standard deviation (a spread, not an inference: it called changes more readily with two replicates than
-    with ten) and every replicate beyond the limit (one failed sample erased E. coli LF82's -8 mM pyruvate
-    uptake, seen in four of five replicates). On live data the interval gives fewer inconclusive cells than
-    either (16 in all of mGrowthDB against 24), calls more as replicates grow, and drew a false arc at most 4%
-    of the time in simulation (Karoline, 2026-10-06: "Confidence interval"). The 0.2 mM limit stays;
-    compounds at another scale can have their own (thiamine=0.01, which also finds mGrowthDB's
-    "thiamine(1+)"). Advanced settings can judge by the mean alone, as 0.1.0 did. The multiple-testing family
-    is the tests that make the arcs; the p-value is reported, the interval decides.
+    background drawn as production: "experiment level + inconclusive". Each experiment is judged on its
+    replicates, by how many there are:
+      * three or more: a one-sided 90% t-interval on the mean ("Confidence interval"): a change needs the
+        near bound beyond the limit, no change the whole interval inside it;
+      * two (13 of the 32 experiments with metabolites in mGrowthDB): both replicates beyond the limit on the
+        same side, or both inside it ("Pairs agree"), since an interval on one degree of freedom left clear
+        pairs such as -3.2 and -1.5 mM inconclusive;
+      * one: inconclusive ("1 is inconclusive"); none exists today, and identical non-zero replicates (one
+        series deposited twice) count as one.
+    Anything else is `inconclusive`: NA with its own evidence, never an arc and never a 0. Across experiments,
+    those that decide must say the same (else `conflict`); an inconclusive experiment whose mean lies beyond
+    the limit on the other side is a conflict too, as are experiments none of which decides but whose means
+    lie beyond the limit on both sides. One that does not contradict is named (`experiment_left_out`), and
+    its mean still counts in the value, since the experiments left out are those with the smaller effects.
+    The value is the mean of the experiments' means; `n`, `n_experiments`, the spread and the test are over
+    them; amounts more than twofold apart are the caution `amounts_differ`. Three rules came first and were
+    dropped over four rounds of review: the mean plus and minus one standard deviation (a spread, not an
+    inference: it called changes more readily with two replicates than with ten), every replicate beyond
+    the limit at any n (one failed sample erased E. coli LF82's -8 mM pyruvate uptake, seen in four of five
+    replicates), and the interval at every n (too strict for pairs, and a single replicate decided alone
+    gave an arc for half of true zeros). The 0.2 mM limit stays; compounds at another scale can have their
+    own (thiamine=0.01, which also finds mGrowthDB's "thiamine(1+)"). Advanced settings can judge by the
+    mean alone, as 0.1.0 did. The multiple-testing family is the tests that make the arcs; the p-value is
+    reported, the rule above decides.
 21. **Merging to genus applies the detection limit**, and taxa that disagree make the genus cell
     inconclusive (`conflict`), instead of a median that can sit below the limit or hide a consumer.
 22. **One value medium per search, made stable and visible.** Karoline, 2026-10-06: "keep one, make it
@@ -144,8 +151,11 @@ with metabolite data."
     from lysing cells). The growth-rate rule ends growth at the first sample after the fastest growth from
     which the specific rate stays below a tenth of its maximum over two consecutive intervals; the boundary
     is the earlier of the two. On the curves checked it ends E. coli at 8 h in all five replicates and B.
-    hydrogenotrophica at 15 to 17 h, and agrees with the 90% rule elsewhere; on coarse curves (24 h apart)
-    the rate rule finds nothing and the 90% rule decides. A first attempt read the 90% rule on a running
+    hydrogenotrophica at 15 to 17 h. A fourth round of the review counted all of mGrowthDB: the rate rule
+    places 19 of 83 replicate boundaries, most of them one sample (4 to 8 h) before the 90% rule (B.
+    thetaiotaomicron, R. intestinalis, B. fragilis, F. prausnitzii), and E. coli 76 to 100 h before it; on
+    coarse curves (24 h apart) it finds nothing and the 90% rule decides. Values whose boundary the rate rule
+    moved by more than one sample carry `growth_rate_boundary`. A first attempt read the 90% rule on a running
     median of three; the second round of the review showed it moved E. coli later still (84 to 120 h),
     did not remove a two-point late rise, and clipped a real one-sample peak (R. intestinalis ri2_B), so it
     was dropped. The first growth curve that gives a boundary is used; relative 16S is no growth curve;
@@ -153,8 +163,11 @@ with metabolite data."
     sampling interval (`boundaries_differ`) are flagged, and so is a boundary the rate rule placed
     (`growth_rate_boundary`). A third round of the review showed the rate rule ending E. coli's growth at 8 h
     while it fermented its glucose from 8 to 12 h (after pyruvate ran out, cells +15%); Karoline chose to keep
-    the boundary and flag it: a stationary value of a compound that kept changing beyond the limit in the
-    first interval after the boundary carries `still_changing`. Not chosen: a whole-run fallback for cultures
+    the boundary and flag it: where the rate rule moved the boundary, a compound whose replicates kept
+    changing beyond the limit in the first interval after it carries `still_changing`, on its exponential
+    value (which lacks that change, and which the CRM takes) and on its stationary value when that change is
+    at least a quarter of it. On E. coli LF82 this marks the glucose taken up from 8 to 12 h, so the
+    exponential phase's -3.1 mM, against -8.2 mM over 0 to 12 h, does not pass as its glucose uptake. Not chosen: a whole-run fallback for cultures
     without a boundary (the unblanked OD of study SMGDB00000010, which starts near 0.7, still reads five
     taxa that made 4 to 6 mM butyrate as not grown; they are `no_phase`, and a time window gives them
     values), and flags for failed samples and transient peaks.
@@ -188,6 +201,10 @@ with metabolite data."
   cells) used ids, a time window and a second window chosen to reproduce it, and the comparison with a
   published figure compared directions of dominant fermentation products, which agree often by chance. Neither
   tests the default exponential-phase rule on held-out studies.
+- **False arcs.** Each experiment is decided at one-sided 90% confidence, so a compound at the limit is
+  called beyond it about one time in ten; in simulation a true zero gave an arc in at most 4% of cells with
+  two or more replicates. Over the 80 or so values of a search of all of mGrowthDB a few arcs are expected to
+  be false; the q-values are reported, not used to decide.
 - **A net change hides what was made and used again** within a phase (formate in E. coli), and a single
   failed sample at a phase end becomes the value; neither is flagged.
 

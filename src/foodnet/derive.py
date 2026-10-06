@@ -42,7 +42,8 @@ PHASE_CHOICES = ("exponential", "stationary", "both")
 PRODUCED, CONSUMED = "produced", "consumed"
 MEASURED, PRESENCE_ONLY = "measured", "presence_only"
 # how two series count as the same deposit: every value within this many mM plus this share of itself
-DUPLICATE_ABS, DUPLICATE_REL, DUPLICATE_MIN_POINTS = 0.011, 0.01, 3
+# rounding to two decimals only: a 1% tolerance merged genuine repeats of one protocol (a fourth review round)
+DUPLICATE_ABS, DUPLICATE_REL, DUPLICATE_MIN_POINTS = 0.0051, 0.0, 3
 DUPLICATE_TIME = 0.02          # hours: sample times that differ by rounding only
 # a series identifies a deposit only when it moves by more than this many mM and this share of its level
 DUPLICATE_MIN_RANGE, DUPLICATE_REL_RANGE = 1.0, 0.05
@@ -108,7 +109,8 @@ def boundaries(cultures, fraction: float = phases.FRACTION, factor: float = phas
             found[i] = {"end": statistics.median(b["end"] for b in siblings),
                         "last": all(b["last"] for b in siblings), "borrowed": True,
                         "coarse": any(b.get("coarse") for b in siblings), "differ": c.experiment in differ,
-                        "by": "rate" if any(b.get("by") == "rate" for b in siblings) else "90%"}
+                        "by": "rate" if any(b.get("by") == "rate" for b in siblings) else "90%",
+                        "moved": any(b.get("moved") for b in siblings)}
             if c.growth is None:
                 skipped.append((c.label, "no growth curve in this replicate; the median phase boundary of its "
                                 "experiment's other replicates is used"))
@@ -131,17 +133,17 @@ def second_window_matches(met: dict, names) -> bool:
     return any(plain(x) in wanted for x in (met.get("name"), met.get("recorded_name")))
 
 
-def _still_changing(series, boundary: float, limit: float) -> bool:
-    """Whether a metabolite moved beyond the limit between the end of exponential growth and its next sample:
-    growth had slowed, but the culture was still using or making it (E. coli LF82 ferments its glucose
-    between 8 and 12 h, after pyruvate runs out, while its cells grow by 15%; Karoline, 2026-10-06: flag it
-    rather than move the boundary)."""
+def _next_change(series, boundary: float):
+    """The metabolite's change from the end of exponential growth to its next sample, or None. Where the
+    growth-rate rule ended growth, a culture can still be using or making a compound while it slows (E. coli
+    LF82 ferments its glucose between 8 and 12 h, after pyruvate runs out, while its cells grow by 15%;
+    Karoline, 2026-10-06: flag it rather than move the boundary). `pool` judges it per cell (`still_changing`)."""
     after = [t for t, _ in series if t > boundary]
     if not after:
-        return False
+        return None
     first, _ = phases.value_at(series, boundary)
     nxt, _ = phases.value_at(series, after[0])
-    return abs(nxt - first) >= limit
+    return nxt - first
 
 
 def changes(cultures, phase: str = "exponential", window: tuple | None = None,
@@ -185,6 +187,7 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                 windows = phases.phase_windows(series, boundary, phase, window)
             for name, (start, end, cautions) in windows.items():
                 cautions = list(cautions)
+                after = None
                 if short:
                     cautions.append("short_record")
                 if boundary and not in_second and window is None:
@@ -194,10 +197,12 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                         cautions.append("coarse_sampling")
                     if boundary.get("differ"):
                         cautions.append("boundaries_differ")
-                    if boundary.get("by") == "rate":
+                    if boundary.get("moved"):
                         cautions.append("growth_rate_boundary")
-                    if name == "stationary" and start is not None and _still_changing(series, start, limit):
-                        cautions.append("still_changing")
+                    # the change right after growth slowed, on both phases' rows: the stationary value then
+                    # holds it, and the exponential value lacks it (and the CRM takes the exponential value)
+                    cut = end if name == "exponential" else start
+                    after = _next_change(series, cut) if (cut is not None and boundary.get("moved")) else None
                 if start is None:
                     rows.append({"culture": i, "taxon": c.taxon["id"], "metabolite": mid,
                                  "metabolite_name": met["name"], "chebi_id": met["chebi_id"], "phase": name,
@@ -210,7 +215,8 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                 rows.append({"culture": i, "taxon": c.taxon["id"], "metabolite": mid,
                              "metabolite_name": met["name"], "chebi_id": met["chebi_id"], "phase": name,
                              "change": d["change"], "start": start, "end": end, "initial": d["initial"],
-                             "exponential_h": duration, "second": in_second, "cautions": cautions})
+                             "exponential_h": duration, "second": in_second, "cautions": cautions,
+                             "after": after if not in_second and window is None else None})
     return rows, skipped
 
 
@@ -368,7 +374,7 @@ def duplicates(cultures) -> tuple:
 
     Two experiments of one taxon are the same deposit when they share at least two compounds and, for every
     shared compound, every replicate series of one matches a replicate series of the other at their common
-    time points (within 0.011 mM plus 1%, which covers rounding to two decimals, and times within
+    time points (within 0.0051 mM, which covers rounding to two decimals and nothing more, and times within
     DUPLICATE_TIME hours), and the shared compounds move (`_in_transit`): series that sit at the
     medium's level match in any two cultures of one medium, so at least two of the shared samples must be in
     transit (`_in_transit`). Only experiments in one medium are compared: a
@@ -429,21 +435,34 @@ def classify(values, limit: float, agree: bool = True):
     """1 (produced), -1 (consumed), 0 (no change) or None (inconclusive) for the replicates of one experiment,
     changes in mM.
 
-    With `agree` (the default, Karoline, 2026-10-06: "Confidence interval"), the decision is on the mean
-    and how well the replicates pin it down: a one-sided 90% t-interval on the mean. A change needs its
-    bound on the near side beyond the limit; no change needs the whole interval inside it; anything else is
-    inconclusive, neither an arc nor a measured zero. More replicates narrow the interval, so they make a
-    call easier, never harder, and one outlier widens it without vetoing a clear change. (Two rules were
-    tried first and dropped on review: the mean plus and minus one standard deviation, which favored two
-    replicates over ten, and every replicate beyond the limit, which let one failed sample erase a change
-    four replicates agreed on.) Identical replicates pin the mean exactly. One value has no interval and is
-    judged by itself; its cell says single_replicate. Without `agree` the mean alone decides, as in 0.1.0."""
+    With `agree` (the default), how many replicates there are decides how (Karoline, 2026-10-06):
+
+      * three or more: a one-sided 90% t-interval on the mean ("Confidence interval"). A change needs its
+        near bound beyond the limit, no change needs the whole interval inside it, anything else is
+        inconclusive. More replicates narrow the interval, so they make a call easier, never harder, and one
+        failed sample widens it without erasing a change four replicates agree on;
+      * two (13 of the 32 experiments with metabolites in mGrowthDB, 2026-10-06): both beyond the limit on
+        the same side for a change, both inside it for none ("Pairs agree"). The interval on one degree of
+        freedom is so wide that clear pairs (-3.2 and -1.5 mM) came out inconclusive;
+      * one: inconclusive ("1 is inconclusive"), so the least data never makes the boldest call. Identical
+        non-zero replicates count as one: they are one series deposited twice, not certainty.
+
+    Without `agree` the mean alone decides, as in 0.1.0. Two rules came first and were dropped on review:
+    the mean plus and minus one standard deviation (a spread, not an inference), and every replicate beyond
+    the limit at any n (one failed sample erased a change)."""
     values = [v for v in values if v is not None]
     if not values:
         return INCONCLUSIVE
     mean = statistics.mean(values)
-    if not agree or len(values) < 2:
+    if not agree:
         return _class(mean, limit)
+    if len(values) > 1 and mean != 0 and statistics.stdev(values) == 0:
+        values = values[:1]
+    if len(values) == 1:
+        return INCONCLUSIVE
+    if len(values) == 2:
+        classes = {_class(v, limit) for v in values}
+        return classes.pop() if len(classes) == 1 else INCONCLUSIVE
     half = t_quantile(CONFIDENCE, len(values) - 1) * statistics.stdev(values) / math.sqrt(len(values))
     low, high = mean - half, mean + half
     if low >= limit:
@@ -473,6 +492,7 @@ def _units(valued, cultures) -> tuple:
 
 
 AMOUNTS_DIFFER = 2.0           # experiments agreeing in direction whose means differ more than this factor
+STILL_SHARE = 0.25             # still_changing: the change right after growth slowed is this share of the phase's
 
 
 def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, limits: dict | None = None) -> dict:
@@ -531,6 +551,12 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
             notes.append("experiments disagree: " + "; ".join(
                 f"{names.get(e, e)} {WORD[c]} ({statistics.mean(per_exp[e]):+.2f} mM)"
                 for e, c in sorted(classes.items(), key=lambda ec: ec[0])))
+        elif not said and len({_class(statistics.mean(v), lim) for v in per_exp.values()} - {0}) > 1:
+            k = INCONCLUSIVE           # none decides, but their means lie beyond the limit on both sides
+            cautions.add("conflict")
+            notes.append("experiments disagree: " + "; ".join(
+                f"{names.get(e, e)} {WORD[_class(statistics.mean(v), lim)]} ({statistics.mean(v):+.2f} mM)"
+                for e, v in sorted(per_exp.items())))
         elif not said:
             k = INCONCLUSIVE
             cautions.add("inconclusive")
@@ -552,6 +578,28 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
                     notes.append("experiments agree, in amounts from " + ", ".join(
                         f"{names.get(e, e)} {statistics.mean(per_exp[e]):+.2f}" for e in sorted(used)) + " mM")
         values = [v for e in used for v in per_exp[e]] if len(used) < len(per_exp) else values
+        if k in (1, -1) and len(used) < len(per_exp):
+            # the amount is over every experiment that does not contradict, not only the deciding ones: the
+            # experiments left out are the ones with the smaller effects, so leaving them out inflates it
+            units = [statistics.mean(v) for v in per_exp.values()]
+            used = list(per_exp)
+            values = [r["change"] for r in valued]
+            if _class(statistics.mean(units), lim) != k:
+                k = INCONCLUSIVE
+                cautions.add("inconclusive")
+                notes.append("inconclusive: with the experiments left out included, the mean change is within the "
+                             f"{lim:g} mM limit")
+        afters = [r["after"] for r in valued if r.get("after") is not None and cultures[r["culture"]].experiment
+                  in used]
+        if k is not INCONCLUSIVE and afters and "growth_rate_boundary" in cautions:
+            moved = statistics.mean(afters)
+            # judged as any change, on the replicates' mean, and only when it is a real part of the phase's change
+            if _class(moved, lim) and (key[2] == "exponential"
+                                       or abs(moved) >= STILL_SHARE * abs(statistics.mean(units))):
+                cautions.add("still_changing")
+                notes.append(f"still changing by {moved:+.2f} mM in the first interval after growth slowed"
+                             + (" (that change is in the stationary value, not this one)"
+                                if key[2] == "exponential" else ""))
         mean = statistics.mean(units)
         sd = statistics.stdev(units) if len(units) > 1 else None
         test = paired(units, [0.0] * len(units))

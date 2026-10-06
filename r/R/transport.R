@@ -23,7 +23,9 @@ read_request <- function(con, token, limit = 16e6, header_limit = 16384L, second
     repeat {
         left <- as.numeric(difftime(deadline, Sys.time(), units = "secs"))
         if (left <= 0) stop_foodnet("the request took too long")
-        if (inherits(con, "sockconn")) socketTimeout(con, max(0.1, left))   # a silent peer cannot outlast it
+        # a silent peer cannot outlast the deadline, and one that sends nothing at all is dropped after 1 s
+        # (the foodnet page sends its request at once), so idle connections cannot queue up a long wait
+        if (inherits(con, "sockconn")) socketTimeout(con, if (n == 0L) min(1, left) else max(0.1, left))
         byte <- readBin(con, "raw", 1L)
         if (!length(byte)) break
         if (n >= header_limit) stop_foodnet("the request headers are too long to be foodnet's")

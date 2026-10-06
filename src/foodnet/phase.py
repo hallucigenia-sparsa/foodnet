@@ -117,11 +117,16 @@ def exponential_end(times, values, fraction: float = FRACTION, factor: float = N
         raise NoBoundary(f"did not grow: the maximum is {top / start:.2g} times the start, below {factor:g}")
     threshold = start + fraction * (top - start)
     end, by = next(t for t, v in pairs if v >= threshold), "90%"
-    by_rate = rate_end([t for t, _ in pairs], [v for _, v in pairs])
+    times = [t for t, _ in pairs]
+    late = times.index(end)
+    by_rate = rate_end(times, [v for _, v in pairs])
     if by_rate is not None and by_rate < end:
         end, by = by_rate, "rate"
-    i = [t for t, _ in pairs].index(end)
-    return {"end": end, "index": i, "last": i == len(pairs) - 1, "coarse": i < 2, "by": by}
+    i = times.index(end)
+    # "moved": the 90% rule alone would have ended growth more than one sample later (E. coli LF82: 8 h
+    # instead of 84 h), which the arcs flag; one sample earlier is within the sampling's own resolution
+    return {"end": end, "index": i, "last": i == len(pairs) - 1, "coarse": i < 2, "by": by,
+            "moved": by == "rate" and late - i > 1}
 
 
 def value_at(series, t: float) -> tuple:

@@ -15,7 +15,7 @@ def test_spellings_of_one_medium_share_a_key():
 def test_cultures_hold_a_growth_curve_and_metabolites_in_hours_and_mm():
     found = reading.read_cultures(FakeClient(), ["SMGDB00000001"])
     cultures = found["cultures"]
-    assert [c.replicate for c in cultures] == ["a1", "a2", "b1"]
+    assert [c.replicate for c in cultures] == ["a1", "a2", "a3", "b1", "b1b"]
     a1 = cultures[0]
     assert a1.taxon["id"] == "ncbi:1" and a1.medium_key == "wilkins chalgren anaerobe broth"
     assert a1.growth["values"] == [1, 10, 100, 1000, 1000]
@@ -38,7 +38,7 @@ def test_an_average_replicate_and_a_non_batch_experiment_are_left_out_with_reaso
         found = reading.read_cultures(client, ["SMGDB00000001"])
     finally:
         EXPERIMENTS["EMGDB000000002"]["cultivationMode"] = old
-    assert [c.replicate for c in found["cultures"]] == ["a1"]
+    assert [c.replicate for c in found["cultures"]] == ["a1", "a3"]
     reasons = " ".join(r for _, r in found["skipped"])
     assert "average of the replicates" in reasons and "chemostat, not batch" in reasons
 

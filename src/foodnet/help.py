@@ -33,11 +33,11 @@ SETTINGS = {
                 "a tenth of its maximum over two consecutive intervals.",
     "no_growth_factor": "A culture that rose less than this many times did not grow and has no phases (1.5).",
     "detection_limit": "A mean change smaller than this, in either direction, counts as no change (0.2 mM).",
-    "judge_confidence": "A change needs a one-sided 90% confidence interval on the mean of an experiment's "
-                        "replicates beyond the detection limit (no change: the interval inside it), and the "
-                        "experiments of a value must not contradict each other; otherwise it is inconclusive, "
-                        "neither an arc nor a measured zero. More replicates narrow the interval. On by default; "
-                        "off, the mean alone decides.",
+    "judge_confidence": "With three or more replicates, a change needs a one-sided 90% confidence interval on "
+                        "their mean beyond the detection limit (no change: inside it); with two, both replicates "
+                        "beyond it on one side (or both inside); one replicate decides nothing. The experiments of "
+                        "a value must not contradict each other. Otherwise it is inconclusive, neither an arc nor a "
+                        "measured zero. On by default; off, the mean alone decides.",
     "compound_limits": "Detection limits of their own for compounds measured at another scale, as name=mM, comma "
                        "separated: thiamine=0.01. Empty by default: every compound takes the detection limit.",
     "ignore_media": "Values from every medium, pooled, instead of only from the value medium.",
@@ -207,12 +207,13 @@ the page names them. Tell media apart by their descriptions and atmosphere switc
 experiments leaves out an experiment by id. The report lists every medium found.
 Studies in the value medium are pooled, each experiment counting once; when their experiments disagree on what
 happened, the value is inconclusive (NA, no arc), carries the caution conflict, and the report names the
-experiments. Within an experiment, the replicates must pin the change down: a one-sided 90% confidence interval
-on their mean must lie beyond the detection limit, so replicates of -0.2 and +1.9 mM are inconclusive, not
-production, while five replicates at -8 mM stay a change if one sample failed. A value from one replicate is
-shown, and its matrix cell says single_replicate. Where growth ended by the growth rate and a compound kept
-changing right after it, its stationary value says still_changing. The same experiment deposited under two
-studies is counted once.</p>
+experiments. Within an experiment, the replicates must pin the change down: with three or more, a one-sided 90%
+confidence interval on their mean must lie beyond the detection limit, so five replicates at -8 mM stay a change
+if one sample failed; with two, both must lie beyond it, so -0.2 and +1.9 mM are inconclusive, not production;
+one replicate decides nothing. Where the growth rate ended growth more than a sample
+before the 90% rule (growth_rate_boundary) and a compound kept changing right after, its values say
+still_changing: the exponential value then lacks part of what the culture took up or made while slowing
+(E. coli LF82's glucose). The same experiment deposited under two studies is counted once.</p>
 <p>Because the value medium is chosen for the whole search, a taxon's values can change with the other taxa
 searched with it: when a taxon has more data in another medium, the page says so. Name a medium in the second box
 to fix the choice.</p>

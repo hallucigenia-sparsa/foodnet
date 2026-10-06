@@ -397,8 +397,9 @@ def readme(result: dict, which: str = "matrices") -> str:
     values = "booleans (1 = it happened, 0 = measured and it did not, NA = no evidence either way)" \
         if s["booleans"] else ("mM, the mean net change over the phase: the mean of the experiments' means when "
                                "several experiments give a value, else the mean of the replicates")
-    spread = ("; a change needs a one-sided 90% confidence interval on the mean beyond it, no change the interval "
-              "inside it, and experiments must not contradict each other, or the value is inconclusive"
+    spread = ("; with three or more replicates a change needs a one-sided 90% confidence interval on the mean "
+              "beyond it (no change: inside it), with two both replicates beyond it, and one replicate decides "
+              "nothing; experiments must not contradict each other, or the value is inconclusive"
               if s.get("judge_confidence", True) else "")
     own = ("; " + ", ".join(f"{k} {v:g} mM" for k, v in sorted(_own_limits(s).items())) + " have limits of their own"
            if _own_limits(s) else "")

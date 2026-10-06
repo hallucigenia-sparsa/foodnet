@@ -33,7 +33,8 @@ def test_the_mean_alone_and_one_value_decide_as_before():
     assert derive.classify([5.0, 5.2], 0.2) == 1
     assert derive.classify([-0.2, 1.9], 0.2) is None           # +0.84 +/- 1.04: inconclusive
     assert derive.classify([-0.2, 1.9], 0.2, agree=False) == 1
-    assert derive.classify([0.9], 0.2) == 1                     # one value: judged by itself
+    assert derive.classify([0.9], 0.2) is None                 # one value: inconclusive
+    assert derive.classify([0.9], 0.2, agree=False) == 1       # the mean alone, as 0.1.0
 
 
 def test_each_experiment_counts_once_so_a_large_study_does_not_outvote_a_small_one():
@@ -135,10 +136,10 @@ def test_replicates_that_end_growth_far_apart_are_marked():
 # ---- the value medium --------------------------------------------------------------------------------
 
 def test_a_taxon_without_a_phase_is_no_phase_and_does_not_vote(client):
-    # C's only culture (mMCB) does not grow: its cells are no_phase, not not_assayed
-    client.contexts[min(k for k, v in client.contexts.items() if v and v[0] == (0, 0.01)
-                        and client.bioreplicates["c1"]["measurementContexts"][0]["id"] == k)] = \
-        [(0, 0.5), (8, 0.5), (16, 0.55), (24, 0.5)]
+    # C's cultures (mMCB) do not grow: its cells are no_phase, not not_assayed
+    for rep in ("c1", "c1b"):
+        client.contexts[client.bioreplicates[rep]["measurementContexts"][0]["id"]] = \
+            [(0, 0.5), (8, 0.5), (16, 0.55), (24, 0.5)]
     r = run(client, ignore_media=True)
     from foodnet import matrix
     assert matrix.entry(r, "ncbi:3", GLC, "exponential", "consumed") == (None, "no_phase")
@@ -166,10 +167,12 @@ def test_a_taxon_with_more_data_in_another_medium_is_named():
     assert len(told) == 1 and "Gamma gamma C1 has more data in mMCB" in told[0] and "Alpha" not in told[0]
 
 
-# ---- agreement (round 2) ------------------------------------------------------------------------------
+# ---- small samples and the interval (rounds 2 to 4) ---------------------------------------------------
 
 def test_a_change_is_decided_on_a_confidence_interval_that_more_replicates_narrow():
-    assert derive.classify([0.25, 0.3], 0.2) is None                  # two close replicates near the limit
+    assert derive.classify([0.25, 0.3], 0.2) == 1                     # a pair: both beyond the limit
+    assert derive.classify([-3.2, -1.52], 0.2) == -1                  # a clear pair is not inconclusive
+    assert derive.classify([0.25, 0.3, 0.1], 0.2) is None              # three: the interval reaches inside
     assert derive.classify([0.25, 0.3, 0.28, 0.27, 0.29], 0.2) == 1    # five pin it down beyond it
     assert derive.classify([0.05, -0.1, 0.12, 0.0], 0.2) == 0
     assert derive.classify([-0.4, 0.7], 0.2) is None
@@ -197,6 +200,22 @@ def test_an_inconclusive_experiment_does_not_veto_the_others_but_is_named():
     cultures = [_culture("E1", [0, 1, 2, 3]), _culture("E1", [0, 1, 2, 3]),
                 _culture("E2", [0, 1, 2, 3], study="S2"), _culture("E2", [0, 1, 2, 3], study="S2")]
     cell = derive.pool(_rows([(0, 1.0), (1, 1.2), (2, -0.1), (3, 1.5)]), cultures, 0.2)[("t1", "x", "exponential")]
-    assert cell["state"] == "produced" and cell["mean"] == pytest.approx(1.1)
+    # E1 (+1.0, +1.2) decides; E2 (-0.1, +1.5) is inconclusive and does not contradict. The amount is over both
+    # experiments (+1.1 and +0.7), since leaving out the smaller effect would inflate it
+    assert cell["state"] == "produced" and cell["mean"] == pytest.approx(0.9)
     assert any("left out as inconclusive" in n for n in cell["notes"]) and "experiment_left_out" in cell["cautions"]
-    assert cell["n"] == 2 and cell["n_experiments"] == 1           # what the value rests on
+    assert cell["n"] == 4 and cell["n_experiments"] == 2
+
+
+def test_identical_replicates_count_as_one_measurement():
+    assert derive.classify([0.21, 0.21], 0.2) is None        # one series twice: one value, inconclusive
+    assert derive.classify([0.0, 0.0], 0.2) == 0              # but an exhausted compound is exactly 0 twice
+    cultures = [_culture("E1", [0, 1, 2, 3]), _culture("E1", [0, 1, 2, 3])]
+    cell = derive.pool(_rows([(0, 0.21), (1, 0.21)]), cultures, 0.2)[("t1", "x", "exponential")]
+    assert "no_variance" in cell["cautions"]
+
+
+def test_repeats_of_one_protocol_that_differ_by_more_than_rounding_are_not_one_deposit():
+    a = _culture("E1", [27.5, 14.0, 5.0, 0.0], times=(0, 8, 24, 48))
+    b = _culture("E2", [27.5, 14.1, 5.02, 0.0], study="S2", times=(0, 8, 24, 48))
+    assert derive.duplicates([a, b]) == (set(), [])

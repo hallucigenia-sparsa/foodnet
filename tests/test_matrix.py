@@ -8,6 +8,7 @@ import io
 import json
 import zipfile
 
+import pytest
 from conftest import run
 
 from foodnet import matrix
@@ -63,8 +64,7 @@ def test_the_pair_holds_magnitudes_and_says_why_a_cell_is_na(client):
     assert consumed[1] == ["Alpha alpha A1", "0", "NA", "NA", "8"]       # acetate measured, went up: 0 here
     assert produced[1] == ["Alpha alpha A1", "4", "NA", "NA", "0"]
     evidence = _rows(z.read("evidence_produced.csv").decode())
-    # B has one replicate in WC, so its measured cells say single_replicate
-    assert evidence[2] == ["Beta beta B1", "not_assayed", "single_replicate", "presence_only", "single_replicate"]
+    assert evidence[2] == ["Beta beta B1", "not_assayed", "measured", "presence_only", "below_limit"]
 
 
 def test_booleans_count_presence_in_another_medium_as_one(client):
@@ -87,7 +87,7 @@ def test_the_crm_payload_carries_the_caveats_as_data(client):
     assert p["format"] == "foodnet.crm/v1" and p["phase"] == "exponential"
     assert p["taxa"] == ["Alpha alpha A1", "Beta beta B1", "Gamma gamma C1"]
     assert p["resources"] == ["acetate", "butyrate", "formate", "glucose"]
-    assert p["consumed"][0] == [0, None, None, 8.0]
+    assert p["consumed"][0] == [0, None, None, pytest.approx(8.0)]
     assert p["initial_concentrations"] == [0.0, 0.0, None, 10.0]
     assert p["caveats"]["without_a_rate"] == ["Gamma gamma C1"]
     assert {(x["taxon"], x["resource"], x["direction"]) for x in p["caveats"]["presence_only"]} == {

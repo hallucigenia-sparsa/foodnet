@@ -29,8 +29,8 @@ def test_cell_states_have_their_own_marks(client):
     circles = list(root.iter(f"{SVG}circle"))
     # presence only: B's formate and C's glucose, one open circle each, plus the one in the key
     assert len([c for c in circles if c.get("fill") == "none"]) == 3
-    # B rests on one replicate: a dot on its four measured cells (butyrate and glucose, both panels) and the key
-    assert len([c for c in circles if c.get("fill") != "none"]) == 5
+    # every value rests on two or more replicates: no single-replicate dots
+    assert len([c for c in circles if c.get("fill") != "none"]) == 0
 
 
 def test_booleans_print_no_numbers(client):
@@ -88,10 +88,10 @@ def test_every_cell_names_its_source_studies_on_mouseover(client):
     root = ET.fromstring(figure.matrices_svg(run(client)))
     titles = ["".join(t.itertext()) for t in root.iter(f"{SVG}title")]
     acetate = next(t for t in titles if t.startswith("Alpha alpha A1, acetate, produced"))
-    assert "4 \u00b1 0 mM, 2 replicate(s)" in acetate          # both replicates +4, so sd 0
+    assert "4 \u00b1 0.1 mM, 3 replicate(s)" in acetate          # both replicates +4, so sd 0
     assert "SMGDB00000001 (Synthetic study one)" in acetate and "EMGDB000000001" in acetate
     formate = next(t for t in titles if t.startswith("Beta beta B1, formate, produced"))
-    assert "not assayed" in formate and "Seen in mMCB (+5 mM, 1 replicate(s)): SMGDB00000002" in formate
+    assert "not assayed" in formate and "Seen in mMCB (+5 mM, 2 replicate(s)): SMGDB00000002" in formate
     # one title per cell: 3 taxa x 4 metabolites x 2 matrices
     assert len(titles) == 24
 

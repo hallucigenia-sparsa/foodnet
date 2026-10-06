@@ -72,9 +72,10 @@ taxon a simulation cannot use.** For each replicate and metabolite, the concentr
    minus the concentration at its start (interpolated between samples), averaged over replicates and then
    over experiments, each experiment counting once. A mean change below the detection limit (0.2 mM, a
    setting; compounds can have their own) is no change, judged on how well the replicates pin the mean
-   down: a change needs a one-sided 90% confidence interval on the mean beyond the limit, no change needs
-   the interval inside it, and experiments must not contradict each other; otherwise the value is
-   inconclusive, neither an arc nor a measured zero. A
+   down: with three or more, a one-sided 90% confidence interval on the mean must lie beyond the limit
+   (inside it for no change); with two, both replicates must; one replicate decides nothing. Experiments
+   must not contradict each other. Otherwise the value is inconclusive, neither an arc nor a measured
+   zero. A
    metabolite series shorter than 24 h is used, and flagged.
 4. **Values from one medium, presence from the others.** With the second box empty, all data are
    considered: the values come from the medium that holds data for the most taxa, and every other medium

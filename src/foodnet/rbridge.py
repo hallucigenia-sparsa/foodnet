@@ -93,7 +93,7 @@ def _local(url: str) -> str:
     return url
 
 
-def send(payload: dict, port: int = DEFAULT_PORT, timeout: float = 30.0) -> dict:
+def send(payload: dict, port: int = DEFAULT_PORT, timeout: float = 60.0) -> dict:
     """POST the CRM payload to a listening R session and return what it answered.
 
     The answer is R's own: {"received": true, "taxa": n, "growth_rates": n, ...} from
