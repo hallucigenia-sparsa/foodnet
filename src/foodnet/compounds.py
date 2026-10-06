@@ -29,10 +29,15 @@ EQUIVALENT = {
     28484: (50128, "isovaleric acid is the conjugate acid of isovalerate"),
     422: (24996, "(S)-lactic acid is a form of lactate; mGrowthDB's lactate carries no stereo-descriptor"),
     15361: (15361, ""),        # pyruvate is recorded as the base already (listed so the name below applies)
+    # ids checked against ChEBI (OLS, 2026-10-06), added after a review: none is in mGrowthDB yet, and an
+    # acid recorded beside its base would otherwise be two metabolites
+    15741: (26806, "succinic acid is the conjugate acid of succinate"),
+    30031: (26806, "succinate(2-) is the dianion of succinate"),
+    17418: (31011, "valeric acid is the conjugate acid of valerate"),
 }
 # the name a joined compound is shown under
 NAMES = {30089: "acetate", 15740: "formate", 17968: "butyrate", 17272: "propionate", 48944: "isobutyrate",
-         50128: "isovalerate", 24996: "lactate", 15361: "pyruvate"}
+         50128: "isovalerate", 24996: "lactate", 15361: "pyruvate", 26806: "succinate", 31011: "valerate"}
 
 # concentration units to mM
 SCALE_TO_MM = {"mm": 1.0, "mmol/l": 1.0, "mmol l-1": 1.0, "mmol/litre": 1.0,
@@ -43,7 +48,7 @@ MASS_TO_G_PER_L = {"g/l": 1.0, "mg/l": 1e-3, "mg/ml": 1.0, "ug/ml": 1e-3, "µg/m
 # g/mol, by the ChEBI id foodnet keys the compound under (after EQUIVALENT)
 MOLAR_MASS = {17234: 180.156, 15361: 88.06, 27082: 342.296, 30089: 60.052, 15740: 46.025, 17968: 88.106,
               17272: 74.079, 48944: 88.106, 50128: 102.133, 24996: 90.078, 26806: 118.088, 28757: 180.156,
-              28260: 180.156, 37684: 180.156, 18222: 150.13, 17057: 342.297, 33984: 164.16}
+              28260: 180.156, 37684: 180.156, 18222: 150.13, 17057: 342.297, 33984: 164.16, 31011: 102.133}
 
 
 def canonical(chebi_id, name: str) -> dict:
