@@ -222,14 +222,18 @@ no_phase, presence_only, not_assayed. The first header cell names the medium the
 phase choice Both, each metabolite has a column per phase.</p>
 <h2 id="crm">Consumer-resource models and R</h2>
 <p>CRM mode collects growth rates: from the replicates whose metabolites gave the values, else from another
-monoculture in the same medium. Get CRM parameters then downloads the matrices, the rates and the initial medium
-concentrations with a README, or sends them to R. With Both, the CRM uses the exponential phase.</p>
+monoculture in the same medium. Get CRM parameters then downloads the matrices, the rates, the initial medium
+concentrations and each taxon's biomass change over the phase with a README, or sends them to R. With Both, the
+CRM uses the exponential phase.</p>
 <p>The R companion package receives them. Install it once with <code>{_e(rbridge.INSTALL_R)}</code>
 ({_e(rbridge.INSTALL_TROUBLE)}), then <code>library(foodnet); crm &lt;- foodnet_listen()</code> and press Send to R.
-<code>crm_efficiency(crm)</code> builds the efficiency matrix a CRM takes (positive for consumption, negative for
-production) and <code>as_miasim(crm)</code> the arguments of
-<a href="{MIASIM}">miaSim</a>'s <code>simulateConsumerResource</code>. Scaling is a modeling choice and is never made
-for you.</p>
+<code>crm_efficiency(crm)</code> builds <a href="{MIASIM}">miaSim</a>'s efficiency matrix from its equations: a
+positive entry is a yield (biomass per mM taken up), a negative one a by-product per unit of growth, so a taxon
+alone gains its measured biomass and makes its measured by-products. Uptake of each resource follows the Monod
+constants, which foodnet does not measure: <code>crm_backcheck(crm, monod_constant = 1)</code> simulates each taxon
+alone against its monoculture. <code>as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1)</code> gives the
+arguments of <code>simulateConsumerResource</code>, and never lets it draw starting abundances or Monod constants at
+random.</p>
 <h2 id="cytoscape">Cytoscape and the downloads</h2>
 <p>Send to Cytoscape puts the network into a running Cytoscape in the style of the legend. A downloaded GraphML can take
 the same style: <a href="{style_link}">foodnet_style.xml</a> (File, Import, Styles from File). JSON is the canonical

@@ -1,50 +1,93 @@
-test_that("the efficiency matrix divides each row by the taxon's uptake", {
-    crm <- foodnet:::as_foodnet_crm(example_payload())
-    expect_warning(E <- crm_efficiency(crm), "B produced acetate")
-    # A: consumed 8 glucose, produced 4 acetate; total uptake 8, so glucose 8/8 = 1, acetate -4/8 = -0.5
-    expect_equal(unname(E["A", ]), c(1, -0.5, 0))
-    # B: consumed 2 glucose and 6 acetate (total 8) and produced 3 butyrate: 0.25, 0.75, -3/8 = -0.375
-    expect_equal(unname(E["B", ]), c(0.25, 0.75, -0.375))
-    expect_equal(sum(E["B", E["B", ] > 0]), 1)
+# The example payload (helper-payload.R): A consumed 8 mM glucose, produced 4 mM acetate, grew by 2 at 0.4/h;
+# B consumed 2 glucose and 6 acetate, produced 3 butyrate, grew by 1, and has no rate (0.5 where one is given).
+
+with_rate <- function() {
+    payload <- example_payload()
+    payload$growth_rates <- list(0.4, 0.5)
+    foodnet:::as_foodnet_crm(payload)
+}
+
+test_that("E follows miaSim: yields per mM taken up, by-products per unit of growth", {
+    E <- suppressWarnings(crm_efficiency(with_rate()))
+    # A: yield 2 / (0.4 * 8) = 0.625 on glucose; acetate -4 * 0.4 / 2 = -0.8
+    expect_equal(unname(E["A", ]), c(0.625, -0.8, 0))
+    # B: yield 1 / (0.5 * 8) = 0.25 on glucose and acetate; butyrate -3 * 0.5 / 1 = -1.5
+    expect_equal(unname(E["B", ]), c(0.25, 0.25, -1.5))
 })
 
-test_that("without normalizing, E is consumed minus produced in mM", {
+test_that("miaSim's yields need a rate and a biomass change for every taxon", {
     crm <- foodnet:::as_foodnet_crm(example_payload())
-    E <- suppressWarnings(crm_efficiency(crm, normalize = "none"))
+    expect_error(suppressWarnings(crm_efficiency(crm)), "B lack one")
+})
+
+test_that("the shares scale is 0.1.0's matrix, and none is consumed minus produced", {
+    crm <- foodnet:::as_foodnet_crm(example_payload())
+    E <- suppressWarnings(crm_efficiency(crm, scale = "shares"))
+    expect_equal(unname(E["A", ]), c(1, -0.5, 0))
+    expect_equal(unname(E["B", ]), c(0.25, 0.75, -0.375))
+    E <- suppressWarnings(crm_efficiency(crm, scale = "none"))
     expect_equal(unname(E["A", ]), c(8, -4, 0))
 })
 
-test_that("NA cells can be refused", {
+test_that("every NA set to 0 is counted by its kind", {
     crm <- foodnet:::as_foodnet_crm(example_payload())
+    expect_warning(crm_efficiency(crm, scale = "none"), "2 not_assayed, 1 presence_only")
     expect_error(crm_efficiency(crm, na = "stop"), "NA")
 })
 
-test_that("as_miasim stops without a growth rate and builds miaSim's arguments with one", {
-    crm <- foodnet:::as_foodnet_crm(example_payload())
-    expect_error(as_miasim(crm), "no growth rate for B")
-    args <- suppressWarnings(as_miasim(crm, missing_rate = 0.3))
-    expect_equal(args$n_species, 2)
-    expect_equal(args$n_resources, 3)
-    expect_equal(args$names_resources, c("glucose", "acetate", "butyrate"))
-    expect_equal(args$growth_rates, c(0.4, 0.3))
-    expect_equal(args$resources, c(10, 2, 0))
-    expect_equal(dim(args$E), c(2, 3))
-})
-
-test_that("the parameters can be written as files", {
-    crm <- foodnet:::as_foodnet_crm(example_payload())
-    dir <- tempfile()
-    on.exit(unlink(dir, recursive = TRUE))
-    paths <- crm_write(crm, dir)
-    expect_true(all(file.exists(paths)))
-    expect_equal(read.csv(paths[3])$growth_rate, c(0.4, NA))
-})
-
-test_that("a link that arrives with an amount from another medium is not warned about", {
+test_that("booleans are no amounts", {
     payload <- example_payload()
-    payload$produced[[2]][[2]] <- 1.5                  # B's acetate, seen elsewhere, now with its value
+    payload$values <- "booleans"
+    expect_error(crm_efficiency(foodnet:::as_foodnet_crm(payload)), "booleans")
+})
+
+test_that("as_miasim needs starting abundances and Monod constants, never drawn at random", {
+    crm <- with_rate()
+    expect_error(as_miasim(crm), "x0")
+    expect_error(as_miasim(crm, x0 = crm$biomass_start), "monod_constant")
+    args <- suppressWarnings(as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1))
+    expect_equal(args$n_species, 2)
+    expect_equal(args$names_resources, c("glucose", "acetate", "butyrate"))
+    expect_equal(args$growth_rates, c(0.4, 0.5))
+    expect_equal(args$x0, c(0.5, 0.2))
+    expect_equal(dim(args$monod_constant), c(2, 3))
+    expect_equal(args$resources, c(10, 2, 0))
+})
+
+test_that("as_miasim stops without a growth rate", {
+    crm <- foodnet:::as_foodnet_crm(example_payload())
+    expect_error(as_miasim(crm, x0 = c(1, 1), monod_constant = 1, E = matrix(0, 2, 3)), "no growth rate for B")
+})
+
+test_that("pooled media and the stationary phase are refused unless allowed", {
+    payload <- example_payload()
+    payload$growth_rates <- list(0.4, 0.5)
+    payload$caveats$mixed_media <- TRUE
     crm <- foodnet:::as_foodnet_crm(payload)
-    expect_no_warning(E <- crm_efficiency(crm))
-    # B: consumed 2 + 6 = 8, produced acetate 1.5 and butyrate 3: acetate 0.75 - 1.5/8 = 0.5625
-    expect_equal(unname(E["B", "acetate"]), 0.5625)
+    expect_error(as_miasim(crm, x0 = c(1, 1), monod_constant = 1), "every medium")
+    expect_type(suppressWarnings(as_miasim(crm, x0 = c(1, 1), monod_constant = 1, allow = "mixed_media")), "list")
+    payload$caveats$mixed_media <- FALSE
+    payload$caveats$stationary_phase <- TRUE
+    expect_error(as_miasim(foodnet:::as_foodnet_crm(payload), x0 = c(1, 1), monod_constant = 1), "stationary")
+})
+
+test_that("a taxon simulated alone gains its biomass and makes its by-products when its uptake matches", {
+    skip_if_not_installed("miaSim")
+    payload <- example_payload()
+    payload$growth_rates <- list(0.4, 0.5)
+    # A alone, on glucose only, with 8 of 10 mM taken up: biomass and acetate follow the uptake
+    payload$taxa <- list("A")
+    payload$consumed <- list(list(8, 0, 0))
+    payload$produced <- list(list(0, 4, 0))
+    payload$evidence_consumed <- list(list("measured", "below_limit", "below_limit"))
+    payload$evidence_produced <- list(list("below_limit", "measured", "below_limit"))
+    payload[c("growth_rates", "biomass_change", "biomass_start", "biomass_unit", "phase_hours")] <-
+        list(list(0.4), list(2), list(0.5), list("OD"), list(12))
+    payload$caveats$presence_only <- list()
+    payload$caveats$without_a_rate <- list()
+    b <- crm_backcheck(foodnet:::as_foodnet_crm(payload), monod_constant = 5)
+    taken <- b$simulated[b$what == "glucose"]
+    # whatever the uptake, biomass and acetate are in the measured proportion to it
+    expect_equal(b$simulated[b$what == "biomass"] / taken, 2 / 8, tolerance = 0.02)
+    expect_equal(b$simulated[b$what == "acetate"] / taken, 4 / 8, tolerance = 0.02)
 })

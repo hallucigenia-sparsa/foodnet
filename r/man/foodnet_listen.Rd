@@ -13,8 +13,11 @@ foodnet_listen(port = 8794, timeout = 300, quiet = FALSE)
 \value{The CRM parameters, an object of class \code{foodnet_crm}. Printing it shows its caveats; see \code{\link{crm_consumed}}, \code{\link{crm_efficiency}} and \code{\link{as_miasim}}.}
 \description{
 Opens a port on this machine and waits for foodnet's "Send to R" to post the parameters to it. The
-page sends them to 127.0.0.1 and nowhere else, and this function answers one request and closes the
-port again.
+page sends them to 127.0.0.1 and nowhere else. Base R cannot limit a listening port to this machine, so
+the listener also writes a one-time secret to a file only this user can read, and accepts parameters
+only from a request that carries it (the foodnet page reads the same file); a request from elsewhere, or
+from a web page, is refused and the listener goes on waiting. It closes the port, and removes the
+secret, once the parameters have arrived.
 }
 \seealso{\code{\link{foodnet_crm}}, which fetches the same parameters when opening a port is not possible.}
 \examples{

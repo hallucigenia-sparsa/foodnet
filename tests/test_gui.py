@@ -103,7 +103,7 @@ def test_crm_parameters_need_crm_mode_and_then_download(server):
     body, _ = _get(f"{server}/crm.zip?token=tok&job={job}")
     assert "growth_rates.csv" in zipfile.ZipFile(io.BytesIO(body)).namelist()
     body, _ = _get(f"{server}/crm.json?token=tok&job={job}")
-    assert json.loads(body)["format"] == "foodnet.crm/v0"
+    assert json.loads(body)["format"] == "foodnet.crm/v1"
 
 
 def test_help_legend_and_about_open(server):

@@ -4,7 +4,10 @@
 # become part of the object rather than prose a reader may never open: `print` shows them every time, and
 # `crm_efficiency` and `as_miasim` act on them.
 
-CRM_FORMAT <- "foodnet.crm/v0"
+CRM_FORMAT <- "foodnet.crm/v1"
+# what this package still reads: v0 lacks the biomass changes, so crm_efficiency() then builds only the
+# "shares" and "none" scales
+CRM_FORMATS <- c("foodnet.crm/v0", "foodnet.crm/v1")
 
 #' @noRd
 stop_foodnet <- function(...) stop(paste0(...), call. = FALSE)
@@ -41,9 +44,9 @@ as_foodnet_crm <- function(payload) {
     if (!is.list(payload) || is.null(payload$format)) {
         stop_foodnet("this is not a foodnet CRM payload: it has no format field")
     }
-    if (!identical(chr(payload$format), CRM_FORMAT)) {
-        warning("this payload says it is ", chr(payload$format), ", and this package reads ", CRM_FORMAT,
-                "; reading it anyway", call. = FALSE)
+    if (!chr(payload$format) %in% CRM_FORMATS) {
+        warning("this payload says it is ", chr(payload$format), ", and this package reads ",
+                paste(CRM_FORMATS, collapse = " and "), "; reading it anyway", call. = FALSE)
     }
     taxa <- chr_vector(payload$taxa)
     resources <- chr_vector(payload$resources)
@@ -51,6 +54,16 @@ as_foodnet_crm <- function(payload) {
     names(rates) <- taxa
     initial <- vapply(payload$initial_concentrations, as_number, numeric(1))
     names(initial) <- resources
+    per_taxon <- function(field) {
+        values <- if (length(payload[[field]])) vapply(payload[[field]], as_number, numeric(1)) else
+            rep(NA_real_, length(taxa))
+        names(values) <- taxa
+        values
+    }
+    units <- if (length(payload$biomass_unit)) vapply(payload$biomass_unit, chr, character(1), NA_character_) else
+        rep(NA_character_, length(taxa))
+    names(units) <- taxa
+    inconclusive <- caveats_rows(payload$caveats$inconclusive)
     caveats <- payload$caveats
     presence <- caveats$presence_only
     presence <- if (length(presence)) {
@@ -75,6 +88,10 @@ as_foodnet_crm <- function(payload) {
              growth_rate_unit = chr(payload$growth_rate_unit, "1/h"),
              growth_rate_detail = payload$growth_rate_detail,
              initial = initial,
+             biomass_change = per_taxon("biomass_change"),
+             biomass_start = per_taxon("biomass_start"),
+             biomass_unit = units,
+             phase_hours = per_taxon("phase_hours"),
              phase = chr(payload$phase),
              values = chr(payload$values, "mM"),
              detection_limit = as_number(payload$detection_limit_mM),
@@ -84,7 +101,10 @@ as_foodnet_crm <- function(payload) {
                             without_a_rate = chr_vector(caveats$without_a_rate),
                             media = chr_vector(caveats$media),
                             value_rule = chr(caveats$value_rule),
-                            searched_both_phases = isTRUE(caveats$searched_both_phases)),
+                            searched_both_phases = isTRUE(caveats$searched_both_phases),
+                            mixed_media = isTRUE(caveats$mixed_media),
+                            stationary_phase = isTRUE(caveats$stationary_phase),
+                            inconclusive = inconclusive),
              readme = chr(payload$readme),
              tool = chr(payload$tool, "foodnet"),
              tool_version = chr(payload$tool_version),
@@ -93,6 +113,19 @@ as_foodnet_crm <- function(payload) {
              studies = chr_vector(payload$studies),
              settings = payload$settings),
         class = "foodnet_crm")
+}
+
+# The list of {taxon, resource, direction} rows a caveat carries, as a data frame.
+#' @noRd
+caveats_rows <- function(rows) {
+    if (!length(rows)) {
+        return(data.frame(taxon = character(0), resource = character(0), direction = character(0),
+                          stringsAsFactors = FALSE))
+    }
+    data.frame(taxon = vapply(rows, function(p) chr(p$taxon), character(1)),
+               resource = vapply(rows, function(p) chr(p$resource), character(1)),
+               direction = vapply(rows, function(p) chr(p$direction), character(1)),
+               stringsAsFactors = FALSE)
 }
 
 #' @noRd
@@ -124,6 +157,22 @@ print.foodnet_crm <- function(x, ...) {
     if (not_assayed) {
         cat(sprintf("   * %d cell(s) were never assayed (NA): no evidence either way.\n", not_assayed))
     }
+    unsure <- count_evidence(x, "inconclusive")
+    if (unsure) {
+        cat(sprintf("   * %d cell(s) are inconclusive (NA): measured, but the spread reaches across the limit.\n",
+                    unsure))
+    }
+    no_phase <- count_evidence(x, "no_phase")
+    if (no_phase) {
+        cat(sprintf("   * %d cell(s) have no phase (NA): measured, but the culture gave no growth phase.\n",
+                    no_phase))
+    }
+    if (x$caveats$mixed_media) {
+        cat("   * values pool every medium: the starting concentrations describe no real medium.\n")
+    }
+    if (x$caveats$stationary_phase) {
+        cat("   * these are stationary-phase amounts: uptake without growth, which a CRM reads as growth.\n")
+    }
     presence <- x$caveats$presence_only
     if (nrow(presence)) {
         shown <- utils::head(presence, 6)
@@ -133,7 +182,7 @@ print.foodnet_crm <- function(x, ...) {
             if (nrow(presence) > 6) paste0(" and ", nrow(presence) - 6, " more") else "", "\n", sep = "")
     }
     if (length(x$caveats$conflicts)) {
-        cat(sprintf("   * %d value(s) pool experiments that disagree: crm_readme(x) names them.\n",
+        cat(sprintf("   * %d value(s) have experiments that disagree (NA): crm_readme(x) names them.\n",
                     length(x$caveats$conflicts)))
     }
     if (length(x$caveats$without_a_rate)) {
@@ -144,8 +193,13 @@ print.foodnet_crm <- function(x, ...) {
     if (x$caveats$searched_both_phases) {
         cat("   * the search asked for both phases; a CRM describes growth, so these are the exponential phase.\n")
     }
+    if (all(is.na(x$biomass_change))) {
+        cat("   * no biomass changes came with these parameters, so crm_efficiency() can build only its\n")
+        cat("     \"shares\" and \"none\" scales (update foodnet for miaSim's yields).\n")
+    }
     cat("   * the cells are measured amounts (net changes), not efficiencies: crm_efficiency(x) turns them\n")
-    cat("     into the E matrix a CRM takes, and how to scale it is your choice.\n")
+    cat("     into miaSim's E (yields per mM taken up, by-products per unit of growth); crm_backcheck()\n")
+    cat("     simulates each taxon alone and says how close it comes to its own monoculture.\n")
     cat("  crm_consumed(x), crm_produced(x), crm_rates(x), crm_resources(x); crm_readme(x) for the full text.\n")
     invisible(x)
 }

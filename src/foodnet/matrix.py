@@ -41,7 +41,9 @@ from .model import FoodNetwork
 NA = "NA"
 EVIDENCE_WORDS = ("measured", "below_limit", "seen_elsewhere", "inconclusive", "no_phase", "presence_only",
                   "not_assayed")
-CRM_FORMAT = "foodnet.crm/v0"
+# v1 (0.2.0): adds each taxon's biomass change over the phase, which miaSim's yields need, and the caveats
+# that make a CRM refuse to build without being told (mixed media, the stationary phase)
+CRM_FORMAT = "foodnet.crm/v1"
 
 
 def taxa_rows(net: FoodNetwork, result: dict | None = None) -> list:
@@ -325,6 +327,16 @@ def initial_csv(result: dict) -> str:
     return _csv(["metabolite", "chebi_id", "mean_mM", "min_mM", "max_mM", "replicates"], rows)
 
 
+def biomass_csv(result: dict) -> str:
+    net = result["network"]
+    rows = []
+    for t in taxa_rows(net, result):
+        b = (result.get("biomass") or {}).get(t.id)
+        rows.append([t.name, *(["NA", "NA", "", "NA", 0] if b is None else
+                               [f"{b['start']:.6g}", f"{b['change']:.6g}", b["unit"], f"{b['hours']:.6g}", b["n"]])])
+    return _csv(["taxon", "biomass_start", "biomass_change", "unit", "phase_hours", "replicates"], rows)
+
+
 def crm_phase(result: dict) -> str:
     """The one phase a CRM is parameterized from: the window when one is set, the exponential phase with
     "Both" (a consumer-resource model describes growth), else the phase chosen. The metabolites of the second
@@ -414,11 +426,24 @@ def readme(result: dict, which: str = "matrices") -> str:
                     if presence_entries(result) == "true" else []),
                   "Initial concentrations: each metabolite's concentration at the first sample of the value-medium "
                   "cultures, averaged (initial_concentrations.csv), in mM.",
+                  "Biomass: each taxon's growth over the same phase, from its growth curve, in that curve's unit "
+                  "(biomass.csv), with the phase's length in hours. A simulation's starting abundance for a taxon "
+                  "must be in the same unit.",
+                  *(["Values come from every medium pooled (Ignore media differences): the initial concentrations "
+                     "mix media and describe none of them, so the R package refuses to build a CRM from these "
+                     "unless told to."] if result["value_rule"]["rule"] == "all" else []),
+                  *(["These are stationary-phase amounts: uptake without growth, which a consumer-resource model "
+                     "reads as growth. The R package refuses to build a CRM from them unless told to."]
+                    if crm_phase(result) == "stationary" else []),
                   "",
-                  "These are measured amounts, not model parameters. A consumer-resource model such as miaSim's "
-                  "simulateConsumerResource takes an efficiency matrix E (positive for consumption, negative for "
-                  "production). The foodnet R package's crm_efficiency() builds one from these matrices; how to scale "
-                  "it is a modeling choice, so nothing here does it for you.", ""]
+                  "These are measured amounts. miaSim's simulateConsumerResource takes an efficiency matrix E: "
+                  "a positive entry is the biomass made per mM of a resource taken up (a yield; the uptake itself "
+                  "is set by the Monod constants, not by E), and a negative one the mM of a by-product made per "
+                  "unit of growth. The foodnet R package's crm_efficiency() builds E that way from these amounts, "
+                  "the biomass changes and the growth rates, so that a taxon simulated alone gains its measured "
+                  "biomass and makes its measured by-products; crm_backcheck() simulates each taxon alone and "
+                  "says how close it comes. foodnet measures no Monod constants, and miaSim's uptake of each "
+                  "resource follows them: choose them, and check them with crm_backcheck().", ""]
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -454,6 +479,7 @@ def crm_payload(result: dict) -> dict:
     mets = [m for m, _, _ in columns(net, result, [ph])]
     initial = [None if result["initial"].get(m.id) is None else result["initial"][m.id]["mean"] for m in mets]
     rates = [result["rates"].get(t.id, {}).get("rate") for t in taxa]
+    biomass = [(result.get("biomass") or {}).get(t.id) for t in taxa]
     presence = []
     for i, t in enumerate(taxa):
         for j, m in enumerate(mets):
@@ -479,11 +505,25 @@ def crm_payload(result: dict) -> dict:
         "growth_rate_detail": {pair["taxa"][i]: result["rates"][t.id] for i, t in enumerate(taxa)
                                if t.id in result["rates"]},
         "initial_concentrations": initial, "initial_unit": "mM",
+        # each taxon's growth over the same phase, in its growth curve's unit: what turns the amounts into
+        # miaSim's yields (crm_efficiency in the R package); a simulation's starting abundance is in that unit
+        "biomass_change": [None if b is None else b["change"] for b in biomass],
+        "biomass_start": [None if b is None else b["start"] for b in biomass],
+        "biomass_unit": [None if b is None else b["unit"] for b in biomass],
+        "phase_hours": [None if b is None else b["hours"] for b in biomass],
         "caveats": {"presence_only": presence, "conflicts": conflicts(result),
                     "duplicates": list(result["duplicates"]),
                     "without_a_rate": [pair["taxa"][i] for i, t in enumerate(taxa) if t.id not in result["rates"]],
                     "media": list(result["value_rule"]["media"]), "value_rule": result["value_rule"]["rule"],
-                    "searched_both_phases": net.meta.get("phase") == "both"},
+                    "searched_both_phases": net.meta.get("phase") == "both",
+                    # a medium that does not exist, and uptake without growth: the R package refuses to build a
+                    # CRM from either unless told to
+                    "mixed_media": result["value_rule"]["rule"] == "all",
+                    "stationary_phase": ph == "stationary",
+                    "inconclusive": [{"taxon": pair["taxa"][i], "resource": m.name, "direction": d}
+                                     for i, _ in enumerate(taxa) for j, m in enumerate(mets)
+                                     for d in ("consumed", "produced")
+                                     if pair[f"evidence_{d}"][i][j] == "inconclusive"]},
         "readme": readme(result, "crm"),
         "studies": sorted(net.studies), "settings": result["settings"],
     }
@@ -503,6 +543,7 @@ def crm_package(result: dict) -> bytes:
                                    first=corner(result)))
         z.writestr("growth_rates.csv", rates_csv(result))
         z.writestr("initial_concentrations.csv", initial_csv(result))
+        z.writestr("biomass.csv", biomass_csv(result))
         z.writestr("crm.json", json.dumps(crm_payload(result), indent=1))
         z.writestr("README.txt", readme(result, "crm"))
     return buffer.getvalue()

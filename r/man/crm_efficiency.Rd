@@ -3,27 +3,40 @@
 \alias{crm_efficiency}
 \title{The efficiency matrix of a consumer-resource model}
 \usage{
-crm_efficiency(x, normalize = c("consumed", "none"), na = c("zero", "stop"))
+crm_efficiency(x, scale = c("miasim", "shares", "none"), na = c("zero", "stop"))
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
-\item{normalize}{\code{"consumed"} or \code{"none"}, as above.}
+\item{scale}{\code{"miasim"}, \code{"shares"} or \code{"none"}, as above.}
 \item{na}{\code{"zero"} or \code{"stop"}, as above.}
 }
 \value{A numeric matrix, taxa by resources.}
 \description{
 A consumer-resource model such as miaSim's \code{simulateConsumerResource} takes an efficiency matrix \code{E},
-taxa by resources, positive where a taxon consumes a resource (its conversion to biomass) and negative
-where it produces one (a by-product). This builds one from the measured amounts.
+taxa by resources, positive where a taxon consumes a resource and negative where it produces one. This
+builds one from the measured amounts.
 
-With \code{normalize = "consumed"} (the default), each taxon's row is divided by the total it consumed: the
-consumed entries become the share of its uptake each resource makes up (they sum to 1), and the produced
-entries the amount of by-product per unit taken up. With \code{"none"}, \code{E} is consumed minus produced, in mM.
-Either is a modeling choice, and a model may need its own scale; that is why the measured amounts are
-kept apart from this.
+With \code{scale = "miasim"} (the default), \code{E} follows miaSim's own equations, read from its source
+(\code{consumerResourceModel}, miaSim 1.18): a taxon grows by \code{growth_rate * sum_j E[j] * R[j] / (R[j] + K[j])}
+per unit of its abundance, takes up each resource it consumes at \code{R / (R + K)} per unit of abundance
+whatever the size of \code{E}, and makes each by-product at \code{|E|} times its growth. So a positive entry is a
+yield, the biomass made per mM taken up, and a negative one the mM of a by-product made per unit of
+biomass divided by the growth rate. For each taxon, with its biomass change \code{dx} and growth rate \code{mu}
+over the phase, \code{E} is \code{dx / (mu * total consumed)} for every resource it consumed and
+\code{-produced * mu / dx} for every resource it produced, so that a taxon simulated alone gains its measured
+biomass from its measured uptake and makes its measured by-products. How its uptake splits between
+resources is set by the Monod constants, which foodnet does not measure; \code{\link{crm_backcheck}} says how close
+a choice of them comes. The biomass is in the unit of each taxon's growth curve (\code{x$biomass_unit}), and so
+must be its starting abundance in a simulation.
 
-\code{NA} cells have no size. With \code{na = "zero"} they count as 0, and a warning names the links seen only in
-another medium, which are real links set to 0 here; \code{"stop"} refuses until you fill them yourself.
+\code{scale = "shares"} is foodnet 0.1.0's matrix: each row divided by the total consumed, so consumed entries
+are shares of uptake and produced entries by-product per unit taken up. miaSim does not read \code{E} that way
+(it reads a positive entry as a yield), so a simulation from it does not reproduce the monocultures; it is
+kept for other models. \code{scale = "none"} is consumed minus produced, in mM.
+
+\code{NA} cells have no size. With \code{na = "zero"} they count as 0, and a warning says how many of each kind
+were set to 0: never assayed, seen only in another medium (a real link), inconclusive (measured, but its
+spread reaches across the limit) and without a phase. \code{"stop"} refuses until you fill them yourself.
 }
 \examples{
 \dontrun{

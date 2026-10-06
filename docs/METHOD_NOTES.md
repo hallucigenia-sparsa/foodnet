@@ -106,6 +106,66 @@ with metabolite data."
     caution ("OK"); the growth-rate fallback takes another monoculture of the taxon in the same medium ("keep
     as is, but with the stringent medium matching"), which decision 18 now makes strict.
 
+20. **The experiment is the unit, and a change must clear the limit across its spread.** Karoline,
+    2026-10-06, after a review of 0.1.0 showed a study with ten replicates outvoting one with two, and
+    +0.84 +/- 1.04 mM on a 27 mM background drawn as production: "experiment level + inconclusive". A cell's
+    mean, standard deviation and test are over its experiments' means (over the replicates when one
+    experiment gives it); `n` stays the replicates and `n_experiments` is new. A change needs the mean plus
+    and minus one standard deviation beyond the limit on one side; no change needs it inside the limit;
+    anything else, and experiments that disagree, is `inconclusive`: NA with its own evidence, never an arc
+    and never a 0. The 0.2 mM limit stays; compounds at another scale can have their own (thiamine=0.01).
+    Advanced settings can judge by the mean alone, as 0.1.0 did. Identical replicates give no test
+    (`no_variance`), and the multiple-testing family is the tests that make the arcs.
+21. **Merging to genus applies the detection limit**, and taxa that disagree make the genus cell
+    inconclusive (`conflict`), instead of a median that can sit below the limit or hide a consumer.
+22. **One value medium per search, made stable and visible.** Karoline, 2026-10-06: "keep one, make it
+    stable". Only taxa whose cultures give values vote; ties go to replicates with values, then the name;
+    the page names the taxa with more data in another medium (their values depend on what was searched with
+    them), a narrow win, and the taxa with no phase; every matrix CSV names the value medium in its first
+    header cell. Choosing per taxon would make a matrix mix media, which a CRM cannot use.
+23. **Cells say why they have no value.** New evidence states: `inconclusive` (decision 20), `no_phase`
+    (assayed, but the cultures gave no end of exponential growth or no stationary phase), and
+    `seen_elsewhere` (0 in the value medium, a change that way in another). 0.1.0 wrote the first two as
+    `not_assayed` or 0, and the third as `below_limit` while its README promised NA.
+24. **A more robust phase boundary.** Karoline, 2026-10-06: "robust boundary". The 90% rule is read on the
+    growth curve smoothed by a running median of three (Tukey's rule at the end, the start as measured); the
+    first growth curve that gives a boundary is used; relative 16S is no growth curve; boundaries on fewer
+    than three samples (`coarse_sampling`) or further apart across replicates than a sampling interval
+    (`boundaries_differ`) are flagged. Not chosen: falling back to the whole run for cultures without a
+    boundary, flags for failed samples and transient peaks, and a boundary from the growth rate. Checked on
+    the real curves: smoothing moves single-point noise and a lone late jump, but not a plateau that keeps
+    creeping up (E. coli LF82, study SMGDB00000009, +20% from 12 to 168 h, whose boundary lands at 84 to
+    120 h); those values carry `boundaries_differ`. See the open decision below.
+25. **Media differ by amount too, and by more phrasings.** An alteration keeps its amount (0.1% and 0.75%
+    linoleic acid, study SMGDB00000014; 0 to 5 mg/L pantothenate, study SMGDB00000019, formerly one medium).
+26. **CRM parameters follow miaSim's equations.** Karoline, 2026-10-06: "rebuild from miaSim". Read from
+    miaSim 1.18's `consumerResourceModel`: a positive entry of E is a yield (uptake is `R/(R+K)` per unit
+    abundance whatever E is), a negative one the by-product per unit of growth. The payload (now
+    `foodnet.crm/v1`) carries each taxon's biomass change over the phase, in its growth curve's unit, and
+    `crm_efficiency()` sets E so that a taxon alone gains its measured biomass and makes its measured
+    by-products from its measured uptake; how uptake splits between resources follows the Monod constants,
+    which foodnet does not measure, and `crm_backcheck()` simulates each taxon alone to test a choice.
+    `as_miasim()` requires starting abundances and Monod constants (miaSim would draw them at random) and
+    refuses pooled media and the stationary phase unless allowed. 0.1.0's uptake shares remain as
+    `scale = "shares"`.
+27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
+    this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
+    be read says `incomplete` in its files and the command line exits 3; the page never serves another
+    search's data for a job that is gone.
+
+## Known limits
+
+- **The validation is not independent.** The reproduction of a hand-checked reference matrix (106 of 108
+  cells) used ids, a time window and a second window chosen to reproduce it, and the comparison with a
+  published figure compared directions of dominant fermentation products, which agree often by chance. Neither
+  tests the default exponential-phase rule on held-out studies.
+- **A net change hides what was made and used again** within a phase (formate in E. coli), and a single
+  failed sample at a phase end becomes the value; neither is flagged.
+
 ## Open decisions
 
-None at the moment.
+1. **The end of exponential growth on a creeping plateau.** Smoothing (decision 24) does not place it for
+   E. coli LF82; a boundary from the growth rate (the first interval whose rate falls below a tenth of the
+   maximum) places it at 8 h in all five replicates, but on noisy qPCR curves (study SMGDB00000004) it ends
+   growth early (3 to 8 h). Karoline to decide whether to switch, combine, or keep the 90% rule with its
+   caution.

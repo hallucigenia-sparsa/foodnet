@@ -348,6 +348,11 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         net.meta["growth_rates"] = {"method": rates.method_name(s["rate_method"], s["rate_window"]),
                                     "rates": organism_rates, "without_a_rate": without_rate}
     initial = crm.initial_concentrations([cultures[i] for i in sorted(chosen)])
+    # the growth over the phase a CRM is parameterized from (foodnet.matrix.crm_phase)
+    crm_ph = "window" if window else ("exponential" if s["phase"] == "both" else s["phase"])
+    biomass = crm.biomass_changes([(i, cultures[i]) for i in sorted(chosen)], value_rows, crm_ph)
+    if s["merge_genera"]:
+        biomass = {}            # strains of one genus grow in units and to densities that do not average
     net.meta["initial_concentrations_mM"] = {k: round(v["mean"], 6) for k, v in initial.items()}
 
     second_info = None if not second else {**second, "metabolites": second_mids, "label": second_window_label(second),
@@ -380,7 +385,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
             # every taxon and metabolite with data by name, whether or not it has an arc in the network
             "names": {n.id: n.name for n in taxa_nodes + metabolite_nodes},
             "presence": matrix_presence, "value_rule": rule, "duplicates": duplicate_lines,
-            "rates": organism_rates, "without_a_rate": without_rate, "initial": initial,
+            "rates": organism_rates, "without_a_rate": without_rate, "initial": initial, "biomass": biomass,
             "cultures": len(cultures), "value_cultures": len(chosen), "warnings": warnings,
             "skipped": skipped, "errors": errors}
 

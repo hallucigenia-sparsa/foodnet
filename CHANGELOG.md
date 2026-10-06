@@ -3,6 +3,38 @@
 All notable changes to foodnet. The format follows Keep a Changelog, and the version numbers follow
 semantic versioning.
 
+## [Unreleased]
+
+### Changed
+- A cell's value counts each experiment once: the mean, its spread and its test are over the experiments'
+  means; `n_experiments` is a new arc field.
+- A change must clear the detection limit across the replicates' spread; a spread across the limit, or
+  experiments that disagree, is inconclusive (NA, no arc) instead of an arc or a 0. Advanced settings can
+  judge by the mean alone, and give compounds their own detection limits.
+- New evidence states in the matrices: inconclusive, no_phase and seen_elsewhere; the image draws the first
+  two. Every matrix CSV names its value medium in its first header cell.
+- Only taxa with values vote for the value medium; the page names taxa with more data in another medium, a
+  narrow win, and taxa without a growth phase.
+- Merging to genus applies the detection limit and makes disagreeing taxa inconclusive.
+- The end of exponential growth is read on a smoothed growth curve; the first curve that gives one is used;
+  coarse sampling and replicates that end growth far apart are flagged.
+- Media are told apart by the amounts their descriptions state and by more phrasings.
+- CRM parameters (`foodnet.crm/v1`) carry each taxon's biomass change; the R package builds miaSim's
+  efficiency matrix from its equations, requires starting abundances and Monod constants, refuses pooled
+  media and the stationary phase unless allowed, and adds `crm_backcheck()`.
+- Identical replicates give no test; multiple testing is corrected over the tests that make the arcs.
+- Duplicate deposits are matched with rounded sample times and need a series that moves.
+- Succinic and valeric acid join their bases.
+
+### Fixed
+- The R listener accepted parameters from any machine on the network and from web pages; it now needs a
+  one-time secret only this user can read, and a stray request can no longer stop it.
+- A result built on records that could not be read gave no sign in its files and exit status 0; it now says
+  `incomplete` and the command line exits 3 (`--allow-incomplete` accepts it).
+- A species list built with read failures dropped taxa silently and was kept for an hour.
+- A download naming a search that was gone served another search's result.
+- Study links accepted any scheme; CSV text cells could run as spreadsheet formulas.
+
 ## [0.1.0] (2026-10-06)
 
 ### Added

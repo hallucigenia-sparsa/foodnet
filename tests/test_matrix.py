@@ -83,7 +83,7 @@ def test_both_phases_give_a_column_per_phase(client):
 def test_the_crm_payload_carries_the_caveats_as_data(client):
     r = run(client, report_rates=True, rate_window=3)
     p = matrix.crm_payload(r)
-    assert p["format"] == "foodnet.crm/v0" and p["phase"] == "exponential"
+    assert p["format"] == "foodnet.crm/v1" and p["phase"] == "exponential"
     assert p["taxa"] == ["Alpha alpha A1", "Beta beta B1", "Gamma gamma C1"]
     assert p["resources"] == ["acetate", "butyrate", "formate", "glucose"]
     assert p["consumed"][0] == [0, None, None, 8.0]
@@ -104,9 +104,20 @@ def test_with_both_phases_the_crm_takes_the_exponential_one(client):
 def test_the_crm_package_holds_every_file(client):
     r = run(client, report_rates=True)
     z = zipfile.ZipFile(io.BytesIO(matrix.crm_package(r)))
-    assert sorted(z.namelist()) == ["README.txt", "consumed.csv", "crm.json", "evidence_consumed.csv",
+    assert sorted(z.namelist()) == ["README.txt", "biomass.csv", "consumed.csv", "crm.json", "evidence_consumed.csv",
                                     "evidence_produced.csv", "growth_rates.csv", "initial_concentrations.csv",
                                     "produced.csv"]
+
+
+def test_the_crm_payload_carries_each_taxons_growth_over_the_phase(client):
+    p = matrix.crm_payload(run(client, report_rates=True))
+    a = p["taxa"].index("Alpha alpha A1")
+    # A's flow cytometry counts rise from 1 at 0 h to 1000 at the 12 h boundary (conftest.py)
+    assert p["biomass_change"][a] == 999 and p["biomass_start"][a] == 1 and p["phase_hours"][a] == 12
+    # C has no culture in the value medium, so no growth there
+    assert p["biomass_change"][p["taxa"].index("Gamma gamma C1")] is None
+    assert p["caveats"]["mixed_media"] is False and p["caveats"]["stationary_phase"] is False
+    assert matrix.crm_payload(run(client, report_rates=True, ignore_media=True))["caveats"]["mixed_media"]
 
 
 def test_the_readme_lists_presence_the_matrices_lack(client):

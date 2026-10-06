@@ -19,5 +19,5 @@ BugReports: https://github.com/hallucigenia-sparsa/foodnet/issues
 Encoding: UTF-8
 Depends: R (>= 4.1)
 Imports: jsonlite, utils
-Suggests: testthat (>= 3.0.0), miaSim
+Suggests: testthat (>= 3.0.0), miaSim, SummarizedExperiment, S4Vectors
 Config/testthat/edition: 3

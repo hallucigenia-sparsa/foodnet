@@ -13,6 +13,11 @@ reports, the median over the replicates.
 
 The initial concentrations are the medium's: each metabolite's concentration at the first sample of the
 value-set cultures, averaged over them (Karoline, 2026-10-04: "yes, send initial medium concentrations").
+
+The biomass change (`biomass_changes`) is what a consumer-resource model needs to turn the amounts into
+yields (Karoline, 2026-10-06, after a review showed that miaSim reads the size of a positive entry of its
+efficiency matrix as a yield, so uptake shares could not reproduce a monoculture): each taxon's growth over
+the same phase its metabolites were measured over, in the unit of its growth curve, with the phase's length.
 """
 from __future__ import annotations
 
@@ -20,7 +25,7 @@ import statistics
 from collections import defaultdict
 
 from . import rates
-from .phase import SPIKE_FACTOR, spike
+from .phase import SPIKE_FACTOR, spike, value_at
 
 FROM_METABOLITE_REPLICATES = "the replicates with metabolite data"
 FROM_SAME_MEDIUM = "another monoculture in the same medium"
@@ -91,3 +96,33 @@ def initial_concentrations(value_cultures) -> dict:
             names[mid] = met["name"]
     return {mid: {"name": names[mid], "mean": statistics.mean(v), "min": min(v), "max": max(v), "n": len(v)}
             for mid, v in found.items()}
+
+
+def biomass_changes(value_cultures, rows, phase: str) -> dict:
+    """{taxon: {"change", "start", "unit", "hours", "n"}}: the growth of each taxon over `phase`, from the
+    value-set cultures' growth curves, interpolated at the start and end of the window their metabolite
+    values cover (one culture's rows share it), averaged over the cultures. A taxon whose curves come in
+    several units takes the unit most of its cultures use; one without a curve or a window is absent."""
+    windows = {}
+    for r in rows:
+        if r["phase"] == phase and r["change"] is not None and not r.get("second"):
+            windows.setdefault(r["culture"], (r["start"], r["end"]))
+    by_taxon = defaultdict(list)
+    for index, c in value_cultures:
+        if c.growth is None or index not in windows:
+            continue
+        start, end = windows[index]
+        series = list(zip(c.growth["times"], c.growth["values"], strict=True))
+        x0, _ = value_at(series, start)
+        x1, _ = value_at(series, end)
+        by_taxon[c.taxon["id"]].append({"unit": c.growth.get("unit") or c.growth.get("technique") or "",
+                                        "start": x0, "change": x1 - x0, "hours": end - start})
+    out = {}
+    for taxon, found in by_taxon.items():
+        units = [f["unit"] for f in found]
+        unit = max(sorted(set(units)), key=units.count)
+        same = [f for f in found if f["unit"] == unit]
+        out[taxon] = {"change": statistics.mean(f["change"] for f in same),
+                      "start": statistics.mean(f["start"] for f in same), "unit": unit,
+                      "hours": statistics.mean(f["hours"] for f in same), "n": len(same)}
+    return out

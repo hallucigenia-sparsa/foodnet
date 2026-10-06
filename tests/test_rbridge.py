@@ -59,7 +59,7 @@ def test_the_payload_reaches_r_and_r_says_what_it_holds(listener, client):
     answer = rbridge.send(payload, port=port)
     assert answer["received"] and answer["taxa"] == 3
     path, body = received[-1]
-    assert path == "/foodnet/crm" and body["format"] == "foodnet.crm/v0"
+    assert path == "/foodnet/crm" and body["format"] == "foodnet.crm/v1"
 
 
 def test_a_wrong_secret_is_refused_and_says_why(listener, tmp_path):

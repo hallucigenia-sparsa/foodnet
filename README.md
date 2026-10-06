@@ -55,15 +55,18 @@ matrices appear first under the settings, then the taxa and the arcs with the do
 1. **Taxa to monocultures.** Names resolve to the strains mGrowthDB holds (a species name to all its
    strains). food**net** reads every batch monoculture of those strains that has metabolite measurements.
    A culture-level growth curve counts in a monoculture, since it measures the one strain.
-2. **Growth phases.** Exponential growth ends at the first sample where the culture reaches 90% of its
-   maximal abundance; the stationary phase runs from there to the last metabolite sample. Below the boxes,
+2. **Growth phases.** Exponential growth ends at the first sample where the culture has risen 90% of the
+   way from its start to its maximum, read on the growth curve smoothed by a running median of three; the
+   stationary phase runs from there to the last metabolite sample. Below the boxes,
    choose Exponential phase (the default), Stationary phase or Both. A time window in Advanced settings
    replaces the phases, and a second window can be given to metabolites named there (trehalose over the whole
    run, for example), so no compound needs a window of its own. Diauxic shifts are not detected.
 3. **A change per phase.** For each replicate and metabolite, the concentration at the end of the phase
-   minus the concentration at its start (interpolated between samples), averaged over replicates. A mean
-   change below the detection limit (0.2 mM, a setting) is no change. A metabolite series shorter than
-   24 h is used, and flagged.
+   minus the concentration at its start (interpolated between samples), averaged over replicates and then
+   over experiments, each experiment counting once. A mean change below the detection limit (0.2 mM, a
+   setting; compounds can have their own) is no change, and a change must clear the limit across the
+   replicates' spread: a spread reaching across it is inconclusive, neither an arc nor a measured zero. A
+   metabolite series shorter than 24 h is used, and flagged.
 4. **Values from one medium, presence from the others.** With the second box empty, all data are
    considered: the values come from the medium that holds data for the most taxa, and every other medium
    only says whether a compound was produced or consumed (`presence_only` arcs, NA matrix cells). A filled
@@ -76,8 +79,10 @@ matrices appear first under the settings, then the taxa and the arcs with the do
    can be switched off, and experiments can be excluded by id. "Ignore media differences" pools
    every medium; "Report everything as booleans" drops the amounts.
 5. **Pooling, with what does not agree reported.** Studies in the value medium are pooled. Experiments
-   that disagree on what happened make a `conflict`, named in the report. The same experiment deposited
-   under two studies is counted once.
+   that disagree on what happened make the value inconclusive, with the caution `conflict`, named in the
+   report. The same experiment deposited under two studies is counted once. Because the value medium is
+   chosen for the whole search, a taxon's values can change with the other taxa searched: the page names
+   the taxa with more data in another medium, and naming a medium in the second box fixes the choice.
 6. **Arcs.** A produced arc runs from the taxon to the metabolite, a consumed arc from the metabolite to
    the taxon, and its width is the amount in mM. One arc per study by default; "Merge arcs across studies"
    and "Merge to genus" are advanced settings, as in grow**net**.
@@ -93,15 +98,18 @@ Every decision and its reason is in [docs/METHOD_NOTES.md](docs/METHOD_NOTES.md)
 ## The outputs
 
 - **The matrices as an image**, shown first under the settings: consumed and produced side by side (or one
-  above the other when they are wide): a number on a gray for a change, white for
-  measured without one, pale orange for not assayed, an open circle for a change seen only in another medium.
+  above the other when they are wide): a number on a gray for a change, white for measured without one,
+  pale orange for not assayed, a question mark for inconclusive, a dash for a culture without the phase, an
+  open circle for a change seen in another medium.
   Downloadable as SVG, and in the matrices zip. Hovering over a cell shows its value, its replicates and the
   studies, experiments and medium behind it (also in the downloaded SVG, opened in a browser).
 - **Network**: JSON (the canonical format, [schema](schema/metabolite_network.schema.json)) or GraphML.
 - **Taxa x metabolites matrix** (CSV): one cell per taxon and metabolite, the mean change in mM, positive
   when produced and negative when consumed.
 - **Consumed and produced matrices** (zip): two matrices of non-negative amounts, an evidence matrix for
-  each (`measured`, `below_limit`, `presence_only`, `not_assayed`), and a README.
+  each (`measured`, `below_limit`, `seen_elsewhere`, `inconclusive`, `no_phase`, `presence_only`,
+  `not_assayed`), and a README. The first header cell of every matrix names the medium the values come
+  from.
 - **Send to Cytoscape**: the network in a running Cytoscape, in the style of the legend. A downloaded
   GraphML takes the same style from `foodnet style`.
 - **Report**: every setting, every arc, and every record left out with its reason.
@@ -117,8 +125,9 @@ it `presence_only` either way. With Both, each metabolite has a column per phase
 ## Consumer-resource models in R
 
 CRM mode collects growth rates: from the replicates whose metabolites gave the values, else from another
-monoculture in the same medium. Get CRM parameters then downloads the matrices, the growth rates and the
-initial medium concentrations, or sends them to R. Install the companion package once:
+monoculture in the same medium. Get CRM parameters then downloads the matrices, the growth rates, the
+initial medium concentrations and each taxon's biomass change over the phase, or sends them to R. Install
+the companion package once:
 
 ```r
 remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r")
@@ -128,15 +137,22 @@ then:
 
 ```r
 library(foodnet)
-crm <- foodnet_listen()          # and press Send to R on the page
-E <- crm_efficiency(crm)         # positive for consumption, negative for production
-args <- as_miasim(crm)           # stops if a taxon has no growth rate
-tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 100)))
+crm <- foodnet_listen()                      # and press Send to R on the page
+E <- crm_efficiency(crm)                     # miaSim's yields and by-products per unit of growth
+crm_backcheck(crm, monod_constant = 1)       # each taxon alone against its own monoculture
+args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1)
+set.seed(1)
+tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 ```
 
-The matrices are measured amounts, not model parameters: `crm_efficiency()` turns them into an efficiency
-matrix, and how to scale it is a modeling choice. With the phase choice Both, the CRM parameters use the
-exponential phase, since a consumer-resource model describes growth. See [r/README.md](r/README.md).
+The matrices are measured amounts. miaSim reads a positive entry of its efficiency matrix as a yield (the
+biomass made per mM taken up; uptake itself follows the Monod constants) and a negative one as a by-product
+per unit of growth, so `crm_efficiency()` builds E from the amounts, the biomass changes and the growth
+rates such that a taxon alone gains its measured biomass and makes its measured by-products. foodnet
+measures no Monod constants: choose them, and check the choice with `crm_backcheck()`. `as_miasim()` never
+lets miaSim draw starting abundances or Monod constants at random, and refuses pooled media and the
+stationary phase unless allowed. With the phase choice Both, the CRM parameters use the exponential phase,
+since a consumer-resource model describes growth. See [r/README.md](r/README.md).
 
 ## The command line
 

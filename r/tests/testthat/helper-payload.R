@@ -1,9 +1,9 @@
 # A small payload, the shape foodnet.matrix.crm_payload writes, with numbers chosen to be checked by hand.
 # Taxon A consumed 8 mM glucose and produced 4 mM acetate; B consumed 2 mM glucose and 6 mM acetate and
 # produced 3 mM butyrate; A's butyrate was never assayed; B producing acetate was seen only in another
-# medium. B has no growth rate.
+# medium. B has no growth rate. A grew by 2 (cells/mL, say) from 0.5 over 12 h; B by 1 from 0.2 over 10 h.
 example_payload <- function() {
-    list(format = "foodnet.crm/v0", tool = "foodnet", tool_version = "0.1.0",
+    list(format = "foodnet.crm/v1", tool = "foodnet", tool_version = "0.1.0",
          derived_at = "2026-10-04T12:00:00+02:00", source_db = "test", phase = "exponential",
          values = "mM", detection_limit_mM = 0.2,
          taxa = list("A", "B"), taxon_ids = list("ncbi:1", "ncbi:2"),
@@ -17,10 +17,13 @@ example_payload <- function() {
                                   list("below_limit", "presence_only", "measured")),
          growth_rates = list(0.4, NULL), growth_rate_unit = "1/h",
          initial_concentrations = list(10, 2, 0), initial_unit = "mM",
+         biomass_change = list(2, 1), biomass_start = list(0.5, 0.2), biomass_unit = list("OD", "OD"),
+         phase_hours = list(12, 10),
          caveats = list(presence_only = list(list(taxon = "B", resource = "acetate", direction = "produced",
                                                   media = list("mMCB"))),
                         conflicts = list(), duplicates = list(), without_a_rate = list("B"),
                         media = list("Wilkins-Chalgren Anaerobe Broth"), value_rule = "majority",
-                        searched_both_phases = FALSE),
+                        searched_both_phases = FALSE, mixed_media = FALSE, stationary_phase = FALSE,
+                        inconclusive = list()),
          readme = "README text\n", studies = list("SMGDB00000001"), settings = list())
 }
