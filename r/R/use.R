@@ -280,9 +280,19 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     # the page's warnings were written for the whole search: keep those that name no taxon left out, and the
     # ones that name none (counts over the whole search are marked as such)
     if (length(x$caveats$warnings) && length(removed)) {
-        names_any <- function(w) any(vapply(removed, function(t) grepl(t, w, fixed = TRUE), logical(1)))
-        x$caveats$warnings <- c(paste("(for the whole search)", x$caveats$warnings[!vapply(x$caveats$warnings,
-                                                                                           names_any, logical(1))]))
+        # a removed taxon is named where its name appears and is not the start of a kept taxon's longer name
+        # ("Escherichia coli" removed, "Escherichia coli LF82" kept)
+        whole_name <- function(t, w) {
+            at <- gregexpr(t, w, fixed = TRUE)[[1]]
+            if (at[1] < 0) return(FALSE)
+            longer <- kept[nchar(kept) > nchar(t) & startsWith(kept, t)]
+            any(vapply(at, function(p) !any(substr(w, p, p + nchar(longer) - 1) == longer), logical(1)))
+        }
+        names_any <- function(w) any(vapply(removed, whole_name, logical(1), w = w))
+        left <- x$caveats$warnings[!vapply(x$caveats$warnings, names_any, logical(1))]
+        mark <- "(for the whole search) "
+        left <- ifelse(startsWith(left, mark), left, paste0(mark, left))
+        x$caveats$warnings <- if (length(left)) left else character(0)
     }
     for (name in c("cautions", "inconclusive")) {
         rows <- x$caveats[[name]]

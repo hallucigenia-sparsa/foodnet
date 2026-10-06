@@ -126,6 +126,10 @@ def _settings_block(settings: dict) -> str:
   <span class="muted">three or more replicates: a one-sided 90% confidence interval on the mean beyond the limit;
   two: both beyond it; one decides nothing; and experiments must not contradict each other. Otherwise
   inconclusive (NA, no arc). On by default</span></div>
+<div class="row"><label>Evaporation over a run
+  <input name="evaporation" type="text" size="5" value="{_esc(round(s['evaporation'] * 100, 6))}"> %</label>
+  <span class="muted">a culture whose growth curve shows no growth gives values only for changes beyond this share
+  of a compound's level (and beyond the detection limit); 10 by default, more for open plates</span></div>
 <div class="row"><label>Detection limits of their own
   <input name="compound_limits" type="text" size="30" value="{_esc(s['compound_limits'])}"></label>
   <span class="muted">for compounds measured at another scale, as name=mM, comma separated: thiamine=0.01</span></div>
@@ -566,6 +570,9 @@ def parse_settings(form: dict) -> dict:
     second_start, second_end = _number(form, "second_window_start"), _number(form, "second_window_end")
     s["second_window_start"] = second_start if second_start is not None else 0.0
     s["second_window_end"] = second_end if second_end is not None and second_end > s["second_window_start"] else None
+    evaporation = _number(form, "evaporation")
+    if evaporation is not None and 0 <= evaporation < 100:
+        s["evaporation"] = evaporation / 100
     fraction = _number(form, "fraction")
     if fraction is not None and 0 < fraction <= 100:
         s["fraction"] = fraction / 100

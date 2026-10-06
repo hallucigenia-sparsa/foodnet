@@ -34,6 +34,9 @@ DEFAULTS = {
     "judge_confidence": True,
     # detection limits of their own, for compounds measured at another scale: "thiamine=0.01, riboflavin=0.005"
     "compound_limits": "",
+    # the share of a compound's level evaporation could change over a run: a culture that did not grow counts
+    # as metabolically active only beyond it (Karoline, 2026-10-06); higher for open plates
+    "evaporation": phases.EVAPORATION,
     "ignore_media": False, "booleans": False,
     # off by default: a rate costs a fit per growth curve; CRM mode turns it on
     "report_rates": False, "rate_method": rates.DEFAULT_METHOD, "rate_window": rates.DEFAULT_WINDOW,
@@ -242,7 +245,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     window = window_of(s)
     second = second_window_of(s)
     rows, skips = d.changes(cultures, s["phase"], window, s["fraction"], s["no_growth_factor"], s["spike_factor"],
-                            second, s["detection_limit"])
+                            second, s["detection_limit"], s["evaporation"])
     second_mids = sorted({r["metabolite"] for r in rows if r.get("second")})
     unmatched = [n for n in (second or {}).get("names", [])
                  if not any(d.second_window_matches(met, [n]) for c in cultures for met in c.metabolites.values())]

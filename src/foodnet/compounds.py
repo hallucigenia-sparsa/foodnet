@@ -35,6 +35,17 @@ EQUIVALENT = {
     30031: (26806, "succinate(2-) is the dianion of succinate"),
     17418: (31011, "valeric acid is the conjugate acid of valerate"),
 }
+# compounds that leave a culture as gas or vapor: their fall is no evidence of uptake (a thirteenth review round:
+# ethanol evaporating while lactate concentrated passed as "used and made" in a culture that did not grow)
+VOLATILE = {"ethanol", "methanol", "acetone", "acetaldehyde", "propanol", "1-propanol", "2-propanol",
+            "isopropanol", "butanol", "1-butanol", "hydrogen", "dihydrogen", "carbon dioxide", "methane",
+            "hydrogen sulfide", "dimethyl sulfide"}
+
+
+def volatile(name: str) -> bool:
+    return " ".join((name or "").casefold().split()) in VOLATILE
+
+
 # the name a joined compound is shown under
 NAMES = {30089: "acetate", 15740: "formate", 17968: "butyrate", 17272: "propionate", 48944: "isobutyrate",
          50128: "isovalerate", 24996: "lactate", 15361: "pyruvate", 26806: "succinate", 31011: "valerate"}

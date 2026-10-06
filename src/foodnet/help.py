@@ -39,6 +39,9 @@ SETTINGS = {
                         "beyond it on one side (or both inside); one replicate decides nothing. The experiments of "
                         "a value must not contradict each other. Otherwise it is inconclusive, neither an arc nor a "
                         "measured zero. On by default; off, the mean alone decides.",
+    "evaporation": "The share of a compound's level that evaporation could change over a run (10%): a culture whose "
+                   "growth curve shows no growth counts as metabolically active, and gives values, only with changes "
+                   "beyond it. Raise it for open plates or long runs.",
     "compound_limits": "Detection limits of their own for compounds measured at another scale, as name=mM, comma "
                        "separated: thiamine=0.01. Empty by default: every compound takes the detection limit.",
     "ignore_media": "Values from every medium, pooled, instead of only from the value medium.",

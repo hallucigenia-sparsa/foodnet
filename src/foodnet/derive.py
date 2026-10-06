@@ -32,6 +32,7 @@ import re
 import statistics
 from collections import defaultdict
 
+from . import compounds
 from . import phase as phases
 from . import selection as selecting
 from .model import genus_name
@@ -155,7 +156,7 @@ def _next_change(series, boundary: float):
 def changes(cultures, phase: str = "exponential", window: tuple | None = None,
             fraction: float = phases.FRACTION, factor: float = phases.NO_GROWTH_FACTOR,
             spike_factor: float = phases.SPIKE_FACTOR, second: dict | None = None,
-            limit: float = DETECTION_LIMIT) -> tuple:
+            limit: float = DETECTION_LIMIT, evaporation: float = phases.EVAPORATION) -> tuple:
     """(rows, skipped): one row per culture, metabolite and phase.
 
     A row: {"culture" (index), "taxon", "metabolite", "metabolite_name", "chebi_id", "phase", "change",
@@ -184,7 +185,7 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
             if in_second:
                 end = second["end"] if second.get("end") is not None else series[-1][0]
                 windows = phases.phase_windows(series, None, phase, (second.get("start") or 0.0, end))
-            elif window is None and boundary is None and c.not_grown and not active(c):
+            elif window is None and boundary is None and c.not_grown and not active(c, limit, evaporation):
                 # it did not grow by either rule, and its compounds did not move as metabolism moves them:
                 # no value, so drift or a dead inoculum is never an arc
                 windows = {ph: (None, None, ["not_grown"]) for ph in
@@ -227,11 +228,17 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                                  "exponential_h": duration, "cautions": cautions})
                     continue
                 d = phases.change(series, start, end)
-                if "whole_run" in cautions and abs(d["change"]) < 2 * _scatter(series):
-                    # a whole-run change smaller than the series' own scatter is no change anyone measured
+                # a change beyond the limit but within what the series' own scatter, or (in a culture that did not
+                # grow) evaporation, could account for: no measured change, so the value becomes inconclusive. Only
+                # changes beyond the limit are judged, so a flat series stays a measured 0, and evaporation only
+                # explains rises (a thirteenth review round)
+                # the scatter within the window the change spans: across phases a compound made and then used
+                # is a trend, not scatter
+                inside = [(t, v) for t, v in series if start <= t <= end]
+                if abs(d["change"]) >= limit and abs(d["change"]) < 2 * _scatter(inside):
                     cautions.append("within_scatter")
-                elif "growth_unclear" in cautions and abs(d["change"]) <= beyond_evaporation(series, limit):
-                    # a culture that did not grow: a change evaporation could account for is no value
+                elif ("growth_unclear" in cautions and d["change"] >= limit
+                      and d["change"] <= beyond_evaporation(series, limit, evaporation)):
                     cautions.append("within_evaporation")
                 if d["beyond"] and "window_beyond_data" not in cautions:
                     cautions.append("window_beyond_data")
@@ -273,14 +280,14 @@ def _steady(series, limit: float, sign: int) -> bool:
     return den > 0 and sign * sum((x - ma) * (y - mb) for x, y in zip(a, b, strict=True)) / den >= TREND
 
 
-def beyond_evaporation(series, limit: float) -> float:
+def beyond_evaporation(series, limit: float, evaporation: float = phases.EVAPORATION) -> float:
     """The change a culture that did not grow must exceed to count: the detection limit, or the share of the
     compound's level that evaporation could account for over the run (phase.EVAPORATION), whichever is larger."""
     level = max(abs(series[0][1]), abs(series[-1][1]))
-    return max(limit, phases.EVAPORATION * level)
+    return max(limit, evaporation * level)
 
 
-def active(culture, limit: float = DETECTION_LIMIT) -> bool:
+def active(culture, limit: float = DETECTION_LIMIT, evaporation: float = phases.EVAPORATION) -> bool:
     """Whether a culture's compounds moved as metabolism moves them over its run: one used up (to below the limit
     from above twice it, or falling steadily) and another made (rising steadily), each by more than evaporation
     could account for (`beyond_evaporation`). A culture whose growth curve shows no growth can still do this (A.
@@ -289,23 +296,30 @@ def active(culture, limit: float = DETECTION_LIMIT) -> bool:
     Endpoints alone are not enough: a twelfth review round found scatter of +/-0.5 mM passing an endpoint test
     in 13 of 20 cultures, and evaporation concentrating one compound while a volatile one fell."""
     series = [m["series"] for m in culture.metabolites.values() if len(m["series"]) > 2]
+    # a volatile compound's fall is no uptake: it can leave as vapor
+    lasting = [m["series"] for m in culture.metabolites.values()
+               if len(m["series"]) > 2 and not compounds.volatile(m.get("name"))]
 
     def moved(s, sign):
-        return sign * (s[-1][1] - s[0][1]) > beyond_evaporation(s, limit)
+        return sign * (s[-1][1] - s[0][1]) > beyond_evaporation(s, limit, evaporation)
 
     used = any(moved(s, -1) and ((s[0][1] >= 2 * limit and s[-1][1] < limit) or _steady(s, limit, -1))
-               for s in series)
+               for s in lasting)
     made = any(moved(s, 1) and _steady(s, limit, 1) for s in series)
     return used and made
 
 
 def _scatter(series) -> float:
-    """How much a series jumps between neighboring samples beyond its trend: the median absolute second
-    difference over two (0 for a straight or short series)."""
+    """How much a series jumps between samples beyond its trend: the spread (median absolute deviation, scaled to
+    a standard deviation) of its sample-to-sample steps, over the square root of two. A steady trend or a single
+    sharp step (glucose 10, 10, 0, 0) gives little; scatter around a level (acetate 24.8, 30.9, 25.2, 31.8) gives
+    much. 0 for a series of fewer than four samples."""
     v = [x for _, x in series]
-    if len(v) < 3:
+    if len(v) < 4:
         return 0.0
-    return statistics.median(abs(v[i - 1] - 2 * v[i] + v[i + 1]) for i in range(1, len(v) - 1)) / 2
+    steps = [b - a for a, b in zip(v, v[1:], strict=False)]
+    middle = statistics.median(steps)
+    return 1.4826 * statistics.median(abs(d - middle) for d in steps) / math.sqrt(2)
 
 
 def exponential_hours(culture, boundary) -> float | None:
@@ -614,8 +628,14 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
     cells = {}
     for key, members in groups.items():
         lim = limits.get(key[1], limit)
-        valued = [r for r in members if r["change"] is not None
-                  and not {"within_scatter", "within_evaporation"} & set(r["cautions"])]
+        noisy = [r for r in members if r["change"] is not None
+                 and {"within_scatter", "within_evaporation"} & set(r["cautions"])]
+        valued = [r for r in members if r["change"] is not None and r not in noisy]
+        if noisy and not valued:
+            # every value lies within its series' scatter (or evaporation): measured, but no change anyone can
+            # tell from noise, so inconclusive rather than no value
+            valued = noisy
+            members = [r for r in members if r["change"] is not None]
         whole = [r for r in valued if "whole_run" in r["cautions"]]
         whole_note = None
         if whole and len(whole) < len(valued):
@@ -682,6 +702,11 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
                     notes.append("experiments agree, in amounts from " + ", ".join(
                         f"{names.get(e, e)} {statistics.mean(per_exp[e]):+.2f}" for e in sorted(used)) + " mM")
         values = [v for e in used for v in per_exp[e]] if len(used) < len(per_exp) else values
+        if valued is noisy and k is not INCONCLUSIVE:
+            k = INCONCLUSIVE
+            cautions.add("inconclusive")
+            notes.append("inconclusive: the changes lie within their series' own scatter, or within what "
+                         "evaporation could account for")
         if k in (1, -1) and len(used) < len(per_exp):
             # the amount is over every experiment that does not contradict, not only the deciding ones: the
             # experiments left out are the ones with the smaller effects, so leaving them out inflates it

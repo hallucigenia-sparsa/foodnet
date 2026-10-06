@@ -229,6 +229,12 @@ with metabolite data."
     (what evaporation could account for); its whole-run values must clear the same threshold
     (`within_evaporation`), and any whole-run value must exceed twice its series' own scatter
     (`within_scatter`). For OD, the 1.5-fold test reads the maximum of a running median of three.
+    A thirteenth round refined both: volatile compounds (ethanol, methanol, acetone, gases) never count as
+    used up, since they can leave as vapor; the evaporation share is a setting (10% by default, more for open
+    plates) and explains rises only; the scatter test applies to every value, phase or whole run, measured
+    within the window the change spans (the spread of its sample-to-sample steps, so a sharp depletion is no
+    scatter) and only to changes beyond the limit, so a flat series stays a measured 0; and a value removed
+    by either test is inconclusive, not missing.
 27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
     this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
     be read says `incomplete` in its files and the command line exits 3; the page never serves another

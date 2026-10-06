@@ -295,3 +295,14 @@ def test_evaporation_is_not_metabolism():
         return {"name": name, "chebi_id": "", "series": list(zip((0, 4, 8, 12), values, strict=True))}
     c.metabolites = {"lactate": met("lactate", (20, 20.7, 21.5, 22.2)), "ethanol": met("ethanol", (5, 4.7, 4.3, 4.0))}
     assert not derive.active(c)
+
+
+def test_a_volatile_falling_is_no_uptake_even_past_the_evaporation_share():
+    curve = {"times": [0, 4, 8, 12], "technique": "od", "level": "", "unit": "od", "values": [0.5, 0.5, 0.5, 0.5]}
+    c = _culture("E1", [0, 1, 2, 3], growth=[curve])
+
+    def met(name, values):
+        return {"name": name, "chebi_id": "", "series": list(zip((0, 4, 8, 12), values, strict=True))}
+    # 12% volume loss: lactate concentrates past 10%, ethanol evaporates
+    c.metabolites = {"lactate": met("lactate", (20, 20.8, 21.6, 22.4)), "ethanol": met("ethanol", (5, 4.4, 3.8, 3.0))}
+    assert not derive.active(c)

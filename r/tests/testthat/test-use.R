@@ -133,3 +133,17 @@ test_that("a growth rate below the phase's own mean rate is named, and can be fl
                                        growth = "phase_floor"))
     expect_equal(args$growth_rates, c(0.4, 0.5))
 })
+
+test_that("subsetting keeps the warnings about kept taxa only, once marked, and never an empty one", {
+    payload <- example_payload()
+    payload$taxa <- list("A", "A b")
+    payload$caveats$warnings <- list("A has more data elsewhere", "A b grew slowly", "3 values are inconclusive")
+    crm <- foodnet:::as_foodnet_crm(payload)
+    kept <- crm_subset(crm, taxa = "A b")
+    expect_equal(kept$caveats$warnings, c("(for the whole search) A b grew slowly",
+                                          "(for the whole search) 3 values are inconclusive"))
+    again <- crm_subset(kept, taxa = "A b")
+    expect_equal(again$caveats$warnings, kept$caveats$warnings)
+    payload$caveats$warnings <- list("A has more data elsewhere")
+    expect_length(crm_subset(foodnet:::as_foodnet_crm(payload), taxa = "A b")$caveats$warnings, 0)
+})
