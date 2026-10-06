@@ -18,24 +18,37 @@ def _exp(description, name="x", medium="Wilkins-Chalgren Anaerobe Broth (WC)", *
     ("BT with WC for 120h", "BT_WC", ()),
     ("RI and BH co-culture with initial acetate", "RI_BH +Ac", ("+ac", "+acetate")),
     ("RI and BH co-culture without initial acetate", "RI_BH -Ac", ("-ac", "-acetate")),
-    ("WC plus 1 mM galactose", "x", ("+galactose",)),
-    ("WC and 1mM N-acetylglucosamine", "x", ("+n-acetylglucosamine",)),
-    ("modified WC without glucose and pyruvate plus 1 mM mannose", "x", ("+mannose", "-glucose", "-pyruvate")),
+    ("WC plus 1 mM galactose", "x", ("+1mm galactose",)),
+    ("WC and 1mM N-acetylglucosamine", "x", ("+1mm n-acetylglucosamine",)),
+    ("modified WC without glucose and pyruvate plus 1 mM mannose", "x", ("+1mm mannose", "-glucose", "-pyruvate")),
     ("C. difficile R20291 (DSM 27147) monoculture grown in DM29 supplemented with 2g/L trehalose.", "x",
-     ("+trehalose",)),
+     ("+2g/l trehalose",)),
     ("C. difficile R20291 (DSM 27147) monoculture grown in DM29 with no additional carbohydrates added.", "x",
      ("-carbohydrates",)),
     ("monoculture grown in modified 10% BHI supplemented with Glutamate. Starting density of ~10^4 CFUs/mL.",
      "SA+Glu_1e4", ("+glu", "+glutamate")),
     ("At monoculture grown on a minimal medium with 0.75% linoleic acid, used for measuring reactive oxygen", "x",
-     ("+linoleic acid",)),
+     ("+0.75% linoleic acid",)),
     ("At monoculture grown on a minimal medium with 0.75% linoleic acid and 1.5μm TBHQ antioxidant "
-     "(dissolved in DMSO)", "x", ("+linoleic acid", "+tbhq antioxidant")),
+     "(dissolved in DMSO)", "x", ("+0.75% linoleic acid", "+1.5μm tbhq antioxidant")),
+    # found missed by a review (2026-10-06): an amount "added", "no supplied", and phrasings to expect
+    ("0.1mg/L pantothenate added in the culture", "x", ("+0.1mg/l pantothenate",)),
+    ("No supplied pantothenate in culture", "x", ("-pantothenate",)),
+    ("WC + 10 mM acetate", "x", ("+10mm acetate",)),
+    ("glucose-free WC", "x", ("-glucose",)),
+    ("WC with 20 mM fructose instead of glucose", "x", ("+20mm fructose", "-glucose")),
     ("E. coli LF82 grown in WC as monoculture for 168h", "EC", ()),
     ('Roseburia monoculture controls of the "btri" experiment', "ri2", ()),
 ])
 def test_alterations_stated_in_descriptions_and_names(description, name, tokens):
     assert media.alterations(_exp(description, name)) == tokens
+
+
+def test_amounts_tell_media_apart():
+    low = media.identity(_exp("minimal medium with 0.1% linoleic acid"))
+    high = media.identity(_exp("minimal medium with 0.75% linoleic acid"))
+    same = media.identity(_exp("minimal medium with 0.1 % linoleic acid"))
+    assert low["key"] != high["key"] and low["key"] == same["key"]
 
 
 def test_spellings_of_one_compound_are_one_medium():
