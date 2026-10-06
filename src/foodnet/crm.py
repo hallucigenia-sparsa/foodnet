@@ -105,10 +105,19 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
     values cover (one culture's rows share it), averaged over the cultures. A taxon whose curves come in
     several techniques or units takes the one most of its cultures use (n says how many); one without a
     curve or a window is absent."""
-    windows = {}
+    windows, whole = {}, set()
     for r in rows:
         if r["phase"] == phase and r["change"] is not None and not r.get("second"):
             windows.setdefault(r["culture"], (r["start"], r["end"]))
+            if "whole_run" in r["cautions"]:
+                whole.add(r["culture"])
+    # as in the values (foodnet.derive.pool): where a taxon has cultures with a phase, its whole-run cultures
+    # are left out, so the biomass comes from the same cultures and window as the amounts (a tenth review
+    # round: study SMGDB00000010 deposits R. intestinalis and a Lachnospiraceae strain under one taxon)
+    phased = {c.taxon["id"] for index, c in value_cultures if index in windows and index not in whole}
+    for index, c in value_cultures:
+        if index in whole and c.taxon["id"] in phased:
+            windows.pop(index, None)
     by_taxon = defaultdict(list)
     for index, c in value_cultures:
         if c.growth is None or index not in windows:
@@ -119,7 +128,8 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         x1, _ = value_at(series, end)
         # the unit is the technique and its unit together: qPCR gene copies and flow cytometry events can both
         # be "Cells/mL" and still measure different things (DNA from lysed cells counts in one, not the other)
-        unit = " ".join(x for x in (c.growth.get("technique") or "", c.growth.get("unit") or "") if x)
+        technique, curve_unit = c.growth.get("technique") or "", c.growth.get("unit") or ""
+        unit = technique if curve_unit.casefold() in ("", technique.casefold()) else f"{technique} {curve_unit}"
         by_taxon[c.taxon["id"]].append({"unit": unit,
                                         "start": x0, "change": x1 - x0, "hours": end - start})
     out = {}

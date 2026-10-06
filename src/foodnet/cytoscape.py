@@ -137,7 +137,9 @@ def style(name: str = STYLE_NAME) -> dict:
             _discrete("direction", "EDGE_TARGET_ARROW_UNSELECTED_PAINT", colors),
             _discrete("line_style", "EDGE_LINE_TYPE",
                       {"SOLID": "SOLID", "LONG_DASH": "LONG_DASH", "DOT": "DOT", "DASH_DOT": "DASH_DOT"}),
-            _discrete("phase", "EDGE_TRANSPARENCY", {"exponential": "230", "stationary": "110", "window": "230"}),
+            # a whole-run change is no phase's: between the two, so it reads apart from both
+            _discrete("phase", "EDGE_TRANSPARENCY", {"exponential": "230", "stationary": "110", "window": "230",
+                                                     "whole_run": "170"}),
             {"mappingType": "continuous", "mappingColumn": "display_weight",
              "mappingColumnType": "Double", "visualProperty": "EDGE_WIDTH",
              "points": [{"value": 0.0, "lesser": "1.0", "equal": "1.0", "greater": "1.0"},

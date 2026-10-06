@@ -28,8 +28,10 @@ which the arcs carry as the caution `coarse_sampling`.
 
 **A culture that did not grow** has no exponential phase. A rise below `NO_GROWTH_FACTOR` (1.5, grownet's
 default for the same question) gives no boundary. An optical density read without its blank can do that to
-a culture that grew (study SMGDB00000010 starts near 0.7), so such a culture's metabolites give their change
-over the whole run instead, marked `whole_run` (Karoline, 2026-10-06), in the column of the phase asked for.
+a culture that grew (study SMGDB00000010 starts near 0.7), so an OD curve that rose by OD_RISE (0.1) or more
+still counts as grown, and its metabolites give their change over the whole run instead, marked `whole_run`
+(Karoline, 2026-10-06), in the column of the phase asked for. A culture that grew by neither rule gives no
+value (`not_grown`): a dead inoculum, evaporation or abiotic drift must not become a consumer.
 
 **The change in a phase** is the metabolite concentration at the end of the phase minus the concentration
 at its start, from the metabolite's own series. The phases are:
@@ -48,6 +50,9 @@ import math
 
 FRACTION = 0.9               # the share of the maximal abundance that ends exponential growth
 NO_GROWTH_FACTOR = 1.5       # below this rise (maximum over start) the culture did not grow
+# ... unless its optical density rose by this much: an OD read without its blank starts high, so a culture that
+# grew can rise less than 1.5-fold (study SMGDB00000010 starts near 0.7 and rises by 0.3; Karoline, 2026-10-06)
+OD_RISE = 0.1
 SHORT_RECORD_H = 24.0        # a metabolite series shorter than this is flagged (Karoline, 2026-10-04)
 
 # time units to hours
@@ -128,6 +133,14 @@ def exponential_end(times, values, fraction: float = FRACTION, factor: float = N
     # instead of 84 h), which the arcs flag; one sample earlier is within the sampling's own resolution
     return {"end": end, "index": i, "last": i == len(pairs) - 1, "coarse": i < 2, "by": by,
             "moved": by == "rate" and late - i > 1}
+
+
+def grown_by_od(curve: dict) -> bool:
+    """Whether an optical density curve rose by OD_RISE or more over its start, whatever the fold."""
+    if (curve.get("technique") or "").casefold() != "od":
+        return False
+    values = [float(v) for v in curve["values"]]
+    return bool(values) and max(values) - values[0] >= OD_RISE
 
 
 def value_at(series, t: float) -> tuple:

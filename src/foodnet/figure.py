@@ -40,7 +40,7 @@ NOT_ASSAYED = "#F6D9B8"
 OTHER_MEDIUM = "#E4DCF1"
 INCONCLUSIVE = "#FBEFC5"
 NO_PHASE = "#DCEDE3"
-MARKS = {"inconclusive": (INCONCLUSIVE, "?"), "no_phase": (NO_PHASE, "\u2013")}
+MARKS = {"inconclusive": (INCONCLUSIVE, "?"), "no_phase": (NO_PHASE, "\u2013"), "not_grown": (NO_PHASE, "\u00d7")}
 GAP = 36              # between the two panels
 MAX_SIDE_BY_SIDE = 1000   # px; wider, the panels stack
 FONT = "system-ui, -apple-system, 'Segoe UI', sans-serif"
@@ -312,6 +312,8 @@ def matrices_svg(result: dict) -> str:
         items.append(("#ffffff", "dot", "one replicate"))
     if "inconclusive" in shown:
         items.append((INCONCLUSIVE, "?", "inconclusive: replicates or experiments disagree"))
+    if "not_grown" in shown:
+        items.append((NO_PHASE, "\u00d7", "assayed, but the culture did not grow"))
     if "no_phase" in shown:
         items.append((NO_PHASE, "\u2013", "assayed, no phase in its cultures"))
     x = label_w

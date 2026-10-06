@@ -57,6 +57,8 @@ def _own_boundary(c, fraction, factor, spike_factor) -> tuple:
     growth rate is read from the same curve. A curve too short, spiked, or without growth gives way to the
     next one (a two-point flow cytometry trace must not hide a full OD curve)."""
     reasons = []
+    c.not_grown = False
+    flat = []
     for curve in c.curves or ([c.growth] if c.growth else []):
         ratio = phases.spike(curve["values"], spike_factor)
         if ratio:
@@ -66,9 +68,12 @@ def _own_boundary(c, fraction, factor, spike_factor) -> tuple:
             found = phases.exponential_end(curve["times"], curve["values"], fraction, factor)
         except phases.NoBoundary as e:
             reasons.append(f"{curve['technique'] or 'growth'} curve: {e}")
+            flat.append(str(e).startswith("did not grow") and not phases.grown_by_od(curve))
             continue
         c.growth = curve
         return found, ""
+    # every curve said "did not grow", and no OD curve rose by OD_RISE: the culture did not grow
+    c.not_grown = bool(flat) and all(flat) and len(flat) == len(reasons)
     return None, "; ".join(reasons)
 
 
@@ -178,6 +183,10 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
             if in_second:
                 end = second["end"] if second.get("end") is not None else series[-1][0]
                 windows = phases.phase_windows(series, None, phase, (second.get("start") or 0.0, end))
+            elif window is None and boundary is None and c.not_grown:
+                # it did not grow by either rule: no value, so drift or a dead inoculum is never an arc
+                windows = {ph: (None, None, ["not_grown"]) for ph in
+                           (("exponential", "stationary") if phase == "both" else (phase,))}
             elif window is None and boundary is None:
                 # no end of exponential growth (a culture read as not grown, as unblanked OD can make it, or no
                 # growth curve at all): the change over the whole run, in the column of the phase asked for and

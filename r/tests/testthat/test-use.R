@@ -63,6 +63,7 @@ test_that("as_miasim needs starting abundances and Monod constants, never drawn 
     expect_equal(args$x0, c(0.5 / 0.625, 0.2 / 0.4))         # into each taxon's unit (crm_scale)
     expect_equal(crm_unscale(crm, args$x0), c(A = 0.5, B = 0.2))
     expect_equal(dim(args$monod_constant), c(2, 3))
+    expect_equal(args$migration_p, 0)            # no random immigration
     expect_equal(args$resources, c(10, 2, 0))
 })
 

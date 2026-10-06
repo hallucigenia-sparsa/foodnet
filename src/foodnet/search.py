@@ -349,6 +349,16 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
             list(taxa), value_cultures, others, set(rule["keys"]), s["ignore_media"], s["rate_method"],
             s["rate_window"], s["spike_factor"])
         skipped += rate_skips
+        # a taxon whose value cultures all lack an end of exponential growth has a growth curve that foodnet
+        # judged unusable, so no rate is taken from it (a tenth review round: 0.0023 per hour for C. catus)
+        whole_taxa = {cultures[r["culture"]].taxon["id"] for r in value_rows if "whole_run" in r["cautions"]} - \
+            {cultures[r["culture"]].taxon["id"] for r in value_rows
+             if r["change"] is not None and "whole_run" not in r["cautions"]}
+        for t in whole_taxa:
+            if organism_rates.get(t, {}).get("source") == crm.FROM_METABOLITE_REPLICATES:
+                organism_rates.pop(t)
+                without_rate[t] = ("its growth curves give no end of exponential growth (its values span the whole "
+                                   "run), so no rate is taken from them; give one yourself")
         if s["merge_genera"]:
             organism_rates, without_rate = _genus_rates(organism_rates, without_rate, taxa)
         net.meta["growth_rates"] = {"method": rates.method_name(s["rate_method"], s["rate_window"]),
@@ -425,6 +435,13 @@ def _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window) -
             out.append(f"The value medium won narrowly: {rule['taxa_per_medium'].get(value_key, 0)} taxa against "
                        f"{runner[1]} for {rule.get('labels', {}).get(runner[0], runner[0])}.")
     if window is None:
+        dead = sorted({taxa[cultures[r["culture"]].taxon["id"]]["name"] for r in rows
+                       if r["culture"] in chosen and "not_grown" in r["cautions"]
+                       and cultures[r["culture"]].taxon["id"] in taxa})
+        if dead:
+            out.append(", ".join(dead) + ": their cultures did not grow (neither 1.5-fold nor, in optical density, by "
+                       f"{phases.OD_RISE:g}), so their metabolite changes give no value (not_grown): drift or a dead "
+                       "inoculum is never an arc. A time window in Advanced settings still gives their changes.")
         lost = defaultdict(set)
         for r in rows:
             if r["culture"] in chosen and "whole_run" in r["cautions"]:

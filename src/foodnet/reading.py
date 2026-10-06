@@ -59,6 +59,8 @@ class Culture:
     # every usable growth curve, most preferred first; `growth` is the first, until the phase boundary
     # (foodnet.derive.boundaries) finds that a later one is the first to give an end of exponential growth
     curves: list = field(default_factory=list)
+    # set by foodnet.derive.boundaries: no curve rose by the no-growth factor nor, for OD, by phase.OD_RISE
+    not_grown: bool = False
 
     @property
     def label(self) -> str:

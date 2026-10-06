@@ -206,7 +206,13 @@ with metabolite data."
     evidence and caution `whole_run`, arcs in phase `whole_run`, and a dashed frame in the image. Where any
     culture of a cell has a phase value, the whole-run changes of the others are left out of it and named.
     Whole-run values do not vote for the value medium. The CRM takes them, and its caveats name these taxa,
-    since stationary uptake is in their values.
+    since stationary uptake is in their values; no growth rate is taken from their curves (give one).
+    A tenth review round showed the rule would also give values to cultures that truly did not grow (a dead
+    inoculum, evaporation or abiotic drift as a "consumed" arc), since the 1.5-fold rule cannot tell them
+    from unblanked OD. Karoline, 2026-10-06 ("Absolute OD rise"): an OD curve that rose by 0.1 or more still
+    counts as grown and gives its whole-run change; a culture that grew by neither rule gives no value
+    (`not_grown`, no arc, named in a warning). On study SMGDB00000010 this keeps C. catus, E. siraeum and S.
+    variabile as whole-run, and reads A. soehngenii (an OD rise under 0.1) as not grown.
 27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
     this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
     be read says `incomplete` in its files and the command line exits 3; the page never serves another

@@ -16,7 +16,7 @@ as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource
 \item{na}{What \code{\link{crm_efficiency}} does with NA cells: \code{"stop"} (the default) or \code{"zero"}.}
 \item{growth}{\code{"measured"} or \code{"phase_floor"}: the growth rates, as in \code{\link{crm_scale}}.}
 }
-\value{A list with \code{n_species}, \code{n_resources}, \code{names_species}, \code{names_resources}, \code{E}, \code{x0}, \code{resources}, \code{growth_rates} and \code{monod_constant}.}
+\value{A list with \code{n_species}, \code{n_resources}, \code{names_species}, \code{names_resources}, \code{E}, \code{x0}, \code{resources}, \code{growth_rates}, \code{monod_constant} and \code{migration_p = 0}: miaSim adds random immigration even with \code{stochastic = FALSE} (miaSim 1.18's \code{perturb}), which in these units would swamp growth.}
 \description{
 Returns the arguments \code{miaSim::simulateConsumerResource} takes: the numbers of taxa and resources and
 their names, the efficiency matrix \code{E}, the initial resource concentrations, the growth rates, the

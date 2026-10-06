@@ -346,7 +346,8 @@ crm_write <- function(x, dir) {
 #' @param na What [crm_efficiency()] does with NA cells: `"stop"` (the default) or `"zero"`.
 #' @param growth `"measured"` or `"phase_floor"`: the growth rates, as in [crm_scale()].
 #' @return A list with `n_species`, `n_resources`, `names_species`, `names_resources`, `E`, `x0`,
-#'   `resources`, `growth_rates` and `monod_constant`.
+#'   `resources`, `growth_rates`, `monod_constant` and `migration_p = 0`: miaSim adds random immigration
+#'   even with `stochastic = FALSE` (miaSim 1.18's `perturb`), which in these units would swamp growth.
 #' @examples
 #' \dontrun{
 #' args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
@@ -407,9 +408,11 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
         E <- crm_efficiency(x, na = na, growth = growth)
         x0 <- as.numeric(x0) / crm_scale(x, growth)       # into each taxon's own unit (crm_scale)
     }
+    # migration_p = 0: miaSim adds random immigration even when stochastic is FALSE (its perturb() does not
+    # scale that term by stochastic), and in these units one event is as large as a starting population
     list(n_species = n, n_resources = m, names_species = x$taxa, names_resources = x$resources, E = E,
          x0 = unname(as.numeric(x0)), resources = unname(resources), growth_rates = unname(rates),
-         monod_constant = unname(K))
+         monod_constant = unname(K), migration_p = 0)
 }
 
 #' Simulate each taxon alone and compare with its monoculture
@@ -464,7 +467,7 @@ crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop"
             n_species = 1, n_resources = m, names_species = taxon, names_resources = x$resources,
             E = E[i, , drop = FALSE], x0 = x0 / scale[[i]], resources = unname(start),
             growth_rates = mu[[taxon]], monod_constant = K[i, , drop = FALSE],
-            t_end = (steps + 1) * 0.1, t_store = steps + 1)
+            t_end = (steps + 1) * 0.1, t_store = steps + 1, migration_p = 0)
         abundance <- SummarizedExperiment::assay(tse)[1, ] * scale[[i]]
         times <- SummarizedExperiment::colData(tse)$time
         at <- which.min(abs(times - hours))

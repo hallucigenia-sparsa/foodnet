@@ -28,7 +28,10 @@ semantic versioning.
 - `crm_efficiency()` and `as_miasim()` refuse NA cells unless told `na = "zero"`; each listener on a port has
   its own secret; a request that has not sent its headers within 5 s is dropped.
 - A culture without an end of exponential growth gives its change over the whole run, marked whole_run (arcs
-  in phase whole_run, a dashed frame in the image), instead of no value.
+  in phase whole_run, a dashed frame in the image), instead of no value, when it grew by the 1.5-fold rule or
+  its optical density rose by 0.1; one that grew by neither gives no value (not_grown).
+- R: as_miasim() and crm_backcheck() switch off miaSim's random immigration (migration_p = 0), which it adds
+  even when stochastic is FALSE and which swamped growth in foodnet's units.
 - Media are told apart by the amounts their descriptions state (in one notation) and by more phrasings.
 - CRM parameters (`foodnet.crm/v1`) carry each taxon's biomass change; the R package builds miaSim's
   efficiency matrix from its equations, requires starting abundances and Monod constants, refuses pooled

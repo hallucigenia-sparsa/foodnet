@@ -137,9 +137,10 @@ def test_replicates_that_end_growth_far_apart_are_marked():
 
 def test_a_taxon_without_a_phase_gives_its_whole_run_change_and_does_not_vote(client):
     # C's cultures (mMCB) do not grow: its value is the change over the whole run (Karoline, 2026-10-06), marked
+    # an OD read without its blank: from 0.5 to 0.65, 1.3-fold but a rise of 0.15, so it grew
     for rep in ("c1", "c1b"):
         client.contexts[client.bioreplicates[rep]["measurementContexts"][0]["id"]] = \
-            [(0, 0.5), (8, 0.5), (16, 0.55), (24, 0.5)]
+            [(0, 0.5), (8, 0.55), (16, 0.65), (24, 0.6)]
     r = run(client, ignore_media=True)
     from foodnet import matrix
     assert matrix.entry(r, "ncbi:3", GLC, "exponential", "consumed") == (5.0, "whole_run")
@@ -152,6 +153,18 @@ def test_a_taxon_without_a_phase_gives_its_whole_run_change_and_does_not_vote(cl
     # and it does not vote for the value medium: mMCB keeps two taxa with phase values only for B
     r = run(client)
     assert r["value_rule"]["media"] == ["Wilkins-Chalgren Anaerobe Broth (WC)"]
+
+
+def test_a_culture_that_did_not_grow_gives_no_value(client):
+    # flat OD (+0.05): grew by neither rule, so its glucose drift is no consumption
+    for rep in ("c1", "c1b"):
+        client.contexts[client.bioreplicates[rep]["measurementContexts"][0]["id"]] = \
+            [(0, 0.5), (8, 0.5), (16, 0.55), (24, 0.5)]
+    r = run(client, ignore_media=True)
+    from foodnet import matrix
+    assert matrix.entry(r, "ncbi:3", GLC, "exponential", "consumed") == (None, "not_grown")
+    assert not [e for e in r["network"].edges if e.taxon == "ncbi:3"]
+    assert any("did not grow" in w for w in r["warnings"])
 
 
 def test_a_taxon_with_more_data_in_another_medium_is_named():
@@ -243,3 +256,14 @@ def test_replicates_that_start_far_apart_are_flagged():
     rows[2]["start"] = 4                       # one replicate's first sample is at 4 h of a 0 to 12 h phase
     cell = derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]
     assert "start_differs" in cell["cautions"]
+
+
+def test_a_taxon_with_phase_cultures_takes_its_biomass_from_them_only():
+    from foodnet import crm
+    curve = {"times": [0, 4, 8, 12], "technique": "od", "level": "", "unit": "od"}
+    grew = _culture("E1", [0, 1, 2, 3], growth=[{**curve, "values": [0.1, 0.4, 1.0, 1.0]}])
+    flat = _culture("E2", [0, 1, 2, 3], growth=[{**curve, "values": [0.7, 0.7, 0.71, 0.7]}])
+    rows = [{"culture": 0, "phase": "exponential", "change": 2.0, "start": 0, "end": 8, "cautions": []},
+            {"culture": 1, "phase": "exponential", "change": 1.0, "start": 0, "end": 12, "cautions": ["whole_run"]}]
+    found = crm.biomass_changes([(0, grew), (1, flat)], rows, "exponential")["t1"]
+    assert found["n"] == 1 and found["change"] == pytest.approx(0.9) and found["unit"] == "od"

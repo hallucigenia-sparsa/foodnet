@@ -199,6 +199,7 @@
                 "still_changing",
                 "growth_rate_boundary",
                 "whole_run",
+                "not_grown",
                 "start_differs",
                 "pair_decided"
               ]

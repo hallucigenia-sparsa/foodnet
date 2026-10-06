@@ -42,7 +42,7 @@ from .model import FoodNetwork
 
 NA = "NA"
 EVIDENCE_WORDS = ("measured", "below_limit", "whole_run", "single_replicate", "seen_elsewhere", "inconclusive",
-                  "no_phase", "presence_only", "not_assayed")
+                  "no_phase", "not_grown", "presence_only", "not_assayed")
 # v1 (0.2.0): adds each taxon's biomass change over the phase, which miaSim's yields need, and the caveats
 # that make a CRM refuse to build without being told (mixed media, the stationary phase)
 CRM_FORMAT = "foodnet.crm/v1"
@@ -164,6 +164,8 @@ def entry(result: dict, taxon: str, met: str, ph: str, direction: str) -> tuple:
             return abs(presence_value(seen)), "presence_only"
         return None, "presence_only"
     if cell is not None:
+        if "not_grown" in cell["cautions"]:
+            return None, "not_grown"       # assayed, but the culture did not grow
         return None, "no_phase"            # assayed, but no phase (or no stationary phase) in its cultures
     return None, "not_assayed"
 
@@ -230,11 +232,18 @@ def _csv(header, rows) -> str:
     return out.getvalue()
 
 
+def row_labels(result: dict, taxa) -> list:
+    """The taxa's row labels, with " [whole run]" for a taxon whose values span the whole run, so a CSV read
+    on its own still says that its row is no phase's (a tenth review round)."""
+    whole = {t for (t, _, _), c in result["cells"].items() if c.get("whole_run")}
+    return [f"{label} [whole run]" if t.id in whole else label for label, t in zip(_labels(taxa), taxa, strict=True)]
+
+
 def signed_rows(net: FoodNetwork, result: dict, phases=None) -> tuple:
     taxa = taxa_rows(net, result)
     cols = columns(net, result, phases)
     rows = [[signed_entry(result, t.id, m.id, ph) for m, ph, _ in cols] for t in taxa]
-    return _labels(taxa), [label for _, _, label in cols], rows
+    return row_labels(result, taxa), [label for _, _, label in cols], rows
 
 
 def signed_csv(net: FoodNetwork, result: dict) -> str:
@@ -247,7 +256,7 @@ def pair_rows(net: FoodNetwork, result: dict, phases=None) -> dict:
     """{"taxa", "columns", "consumed", "produced", "evidence_consumed", "evidence_produced"}."""
     taxa = taxa_rows(net, result)
     cols = columns(net, result, phases)
-    out = {"taxa": _labels(taxa), "columns": [label for _, _, label in cols]}
+    out = {"taxa": row_labels(result, taxa), "columns": [label for _, _, label in cols]}
     for direction in ("consumed", "produced"):
         values, evidence = [], []
         for t in taxa:
