@@ -135,3 +135,18 @@ def test_a_window_that_cannot_be_used_is_said_not_dropped():
     assert "needs a start" in gui.window_problem({"window_end": ["5"]})
     assert gui.window_problem({"second_window_start": ["0"], "second_window_end": [""]}) == ""
     assert gui.window_problem({"window_start": ["0"], "window_end": ["48"]}) == ""
+
+
+def test_a_search_that_is_gone_is_a_404_never_another_searchs_data(server):
+    _search(server)                                  # a result exists, so a fallback would have served it
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _get(f"{server}/crm.json?token=tok&job=deadbeef")
+    assert e.value.code == 404 and "no longer here" in e.value.read().decode()
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _get(f"{server}/download?token=tok&job=deadbeef&format=json")
+    assert e.value.code == 404
+
+
+def test_only_web_addresses_become_study_links():
+    assert gui._web("https://doi.org/10.1/x") and gui._web(" http://example.org ")
+    assert not gui._web("javascript:alert(1)") and not gui._web("") and not gui._web("data:text/html,x")

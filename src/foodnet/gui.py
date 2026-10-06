@@ -331,14 +331,20 @@ def _arc_rows(net, edges) -> str:
     return "".join(rows)
 
 
+def _web(url: str) -> bool:
+    """Whether a study's url (free text from whoever deposited it) is a web address: anything else, such as a
+    javascript: url, would run on the page that holds the session token."""
+    return urllib.parse.urlparse((url or "").strip()).scheme in ("http", "https")
+
+
 def _sources(net) -> str:
     if not net.studies:
         return ""
     by_study = studies_with_edges(net)
     items = "".join(
         f"<li>{_esc(sid)}: {_esc(study.citation or sid)} [{_esc(study.license or 'license: see study')}] supports "
-        f"{len(by_study.get(sid, []))} arc(s)" + (f" &middot; <a href=\"{_esc(study.url)}\">study</a>" if study.url
-                                                  else "") + "</li>"
+        f"{len(by_study.get(sid, []))} arc(s)"
+        + (f" &middot; <a href=\"{_esc(study.url)}\">study</a>" if _web(study.url) else "") + "</li>"
         for sid, study in sorted(net.studies.items()))
     return ("<h2>Sources</h2><p class=\"muted\">Cited at the level of each arc; per-study licenses are "
             f"respected.</p><ul class=\"sources\">{items}</ul>")
@@ -634,11 +640,29 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         return render_result(self.token, job["result"])
 
     def _result(self, query: dict):
-        job = self.state.get("jobs", {}).get(query.get("job", [""])[0])
-        result = job["result"] if job and job.get("status") == "done" else self.state.get("result")
+        """The result a request names by its job, or the last one shown when it names none. A job that is gone
+        (pruned, or from before a restart) gives None, never another search's result."""
+        wanted = query.get("job", [""])[0]
+        if wanted:
+            job = self.state.get("jobs", {}).get(wanted)
+            result = job["result"] if job and job.get("status") == "done" else None
+        else:
+            result = self.state.get("result")
         if result is not None:
             result["port"] = self.server.server_address[1]
         return result
+
+    # the routes that serve a search's data: a job they name that is gone is a 404, so an old tab or a pasted
+    # crm.json link never receives another search's data
+    DATA_ROUTES = ("/download", "/rates.csv", "/crm.zip", "/crm.json", "/matrices.svg", "/report.txt", "/crm",
+                   "/cytoscape")
+
+    def _gone(self, path: str, query: dict) -> bool:
+        if path in self.DATA_ROUTES and query.get("job", [""])[0] and self._result(query) is None:
+            self._send(render_form(self.token, message="That search is no longer here (the page keeps the latest "
+                                                       f"{KEPT_JOBS} searches); run it again."), status=404)
+            return True
+        return False
 
     def _download(self, fmt: str, query: dict):
         result = self._result(query)
@@ -658,6 +682,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         query = urllib.parse.parse_qs(parsed.query)
         if not self._authorized(query):
+            return
+        if self._gone(parsed.path, query):
             return
         if parsed.path == "/":
             job = query.get("job", [""])[0]
@@ -751,7 +777,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         progress(0, None, "Reading the species list of mGrowthDB (the first search in an hour)")
                         self.state["index"] = species_index(fresh, progress=progress)
                         self.state["client"] = fresh
-                        self.state["index_built"] = time.monotonic()
+                        # an index the crawl could not read whole hides taxa: it serves this search (which
+                        # reports it) and is built again for the next one
+                        self.state["index_built"] = 0 if self.state["index"].failed else time.monotonic()
                     client = self.state["client"]
                 job["result"] = run_query(client, entries, settings, self.state["index"], progress=progress,
                                           all_studies=all_studies)
@@ -772,6 +800,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         query = urllib.parse.parse_qs(parsed.query)
         if not self._authorized(query):
+            return
+        if self._gone(parsed.path, query):
             return
         if parsed.path == "/cytoscape":
             self._send(self._to_cytoscape(query))

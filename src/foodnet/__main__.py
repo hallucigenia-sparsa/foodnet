@@ -16,6 +16,10 @@ import sys
 from . import rates
 from .search import DEFAULTS, PHASE_LABELS
 
+# the exit status of a derive whose result is incomplete (records that could not be read): its files are
+# written and say so, but a script must not take them for a complete result
+INCOMPLETE = 3
+
 DERIVE_EXAMPLES = """examples:
   the page's Example, with its report, sent to Cytoscape:
     foodnet derive --taxa "Escherichia coli LF82" "Bacteroides fragilis" "Roseburia intestinalis" \\
@@ -91,6 +95,9 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--crm", help="also write the CRM parameters (zip); needs --report-rates or --crm-mode")
     d.add_argument("--to-r", action="store_true", help="send the CRM parameters to a listening R session")
     d.add_argument("--r-port", type=int, default=None)
+    d.add_argument("--allow-incomplete", action="store_true",
+                   help=f"exit 0 even when mGrowthDB records could not be read (otherwise {INCOMPLETE}; the files "
+                        "say incomplete either way)")
     d.add_argument("--to-cytoscape", action="store_true", help="send the network to a running Cytoscape")
     d.add_argument("--cytoscape-port", type=int, default=1234)
 
@@ -201,6 +208,11 @@ def _derive(a) -> int:
             print(f"Send to Cytoscape: {e}", file=sys.stderr)
             return 1
         print(f"sent to Cytoscape: network {sent['suid']}", file=sys.stderr)
+    if result["errors"] and not a.allow_incomplete:
+        # the files are written, and say so in their meta; a script must not take them for complete
+        print("foodnet: the result is incomplete (mGrowthDB records could not be read; see the notes above). "
+              f"Exit status {INCOMPLETE}; --allow-incomplete accepts it.", file=sys.stderr)
+        return INCOMPLETE
     return 0
 
 

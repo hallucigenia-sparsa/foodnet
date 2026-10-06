@@ -11,65 +11,123 @@ http_response <- function(body, status = "200 OK", type = "application/json") {
 }
 
 # Read one HTTP request from a connection: the request line, the headers, and the body named by
-# Content-Length. Headers are small, so they are read a byte at a time until the blank line, which keeps
-# this free of any parsing library.
+# Content-Length. Headers are small, so they are read a byte at a time into a fixed buffer until the blank
+# line, which keeps this free of any parsing library and its cost linear in what arrives.
 #' @noRd
-read_request <- function(con, limit = 64e6) {
-    header <- raw(0)
+read_request <- function(con, limit = 64e6, header_limit = 16384L) {
+    header <- raw(header_limit)
+    n <- 0L
     repeat {
         byte <- readBin(con, "raw", 1L)
         if (!length(byte)) break
-        header <- c(header, byte)
-        n <- length(header)
+        if (n >= header_limit) stop_foodnet("the request headers are too long to be foodnet's")
+        n <- n + 1L
+        header[n] <- byte
         if (n >= 4L && identical(header[(n - 3L):n], as.raw(c(13, 10, 13, 10)))) break
-        if (n > 1e6) stop_foodnet("the request headers are too long to be foodnet's")
     }
-    lines <- strsplit(rawToChar(header), "\r\n", fixed = TRUE)[[1]]
+    lines <- strsplit(rawToChar(header[seq_len(n)]), "\r\n", fixed = TRUE)[[1]]
     first <- if (length(lines)) lines[1] else ""
-    named <- grep("^content-length:", lines, ignore.case = TRUE, value = TRUE)
-    size <- if (length(named)) as.integer(trimws(sub("^[^:]*:", "", named[1]))) else 0L
-    if (is.na(size) || size < 0 || size > limit) stop_foodnet("the request body is not a size we accept")
+    field <- function(name) {
+        found <- grep(paste0("^", name, ":"), lines, ignore.case = TRUE, value = TRUE)
+        if (length(found)) trimws(sub("^[^:]*:", "", found[1])) else NA_character_
+    }
+    size <- suppressWarnings(as.integer(field("content-length")))
+    if (is.na(size)) size <- 0L
+    if (size < 0 || size > limit) stop_foodnet("the request body is not a size we accept")
     body <- ""
     if (size > 0) {
         body <- rawToChar(readBin(con, "raw", size))
         Encoding(body) <- "UTF-8"
     }
-    list(request = first, body = body)
+    list(request = first, body = body, token = field("x-foodnet-token"), origin = field("origin"))
 }
 
-# One accepted connection: answer it, and return the parameters when it carried them.
+# Where foodnet_listen() leaves the secret the page must send, readable by this user only. The foodnet page
+# reads the same file (foodnet.rbridge.token_path computes R's tools::R_user_dir the same way), so a request
+# from another machine, or from a web page open in a browser, cannot carry it: base R cannot bind a server
+# socket to 127.0.0.1 alone, so the port is reachable from the network and the secret is what keeps it ours.
 #' @noRd
-serve_one <- function(server) {
+listen_token_path <- function() file.path(tools::R_user_dir("foodnet", "cache"), "listen-token")
+
+#' @noRd
+new_listen_token <- function() {
+    bytes <- if (file.exists("/dev/urandom")) {
+        source <- file("/dev/urandom", "rb", raw = TRUE)
+        on.exit(close(source), add = TRUE)
+        readBin(source, "raw", 24L)
+    } else {
+        # no system source of randomness (Windows): R's generator, leaving the session's own stream untouched
+        seed <- if (exists(".Random.seed", envir = globalenv())) get(".Random.seed", envir = globalenv())
+        on.exit(if (is.null(seed)) rm(".Random.seed", envir = globalenv()) else
+            assign(".Random.seed", seed, envir = globalenv()), add = TRUE)
+        set.seed(NULL)
+        as.raw(sample.int(256L, 24L, replace = TRUE) - 1L)
+    }
+    paste(sprintf("%02x", as.integer(bytes)), collapse = "")
+}
+
+#' @noRd
+write_listen_token <- function(token, path = listen_token_path()) {
+    dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+    if (file.exists(path)) file.remove(path)
+    file.create(path)
+    Sys.chmod(path, "0600")
+    writeLines(token, path)
+    path
+}
+
+#' @noRd
+answer <- function(con, body, status = "200 OK", type = "application/json") {
+    writeBin(charToRaw(http_response(body, status = status, type = type)), con)
+    NULL
+}
+
+# One accepted connection: answer it, and return the parameters when it carried them. Anything else is
+# answered and the listener goes on waiting, so a stray request can neither stop it nor plant parameters.
+#' @noRd
+serve_one <- function(server, token) {
     con <- socketAccept(server, blocking = TRUE, open = "a+b", timeout = 10)
     on.exit(try(close(con), silent = TRUE), add = TRUE)
-    request <- read_request(con)
+    request <- tryCatch(read_request(con), error = function(e) NULL)
+    if (is.null(request)) {
+        return(answer(con, "{\"received\": false, \"error\": \"not a request foodnet sends\"}",
+                      status = "400 Bad Request"))
+    }
     if (!grepl("^POST ", request$request)) {
         # a browser or a port scan: say what this port is, and go on waiting for the real thing
-        writeBin(charToRaw(http_response(
-            "this port belongs to the foodnet R package; foodnet posts CRM parameters to it",
-            type = "text/plain")), con)
-        return(NULL)
+        return(answer(con, "this port belongs to the foodnet R package; foodnet posts CRM parameters to it",
+                      type = "text/plain"))
+    }
+    if (!is.na(request$origin) || is.na(request$token) || !identical(request$token, token)) {
+        # a web page (browsers name their origin) or a request without this session's secret
+        return(answer(con, paste0("{\"received\": false, \"error\": \"this listener takes parameters from the ",
+                                  "foodnet page on this machine only; update foodnet if it is the page\"}"),
+                      status = "403 Forbidden"))
     }
     payload <- tryCatch(fromJSON(request$body, simplifyVector = FALSE), error = function(e) NULL)
     if (is.null(payload)) {
-        writeBin(charToRaw(http_response("{\"received\": false, \"error\": \"not JSON\"}",
-                                         status = "400 Bad Request")), con)
-        return(NULL)
+        return(answer(con, "{\"received\": false, \"error\": \"not JSON\"}", status = "400 Bad Request"))
     }
-    crm <- as_foodnet_crm(payload)
-    answer <- sprintf(paste0("{\"received\": true, \"taxa\": %d, \"resources\": %d, ",
-                             "\"growth_rates\": %d, \"without_a_rate\": %d}"),
-                      length(crm$taxa), length(crm$resources), sum(!is.na(crm$growth_rates)),
-                      length(crm$caveats$without_a_rate))
-    writeBin(charToRaw(http_response(answer)), con)
+    crm <- tryCatch(as_foodnet_crm(payload), error = function(e) NULL)
+    if (is.null(crm)) {
+        return(answer(con, "{\"received\": false, \"error\": \"not foodnet CRM parameters\"}",
+                      status = "400 Bad Request"))
+    }
+    answer(con, sprintf(paste0("{\"received\": true, \"taxa\": %d, \"resources\": %d, ",
+                               "\"growth_rates\": %d, \"without_a_rate\": %d}"),
+                        length(crm$taxa), length(crm$resources), sum(!is.na(crm$growth_rates)),
+                        length(crm$caveats$without_a_rate)))
     crm
 }
 
 #' Receive CRM parameters from the foodnet page
 #'
 #' Opens a port on this machine and waits for foodnet's "Send to R" to post the parameters to it. The
-#' page sends them to 127.0.0.1 and nowhere else, and this function answers one request and closes the
-#' port again.
+#' page sends them to 127.0.0.1 and nowhere else. Base R cannot limit a listening port to this machine, so
+#' the listener also writes a one-time secret to a file only this user can read, and accepts parameters
+#' only from a request that carries it (the foodnet page reads the same file); a request from elsewhere, or
+#' from a web page, is refused and the listener goes on waiting. It closes the port, and removes the
+#' secret, once the parameters have arrived.
 #'
 #' @param port Port to listen on. The foodnet page sends to 8794 unless told otherwise (grownet's
 #'   package uses 8793, so both can listen at once).
@@ -86,6 +144,9 @@ serve_one <- function(server) {
 #' }
 #' @export
 foodnet_listen <- function(port = 8794, timeout = 300, quiet = FALSE) {
+    token <- new_listen_token()
+    path <- write_listen_token(token)
+    on.exit(unlink(path), add = TRUE)
     server <- serverSocket(port)
     on.exit(close(server), add = TRUE)
     if (!quiet) {
@@ -100,7 +161,7 @@ foodnet_listen <- function(port = 8794, timeout = 300, quiet = FALSE) {
                          "foodnet_listen(), then press Send to R on the foodnet page.")
         }
         if (!isTRUE(socketSelect(list(server), timeout = min(left, 1))[1])) next
-        crm <- serve_one(server)
+        crm <- serve_one(server, token)
         if (is.null(crm)) next
         if (!quiet) print(crm)
         return(invisible(crm))

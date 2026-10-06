@@ -195,6 +195,14 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                             "settings: Include supporting evidence outside the second box)"))
         cultures = [c for c in cultures if named(c)]
         read["growth_only"] = [c for c in read["growth_only"] if named(c)]
+    lost = getattr(index, "failed", [])
+    if lost and not all_studies:
+        errors.append(f"{len(lost)} record(s) of the species list could not be read from mGrowthDB (for example "
+                      f"{lost[0][0]}: {lost[0][1]}), so taxa held only there are missing from this search; the result "
+                      "is incomplete, so run the search again")
+    elif lost:
+        errors.append(f"{len(lost)} record(s) could not be read while listing mGrowthDB's studies (for example "
+                      f"{lost[0][0]}: {lost[0][1]}); the result is incomplete, so run the search again")
     failed = [x for x in skipped if x[1].startswith(UNREAD)]
     if failed:
         errors.append(f"{len(failed)} record(s) could not be read from mGrowthDB (for example {failed[0][0]}: "
@@ -326,6 +334,10 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     if second_info and second_mids:
         warnings.append(f"{', '.join(metabolites[m][0] for m in second_mids if m in metabolites)}: measured over the "
                         f"second time window, {second_info['label']}, not over the phase or main window.")
+    # a result built on what could not all be read says so in its files, not only on the screen (the command
+    # line also exits with an error, unless told to accept it)
+    net.meta["incomplete"] = bool(errors)
+    net.meta["errors"] = list(errors)
     say(len(studies), len(studies), "Preparing the result")
     return {"entries": names, "settings": dict(s), "resolved": resolved["resolved"],
             "reasons": resolved["reasons"], "suggestions": resolved["suggestions"], "genera": resolved["genera"],

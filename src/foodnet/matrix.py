@@ -178,11 +178,26 @@ def _number(value) -> str:
     return f"{value:.6g}"
 
 
+_FORMULA = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _inert(cell):
+    """A text cell a spreadsheet would run as a formula (names come from the database as deposited), with a
+    leading apostrophe; numbers, negative ones included, stay as they are (OWASP, CSV injection)."""
+    if not isinstance(cell, str) or not cell.startswith(_FORMULA):
+        return cell
+    try:
+        float(cell)
+        return cell
+    except ValueError:
+        return "'" + cell
+
+
 def _csv(header, rows) -> str:
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
-    writer.writerow(header)
-    writer.writerows(rows)
+    writer.writerow([_inert(c) for c in header])
+    writer.writerows([_inert(c) for c in row] for row in rows)
     return out.getvalue()
 
 

@@ -40,8 +40,11 @@ class SpeciesIndex(dict):
     (Karoline, grownet #24, 2026-09-18). Old names stay in the list, so they still resolve. `studies`: the ids of
     every study the crawl found, in id order, which the page's All button derives."""
 
-    def __init__(self, *args, current=None, studies=(), where=None, **kwargs):
+    def __init__(self, *args, current=None, studies=(), where=None, failed=(), **kwargs):
         super().__init__(*args, **kwargs)
+        # what the crawl could not read: a study or experiment missing here hides its taxa from every search,
+        # so a search reports it as an error and the page does not keep an index that holds any
+        self.failed = list(failed)
         self.current = dict(current or {})
         self.studies = list(studies)
         # taxon id -> the studies with an experiment holding it. foodnet finds studies here, not through
@@ -61,20 +64,32 @@ def species_index(client, max_studies: int = MAX_STUDIES, progress=None) -> dict
     Study ids are consecutive, so the crawl walks them and stops after MISS_RUN absent ids in a row. The
     studies and their experiments are read in parallel (`foodnet.fetch`), then walked in id order, so the
     first name seen for a taxon is the same as a one-by-one crawl would keep. A study or experiment that
-    cannot be read is skipped: a partial index is more useful than no index.
+    cannot be read is skipped, since a partial index is more useful than no index, and recorded in `failed`,
+    since its taxa are then missing from every search.
     """
     from .fetch import _each, study_ids_in_order
 
     if not (hasattr(client, "get_study") and hasattr(client, "get_experiment")):
         return _species_index_one_by_one(client, max_studies)
     ids = study_ids_in_order(client, STUDY_ID, max_studies, MISS_RUN)
-    experiment_ids = [e["id"] for sid in ids for e in (client.get_study(sid) or {}).get("experiments", [])]
-    _each(client.get_experiment, experiment_ids, progress, "Reading the species list of mGrowthDB")
+    failed = []
+    experiment_ids = []
+    for sid in ids:
+        try:
+            experiment_ids += [e["id"] for e in (client.get_study(sid) or {}).get("experiments", [])]
+        except Exception as e:  # noqa: BLE001 - recorded, and the study is skipped below
+            failed.append((sid, str(e)))
+    failures = []
+    _each(client.get_experiment, experiment_ids, progress, "Reading the species list of mGrowthDB",
+          failures=failures)
+    failed += [(eid, str(e)) for eid, e in failures]
     index, published, where = {}, [], {}
     for order, sid in enumerate(ids):
         try:
             experiments = client.study_experiments(sid)       # from the cache the parallel reads filled
-        except Exception:      # noqa: BLE001 - one unreadable study is skipped, the rest still count
+        except Exception as e:  # noqa: BLE001 - one unreadable study is skipped, the rest still count
+            if not any(sid == x for x, _ in failed):
+                failed.append((sid, str(e)))
             continue
         for exp in experiments:
             for name, taxon in _strain_entries(exp):
@@ -86,7 +101,7 @@ def species_index(client, max_studies: int = MAX_STUDIES, progress=None) -> dict
         for exp in experiments:
             for name, taxon in _strain_entries(exp):
                 current[taxon] = name
-    return SpeciesIndex(index, current=current, studies=ids, where=where)
+    return SpeciesIndex(index, current=current, studies=ids, where=where, failed=failed)
 
 
 def _species_index_one_by_one(client, max_studies: int) -> dict:
