@@ -3,7 +3,7 @@
 All notable changes to foodnet. The format follows Keep a Changelog, and the version numbers follow
 semantic versioning.
 
-## [0.1.0] (unreleased)
+## [0.1.0] (2026-10-06)
 
 ### Added
 - Bipartite taxon and metabolite networks from mGrowthDB batch monocultures: produced arcs from a taxon to a
