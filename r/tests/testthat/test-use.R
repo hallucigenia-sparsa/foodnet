@@ -146,4 +146,9 @@ test_that("subsetting keeps the warnings about kept taxa only, once marked, and 
     expect_equal(again$caveats$warnings, kept$caveats$warnings)
     payload$caveats$warnings <- list("A has more data elsewhere")
     expect_length(crm_subset(foodnet:::as_foodnet_crm(payload), taxa = "A b")$caveats$warnings, 0)
+    # the common case: the removed taxon shares no prefix with a kept one
+    payload$taxa <- list("Bacteroides fragilis", "Roseburia intestinalis")
+    payload$caveats$warnings <- list("no growth curve for Roseburia intestinalis", "2 values are inconclusive")
+    kept <- crm_subset(foodnet:::as_foodnet_crm(payload), taxa = "Bacteroides fragilis")
+    expect_equal(kept$caveats$warnings, "(for the whole search) 2 values are inconclusive")
 })

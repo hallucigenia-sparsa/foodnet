@@ -306,3 +306,15 @@ def test_a_volatile_falling_is_no_uptake_even_past_the_evaporation_share():
     # 12% volume loss: lactate concentrates past 10%, ethanol evaporates
     c.metabolites = {"lactate": met("lactate", (20, 20.8, 21.6, 22.4)), "ethanol": met("ethanol", (5, 4.4, 3.8, 3.0))}
     assert not derive.active(c)
+
+
+def test_a_replicate_within_its_own_scatter_keeps_its_vote():
+    cultures = [_culture("E1", [0, 1, 2, 3]) for _ in range(3)]
+    rows = _rows([(0, 1.0), (1, 0.95), (2, -1.2)])
+    rows[2]["cautions"] = ["within_scatter"]      # its series scatters, but it still counts
+    cell = derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]
+    assert cell["state"] == "inconclusive" and cell["n"] == 3
+    rows = _rows([(0, 1.0), (1, 0.95), (2, 1.1)])
+    for r in rows:
+        r["cautions"] = ["within_scatter"]        # all within scatter: inconclusive
+    assert derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]["state"] == "inconclusive"

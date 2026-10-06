@@ -42,8 +42,14 @@ VOLATILE = {"ethanol", "methanol", "acetone", "acetaldehyde", "propanol", "1-pro
             "hydrogen sulfide", "dimethyl sulfide"}
 
 
-def volatile(name: str) -> bool:
-    return " ".join((name or "").casefold().split()) in VOLATILE
+# the same by ChEBI id, for a study that records one under another name: ethanol, methanol, acetone,
+# acetaldehyde, 1-propanol, 2-propanol, 1-butanol, dihydrogen, carbon dioxide, methane, hydrogen sulfide
+VOLATILE_CHEBI = {"16236", "17790", "15347", "15343", "28831", "17824", "28885", "18276", "16526", "16183", "16136"}
+
+
+def volatile(name: str, chebi_id: str = "") -> bool:
+    return (" ".join((name or "").casefold().split()) in VOLATILE
+            or str(chebi_id or "").removeprefix("CHEBI:") in VOLATILE_CHEBI)
 
 
 # the name a joined compound is shown under

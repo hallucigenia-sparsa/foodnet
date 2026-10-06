@@ -150,3 +150,9 @@ def test_a_search_that_is_gone_is_a_404_never_another_searchs_data(server):
 def test_only_web_addresses_become_study_links():
     assert gui._web("https://doi.org/10.1/x") and gui._web(" http://example.org ")
     assert not gui._web("javascript:alert(1)") and not gui._web("") and not gui._web("data:text/html,x")
+
+
+def test_an_evaporation_share_outside_its_range_is_refused():
+    assert "percentage" in gui.window_problem({"evaporation": ["-5"]})
+    assert "percentage" in gui.window_problem({"evaporation": ["abc"]})
+    assert gui.window_problem({"evaporation": ["15"]}) == ""

@@ -298,7 +298,7 @@ def active(culture, limit: float = DETECTION_LIMIT, evaporation: float = phases.
     series = [m["series"] for m in culture.metabolites.values() if len(m["series"]) > 2]
     # a volatile compound's fall is no uptake: it can leave as vapor
     lasting = [m["series"] for m in culture.metabolites.values()
-               if len(m["series"]) > 2 and not compounds.volatile(m.get("name"))]
+               if len(m["series"]) > 2 and not compounds.volatile(m.get("name"), m.get("chebi_id"))]
 
     def moved(s, sign):
         return sign * (s[-1][1] - s[0][1]) > beyond_evaporation(s, limit, evaporation)
@@ -628,14 +628,14 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
     cells = {}
     for key, members in groups.items():
         lim = limits.get(key[1], limit)
+        # a replicate within its series' scatter (or evaporation) keeps its vote: dropping it would select
+        # replicates by their values and hand the call to the ones left (a fourteenth review round). Only when
+        # every value is so does the cell become inconclusive
         noisy = [r for r in members if r["change"] is not None
                  and {"within_scatter", "within_evaporation"} & set(r["cautions"])]
-        valued = [r for r in members if r["change"] is not None and r not in noisy]
-        if noisy and not valued:
-            # every value lies within its series' scatter (or evaporation): measured, but no change anyone can
-            # tell from noise, so inconclusive rather than no value
-            valued = noisy
-            members = [r for r in members if r["change"] is not None]
+        valued = [r for r in members if r["change"] is not None]
+        if noisy and len(noisy) < len(valued):
+            noisy = []
         whole = [r for r in valued if "whole_run" in r["cautions"]]
         whole_note = None
         if whole and len(whole) < len(valued):
@@ -702,7 +702,7 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
                     notes.append("experiments agree, in amounts from " + ", ".join(
                         f"{names.get(e, e)} {statistics.mean(per_exp[e]):+.2f}" for e in sorted(used)) + " mM")
         values = [v for e in used for v in per_exp[e]] if len(used) < len(per_exp) else values
-        if valued is noisy and k is not INCONCLUSIVE:
+        if noisy and k is not INCONCLUSIVE:
             k = INCONCLUSIVE
             cautions.add("inconclusive")
             notes.append("inconclusive: the changes lie within their series' own scatter, or within what "

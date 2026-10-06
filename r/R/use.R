@@ -286,6 +286,7 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
             at <- gregexpr(t, w, fixed = TRUE)[[1]]
             if (at[1] < 0) return(FALSE)
             longer <- kept[nchar(kept) > nchar(t) & startsWith(kept, t)]
+            if (!length(longer)) return(TRUE)
             any(vapply(at, function(p) !any(substr(w, p, p + nchar(longer) - 1) == longer), logical(1)))
         }
         names_any <- function(w) any(vapply(removed, whole_name, logical(1), w = w))

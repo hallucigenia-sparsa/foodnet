@@ -260,6 +260,9 @@ with metabolite data."
 - **The exponential phase can miss a slow-down.** Where the growth rate ends growth early (E. coli LF82),
   part of a compound's use falls in the stationary phase; the values say `still_changing`, the page, the
   zips, crm.json and the R package warn, and a time window over both phases gives the whole change.
+- **The scatter test needs four samples in a window.** A window of fewer (Db-MM's 0 to 24 h exponential phase
+  holds two) gets no scatter check; such values carry `coarse_sampling` or `pair_decided`. Volatile compounds
+  are recognized by name or ChEBI id from a fixed list.
 - **A net change hides what was made and used again** within a phase (formate in E. coli), and a single
   failed sample at a phase end becomes the value; neither is flagged.
 

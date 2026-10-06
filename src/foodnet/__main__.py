@@ -134,6 +134,8 @@ def settings_from(a) -> dict:
              exclude_experiments=a.exclude_experiments, strict_media=not a.no_strict_media,
              include_non_batch=a.include_non_batch, spike_factor=a.spike_factor, correction=a.correction)
     from .search import compound_limits_of
+    if not 0 <= a.evaporation < 1:
+        raise SystemExit("--evaporation is a share from 0 to below 1 (0.1 is 10%)")
     try:
         compound_limits_of(s)
     except ValueError as e:

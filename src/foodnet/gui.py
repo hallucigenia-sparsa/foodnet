@@ -554,6 +554,14 @@ def window_problem(form: dict) -> str:
         compound_limits_of({"compound_limits": form.get("compound_limits", [""])[0]})
     except ValueError as e:
         return str(e)[0].upper() + str(e)[1:] + "."
+    raw = (form.get("evaporation", [""])[0] or "").strip()
+    if raw:
+        try:
+            share = float(raw)
+        except ValueError:
+            share = None
+        if share is None or not 0 <= share < 100:
+            return f"Evaporation over a run is a percentage from 0 to below 100; it was {raw}."
     return ""
 
 
@@ -570,7 +578,7 @@ def parse_settings(form: dict) -> dict:
     second_start, second_end = _number(form, "second_window_start"), _number(form, "second_window_end")
     s["second_window_start"] = second_start if second_start is not None else 0.0
     s["second_window_end"] = second_end if second_end is not None and second_end > s["second_window_start"] else None
-    evaporation = _number(form, "evaporation")
+    evaporation = _number(form, "evaporation", positive=False)
     if evaporation is not None and 0 <= evaporation < 100:
         s["evaporation"] = evaporation / 100
     fraction = _number(form, "fraction")
