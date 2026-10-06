@@ -538,6 +538,7 @@ def crm_payload(result: dict) -> dict:
         "biomass_start": [None if b is None else b["start"] for b in biomass],
         "biomass_unit": [None if b is None else b["unit"] for b in biomass],
         "phase_hours": [None if b is None else b["hours"] for b in biomass],
+        "phase_growth_rates": [None if b is None else b.get("phase_rate") for b in biomass],
         "caveats": {"presence_only": presence, "conflicts": conflicts(result),
                     "duplicates": list(result["duplicates"]),
                     "without_a_rate": [pair["taxa"][i] for i, t in enumerate(taxa) if t.id not in result["rates"]],

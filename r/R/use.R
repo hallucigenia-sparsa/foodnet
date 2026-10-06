@@ -93,15 +93,19 @@ crm_resources <- function(x, missing = NULL) {
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param scale `"miasim"`, `"shares"` or `"none"`, as above.
 #' @param na `"stop"` or `"zero"`, as above.
+#' @param growth `"measured"` (the default): the growth rates as foodnet fitted them. `"phase_floor"`: at
+#'   least the mean rate each taxon's own curves show over the phase (see [crm_scale()]).
 #' @return A numeric matrix, taxa by resources.
 #' @examples
 #' \dontrun{
 #' E <- crm_efficiency(crm, na = "zero")
 #' }
 #' @export
-crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero")) {
+crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero"),
+                           growth = c("measured", "phase_floor")) {
     stopifnot(inherits(x, "foodnet_crm"))
     scale <- match.arg(scale)
+    growth <- match.arg(growth)
     na <- match.arg(na)
     m <- amounts(x, na, booleans_ok = scale == "none")
     consumed <- m$consumed
@@ -117,7 +121,7 @@ crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("sto
     if (scale == "shares") {
         return((consumed - produced) / ifelse(total > 0, total, 1))
     }
-    crm_scale(x)        # stops, naming them, when a taxon lacks what the scale needs
+    crm_scale(x, growth)        # stops, naming them, when a taxon lacks what the scale needs
     squares <- rowSums(consumed^2)
     consumed / ifelse(total > 0, total, 1) - produced * ifelse(squares > 0, total / squares, 0)
 }
@@ -173,16 +177,24 @@ amounts <- function(x, na = "stop", booleans_ok = FALSE) {
 #' grow at its measured rate with its measured yield. Divide starting abundances by it ([as_miasim()] does)
 #' and multiply simulated ones by it ([crm_unscale()]).
 #'
+#' The growth rate in it is foodnet's fitted maximum rate, or with `growth = "phase_floor"` at least the
+#' mean rate the taxon's own curves show over the phase. A maximum below that mean cannot be right: it comes
+#' from a fitting window that took in the plateau of a fast, sparsely sampled curve (E. coli LF82: 0.375
+#' fitted against 0.65 per hour over its phase), and it would grow the taxon too slowly. Such taxa are named in
+#' a warning.
+#'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
+#' @param growth `"measured"` or `"phase_floor"`, as above.
 #' @return A named numeric vector, one per taxon.
 #' @export
-crm_scale <- function(x) {
+crm_scale <- function(x, growth = c("measured", "phase_floor")) {
     stopifnot(inherits(x, "foodnet_crm"))
+    growth <- match.arg(growth)
     consumed <- x$consumed
     consumed[is.na(consumed)] <- 0
     total <- rowSums(consumed)
     squares <- rowSums(consumed^2)
-    rates <- x$growth_rates
+    rates <- crm_growth(x, growth)
     dx <- x$biomass_change
     lacking <- names(rates)[is.na(rates) | is.na(dx) | dx <= 0 | total <= 0]
     if (length(lacking)) {
@@ -201,10 +213,11 @@ crm_scale <- function(x) {
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param abundance Abundances from a simulation built with [as_miasim()]: a vector with one value per
 #'   taxon, or a matrix with taxa as rows (as `SummarizedExperiment::assay()` of miaSim's result).
+#' @param growth The `growth` given to [as_miasim()].
 #' @return The same, multiplied by [crm_scale()].
 #' @export
-crm_unscale <- function(x, abundance) {
-    scale <- crm_scale(x)
+crm_unscale <- function(x, abundance, growth = c("measured", "phase_floor")) {
+    scale <- crm_scale(x, match.arg(growth))
     if (is.matrix(abundance)) {
         if (nrow(abundance) != length(scale)) {
             stop_foodnet("abundance needs one row per taxon (", length(scale), "), as assay() of miaSim's result; ",
@@ -214,6 +227,22 @@ crm_unscale <- function(x, abundance) {
     }
     if (length(abundance) != length(scale)) stop_foodnet("abundance needs one value per taxon (", length(scale), ")")
     abundance * scale
+}
+
+# The growth rates a simulation uses, and a warning for any below its phase's own mean rate.
+#' @noRd
+crm_growth <- function(x, growth = "measured") {
+    rates <- x$growth_rates
+    phase <- x$phase_growth_rates
+    if (is.null(phase)) return(rates)
+    slow <- !is.na(phase) & !is.na(rates) & phase > 1.1 * rates
+    if (growth == "phase_floor") return(ifelse(slow, phase, rates))
+    if (any(slow)) {
+        warning("growth rate below the phase's own mean rate for ", paste(names(rates)[slow], collapse = ", "),
+                " (a fitted window took in the plateau); such a taxon grows too slowly in a simulation. ",
+                "growth = \"phase_floor\" uses the phase's mean rate there.", call. = FALSE)
+    }
+    rates
 }
 
 #' Keep some taxa (and resources)
@@ -235,7 +264,8 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     for (name in c("consumed", "produced", "evidence_consumed", "evidence_produced")) {
         x[[name]] <- x[[name]][keep_t, keep_r, drop = FALSE]
     }
-    for (name in c("growth_rates", "biomass_change", "biomass_start", "biomass_unit", "phase_hours")) {
+    for (name in c("growth_rates", "biomass_change", "biomass_start", "biomass_unit", "phase_hours",
+                   "phase_growth_rates")) {
         x[[name]] <- x[[name]][keep_t]
     }
     x$initial <- x$initial[keep_r]
@@ -314,6 +344,7 @@ crm_write <- function(x, dir) {
 #' @param missing_resource A starting concentration for the resources that have none, or `NULL` to stop.
 #' @param allow Caveats to accept: `"mixed_media"`, `"stationary_phase"`.
 #' @param na What [crm_efficiency()] does with NA cells: `"stop"` (the default) or `"zero"`.
+#' @param growth `"measured"` or `"phase_floor"`: the growth rates, as in [crm_scale()].
 #' @return A list with `n_species`, `n_resources`, `names_species`, `names_resources`, `E`, `x0`,
 #'   `resources`, `growth_rates` and `monod_constant`.
 #' @examples
@@ -325,8 +356,9 @@ crm_write <- function(x, dir) {
 #' }
 #' @export
 as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource = NULL,
-                      allow = character(), na = c("stop", "zero")) {
+                      allow = character(), na = c("stop", "zero"), growth = c("measured", "phase_floor")) {
     na <- match.arg(na)
+    growth <- match.arg(growth)
     stopifnot(inherits(x, "foodnet_crm"))
     if (x$caveats$mixed_media && !"mixed_media" %in% allow) {
         stop_foodnet("these values pool every medium (Ignore media differences): their starting concentrations ",
@@ -352,6 +384,7 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     if (!identical(dim(K), c(n, m)) || anyNA(K)) stop_foodnet("monod_constant needs one number or a ", n, " by ",
                                                              m, " matrix")
     rates <- crm_rates(x, missing = missing_rate)
+    if (growth == "phase_floor") rates <- pmax(rates, x$phase_growth_rates, na.rm = TRUE)
     if (anyNA(rates)) {
         stop_foodnet("no growth rate for ", paste(names(rates)[is.na(rates)], collapse = ", "),
                      ": a CRM simulation needs one for every taxon. Give as_miasim(x, missing_rate = ) a ",
@@ -367,8 +400,8 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
                 "them)", call. = FALSE)
     }
     if (is.null(E)) {
-        E <- crm_efficiency(x, na = na)
-        x0 <- as.numeric(x0) / crm_scale(x)       # into each taxon's own unit (crm_scale)
+        E <- crm_efficiency(x, na = na, growth = growth)
+        x0 <- as.numeric(x0) / crm_scale(x, growth)       # into each taxon's own unit (crm_scale)
     }
     list(n_species = n, n_resources = m, names_species = x$taxa, names_resources = x$resources, E = E,
          x0 = unname(as.numeric(x0)), resources = unname(resources), growth_rates = unname(rates),
@@ -388,6 +421,7 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
 #' @param monod_constant Monod constants in mM: one number, or a taxa by resources matrix.
 #' @param missing_resource A starting concentration for resources with none (default 0).
 #' @param na What [crm_efficiency()] does with NA cells: `"stop"` (the default) or `"zero"`.
+#' @param growth `"measured"` or `"phase_floor"`: the growth rates, as in [crm_scale()].
 #' @return A data frame: taxon, what (`"biomass"`, `"hours to grow"`, or a resource), direction, measured,
 #'   simulated and their ratio. Biomass is in each growth curve's unit.
 #' @examples
@@ -395,15 +429,18 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
 #' crm_backcheck(crm, monod_constant = 1, na = "zero")
 #' }
 #' @export
-crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop", "zero")) {
+crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop", "zero"),
+                          growth = c("measured", "phase_floor")) {
     na <- match.arg(na)
+    growth <- match.arg(growth)
     stopifnot(inherits(x, "foodnet_crm"))
     if (!requireNamespace("miaSim", quietly = TRUE)) {
         stop_foodnet("crm_backcheck() runs miaSim: install it with BiocManager::install(\"miaSim\")")
     }
     if (missing(monod_constant)) stop_foodnet("give monod_constant, in mM; foodnet measures none")
-    E <- crm_efficiency(x, na = na)
-    scale <- crm_scale(x)
+    E <- crm_efficiency(x, na = na, growth = growth)
+    scale <- crm_scale(x, growth)
+    mu <- suppressWarnings(crm_growth(x, growth))
     n <- length(x$taxa)
     m <- length(x$resources)
     K <- if (length(monod_constant) == 1) matrix(monod_constant, n, m) else as.matrix(monod_constant)
@@ -422,7 +459,7 @@ crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop"
         tse <- miaSim::simulateConsumerResource(
             n_species = 1, n_resources = m, names_species = taxon, names_resources = x$resources,
             E = E[i, , drop = FALSE], x0 = x0 / scale[[i]], resources = unname(start),
-            growth_rates = x$growth_rates[[taxon]], monod_constant = K[i, , drop = FALSE],
+            growth_rates = mu[[taxon]], monod_constant = K[i, , drop = FALSE],
             t_end = (steps + 1) * 0.1, t_store = steps + 1)
         abundance <- SummarizedExperiment::assay(tse)[1, ] * scale[[i]]
         times <- SummarizedExperiment::colData(tse)$time

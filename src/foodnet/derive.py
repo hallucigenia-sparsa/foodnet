@@ -499,6 +499,7 @@ def _units(valued, cultures) -> tuple:
 
 AMOUNTS_DIFFER = 2.0           # experiments agreeing in direction whose means differ more than this factor
 STILL_SHARE = 0.25             # still_changing: the change right after growth slowed is this share of the phase's
+START_SHARE = 0.25             # start_differs: replicates' starts differ by more than this share of the phase
 
 
 def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, limits: dict | None = None) -> dict:
@@ -611,8 +612,15 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
         test = paired(units, [0.0] * len(units))
         if len(values) == 1:
             cautions.add("single_replicate")
-        if k in (1, -1) and agree and any(len(per_exp[e]) == 2 for e in used if classes.get(e) == k):
-            # decided on a pair, which errs more readily than three or more replicates (a fifth review round)
+        starts = [r["start"] for r in valued if r.get("start") is not None]
+        lengths = [r["end"] - r["start"] for r in valued if r.get("start") is not None and r.get("end") is not None]
+        if starts and lengths and max(starts) - min(starts) > START_SHARE * statistics.mean(lengths):
+            # replicates whose metabolite series start later cover less of the phase (E. coli LF82: two of five
+            # replicates have no 0 h sample, so their exponential values run from 4 h; a final review round)
+            cautions.add("start_differs")
+        if k in (1, -1, 0) and agree and any(len(per_exp[e]) == 2 for e in used if classes.get(e) == k):
+            # decided on a pair, which errs more readily than three or more replicates, a change or a zero
+            # alike (a pair inside the limit is a false zero more often than a triplicate)
             cautions.add("pair_decided")
         if test and test.get("no_variance"):
             cautions.add("no_variance")

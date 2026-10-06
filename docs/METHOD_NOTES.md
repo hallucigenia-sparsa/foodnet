@@ -191,6 +191,11 @@ with metabolite data."
     `as_miasim()` requires starting abundances and Monod constants (miaSim would draw them at random) and
     refuses pooled media and the stationary phase unless allowed. 0.1.0's uptake shares remain as
     `scale = "shares"`.
+    A final round found E. coli LF82's fitted rate (easylinear, 0.375 per hour) below the mean rate its own
+    curves show over the phase (0.65): the fitting window took in the plateau of a fast, sparsely sampled
+    curve, and a simulation grew it at half speed. The payload carries each taxon's phase mean rate, the page
+    and R warn when it exceeds the fitted rate, and `growth = "phase_floor"` uses it there; the default stays
+    the fitted rate (grownet's method, Karoline's choice of 2026-10-04).
 27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
     this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
     be read says `incomplete` in its files and the command line exits 3; the page never serves another
@@ -208,7 +213,9 @@ with metabolite data."
   be false; the q-values are reported, not used to decide.
 - **Pairs err more readily than triplicates.** A pair decides when both replicates lie beyond the limit, with
   no estimate of noise: on noisy data (a standard deviation of 1 mM) about a third of pair-decided arcs on a
-  true zero are false, against about one in seven for three replicates. Such values carry `pair_decided`.
+  true zero are false, against about one in seven for three replicates, and a real change of 0.3 mM is read
+  as no change about one time in sixteen (one in seventy for three). Such values, changes and zeros alike,
+  carry `pair_decided`; a matrix 0 with that caution in cautions.csv rests on two replicates.
   Identical replicates count as one only within twice the limit, so 0.39 mM three times is inconclusive and
   0.41 mM three times is a change.
 - **The exponential phase can miss a slow-down.** Where the growth rate ends growth early (E. coli LF82),

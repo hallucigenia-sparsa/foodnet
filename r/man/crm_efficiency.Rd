@@ -3,12 +3,13 @@
 \alias{crm_efficiency}
 \title{The efficiency matrix of a consumer-resource model}
 \usage{
-crm_efficiency(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero"))
+crm_efficiency(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero"), growth = c("measured", "phase_floor"))
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
 \item{scale}{\code{"miasim"}, \code{"shares"} or \code{"none"}, as above.}
 \item{na}{\code{"stop"} or \code{"zero"}, as above.}
+\item{growth}{\code{"measured"} (the default): the growth rates as foodnet fitted them. \code{"phase_floor"}: at least the mean rate each taxon's own curves show over the phase (see \code{\link{crm_scale}}).}
 }
 \value{A numeric matrix, taxa by resources.}
 \description{

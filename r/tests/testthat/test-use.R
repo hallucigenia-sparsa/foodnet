@@ -109,3 +109,15 @@ test_that("a taxon simulated alone gains its biomass and makes its by-products w
     expect_gt(hours, 3)
     expect_lt(hours, 12)
 })
+
+test_that("a growth rate below the phase's own mean rate is named, and can be floored", {
+    payload <- example_payload()
+    payload$growth_rates <- list(0.4, 0.5)
+    payload$phase_growth_rates <- list(0.8, 0.5)          # A's curves grew faster over the phase than its rate
+    crm <- foodnet:::as_foodnet_crm(payload)
+    expect_warning(crm_scale(crm), "below the phase's own mean rate for A")
+    expect_equal(unname(crm_scale(crm, "phase_floor")), c(2 * 8 / (0.8 * 64), 1 * 8 / (0.5 * 40)))
+    args <- suppressWarnings(as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, na = "zero",
+                                       growth = "phase_floor"))
+    expect_equal(args$growth_rates, c(0.8, 0.5))
+})

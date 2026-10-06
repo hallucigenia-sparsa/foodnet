@@ -3,10 +3,11 @@
 \alias{crm_scale}
 \title{Each taxon's unit of abundance in a miaSim simulation}
 \usage{
-crm_scale(x)
+crm_scale(x, growth = c("measured", "phase_floor"))
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
+\item{growth}{\code{"measured"} or \code{"phase_floor"}, as above.}
 }
 \value{A named numeric vector, one per taxon.}
 \description{
@@ -16,4 +17,10 @@ change over the phase, \code{mu} its growth rate, \code{C} its total uptake in m
 its uptakes of each resource. In this unit miaSim's fixed uptake (1 mM per unit per hour at saturation) makes the taxon
 grow at its measured rate with its measured yield. Divide starting abundances by it (\code{\link{as_miasim}} does)
 and multiply simulated ones by it (\code{\link{crm_unscale}}).
+
+The growth rate in it is foodnet's fitted maximum rate, or with \code{growth = "phase_floor"} at least the
+mean rate the taxon's own curves show over the phase. A maximum below that mean cannot be right: it comes
+from a fitting window that took in the plateau of a fast, sparsely sampled curve (E. coli LF82: 0.375
+fitted against 0.65 per hour over its phase), and it would grow the taxon too slowly. Such taxa are named in
+a warning.
 }

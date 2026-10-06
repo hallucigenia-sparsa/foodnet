@@ -221,3 +221,17 @@ def test_repeats_of_one_protocol_that_differ_by_more_than_rounding_are_not_one_d
     a = _culture("E1", [27.5, 14.0, 5.0, 0.0], times=(0, 8, 24, 48))
     b = _culture("E2", [27.5, 14.1, 5.02, 0.0], study="S2", times=(0, 8, 24, 48))
     assert derive.duplicates([a, b]) == (set(), [])
+
+
+def test_a_zero_decided_on_a_pair_is_flagged_too():
+    cultures = [_culture("E1", [0, 1, 2, 3]), _culture("E1", [0, 1, 2, 3])]
+    cell = derive.pool(_rows([(0, 0.15), (1, 0.18)]), cultures, 0.2)[("t1", "x", "exponential")]
+    assert cell["state"] == "no_change" and "pair_decided" in cell["cautions"]
+
+
+def test_replicates_that_start_far_apart_are_flagged():
+    cultures = [_culture("E1", [0, 1, 2, 3]) for _ in range(3)]
+    rows = _rows([(0, 1.0), (1, 1.1), (2, 0.9)])
+    rows[2]["start"] = 4                       # one replicate's first sample is at 4 h of a 0 to 12 h phase
+    cell = derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]
+    assert "start_differs" in cell["cautions"]

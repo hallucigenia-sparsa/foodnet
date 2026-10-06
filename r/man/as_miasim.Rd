@@ -3,7 +3,7 @@
 \alias{as_miasim}
 \title{Shape the parameters for miaSim}
 \usage{
-as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource = NULL, allow = character(), na = c("stop", "zero"))
+as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource = NULL, allow = character(), na = c("stop", "zero"), growth = c("measured", "phase_floor"))
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
@@ -14,6 +14,7 @@ as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource
 \item{missing_resource}{A starting concentration for the resources that have none, or \code{NULL} to stop.}
 \item{allow}{Caveats to accept: \code{"mixed_media"}, \code{"stationary_phase"}.}
 \item{na}{What \code{\link{crm_efficiency}} does with NA cells: \code{"stop"} (the default) or \code{"zero"}.}
+\item{growth}{\code{"measured"} or \code{"phase_floor"}: the growth rates, as in \code{\link{crm_scale}}.}
 }
 \value{A list with \code{n_species}, \code{n_resources}, \code{names_species}, \code{names_resources}, \code{E}, \code{x0}, \code{resources}, \code{growth_rates} and \code{monod_constant}.}
 \description{

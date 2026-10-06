@@ -358,6 +358,8 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     biomass = crm.biomass_changes([(i, cultures[i]) for i in sorted(chosen)], value_rows, crm_ph)
     if s["merge_genera"]:
         biomass = {}            # strains of one genus grow in units and to densities that do not average
+    slow = sorted(taxa[t]["name"] for t, b in biomass.items() if t in organism_rates and t in taxa
+                  and b.get("phase_rate") and b["phase_rate"] > 1.1 * organism_rates[t]["rate"])
     net.meta["initial_concentrations_mM"] = {k: round(v["mean"], 6) for k, v in initial.items()}
 
     second_info = None if not second else {**second, "metabolites": second_mids, "label": second_window_label(second),
@@ -368,6 +370,13 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     warnings = _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown_in,
                          not selecting.empty(selection))
     warnings += _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window)
+    if slow:
+        # a maximum rate below the mean over the phase cannot be right (a final review round: E. coli LF82,
+        # 0.375 per hour fitted against 0.65 over its phase)
+        warnings.append("The growth rate of " + ", ".join(slow) + " is below the mean rate its own curves show over "
+                        "the phase: the fitted window took in its plateau (fast growth, sparse samples), so a model "
+                        "would grow it too slowly. In R, as_miasim(growth = \"phase_floor\") uses the phase's mean "
+                        "rate where it is higher.")
     if unknown_limits:
         warnings.append("Detection limits of their own name " + ", ".join(unknown_limits) + ", which no culture of "
                         "these taxa measured; check the spelling (the report lists every metabolite read).")

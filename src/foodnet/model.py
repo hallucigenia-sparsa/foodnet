@@ -47,7 +47,8 @@ CAUTIONS = (
     "experiment_left_out",     # an inconclusive experiment that does not contradict the others is left out
     "still_changing",          # the compound kept changing beyond the limit right after growth slowed
     "growth_rate_boundary",    # the growth-rate rule ended growth more than one sample before the 90% rule
-    "pair_decided",            # an experiment of two replicates decided it: both beyond the limit, no interval
+    "start_differs",           # the replicates' windows start more than a quarter of the phase apart
+    "pair_decided",            # an experiment of two replicates decided it (a change or no change), no interval
 )
 
 # words before a genus that are not a genus (the same rule as grownet)

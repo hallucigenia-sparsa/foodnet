@@ -92,6 +92,7 @@ as_foodnet_crm <- function(payload) {
              biomass_start = per_taxon("biomass_start"),
              biomass_unit = units,
              phase_hours = per_taxon("phase_hours"),
+             phase_growth_rates = per_taxon("phase_growth_rates"),
              phase = chr(payload$phase),
              values = chr(payload$values, "mM"),
              detection_limit = as_number(payload$detection_limit_mM),
@@ -179,7 +180,7 @@ print.foodnet_crm <- function(x, ...) {
         cat(paste0("   * ", x$caveats$warnings, "\n"), sep = "")
     }
     flagged <- x$caveats$cautions
-    if (nrow(flagged)) {
+    if (NROW(flagged)) {
         moving <- flagged[grepl("still_changing", flagged$cautions), , drop = FALSE]
         if (nrow(moving)) {
             named <- paste(moving$taxon, moving$resource)
@@ -188,6 +189,13 @@ print.foodnet_crm <- function(x, ...) {
                         if (length(named) > 6) paste0(" and ", length(named) - 6, " more") else ""))
         }
         cat(sprintf("   * %d value(s) carry cautions: x$caveats$cautions lists them.\n", nrow(flagged)))
+    }
+    phase <- x$phase_growth_rates
+    slow <- if (is.null(phase)) character(0) else
+        names(phase)[!is.na(phase) & !is.na(x$growth_rates) & phase > 1.1 * x$growth_rates]
+    if (length(slow)) {
+        cat(sprintf("   * growth rate below the phase's own mean rate for %s: as_miasim(growth = \"phase_floor\")\n",
+                    paste(slow, collapse = ", ")))
     }
     single <- count_evidence(x, "single_replicate")
     if (single) {

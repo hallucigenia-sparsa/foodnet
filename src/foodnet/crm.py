@@ -21,6 +21,7 @@ the same phase its metabolites were measured over, in the unit of its growth cur
 """
 from __future__ import annotations
 
+import math
 import statistics
 from collections import defaultdict
 
@@ -126,7 +127,11 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         units = [f["unit"] for f in found]
         unit = max(sorted(set(units)), key=units.count)
         same = [f for f in found if f["unit"] == unit]
-        out[taxon] = {"change": statistics.mean(f["change"] for f in same),
-                      "start": statistics.mean(f["start"] for f in same), "unit": unit,
-                      "hours": statistics.mean(f["hours"] for f in same), "n": len(same)}
+        start = statistics.mean(f["start"] for f in same)
+        change = statistics.mean(f["change"] for f in same)
+        hours = statistics.mean(f["hours"] for f in same)
+        out[taxon] = {"change": change, "start": start, "unit": unit, "hours": hours, "n": len(same),
+                      # the mean specific growth rate over the phase: a maximum rate below it cannot be right
+                      "phase_rate": (math.log((start + change) / start) / hours
+                                     if start > 0 and start + change > 0 and hours > 0 else None)}
     return out

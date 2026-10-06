@@ -3,11 +3,12 @@
 \alias{crm_unscale}
 \title{A simulation's abundances in each taxon's growth curve unit}
 \usage{
-crm_unscale(x, abundance)
+crm_unscale(x, abundance, growth = c("measured", "phase_floor"))
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
 \item{abundance}{Abundances from a simulation built with \code{\link{as_miasim}}: a vector with one value per taxon, or a matrix with taxa as rows (as \code{SummarizedExperiment::assay()} of miaSim's result).}
+\item{growth}{The \code{growth} given to \code{\link{as_miasim}}.}
 }
 \value{The same, multiplied by \code{\link{crm_scale}}.}
 \description{
