@@ -1,5 +1,5 @@
 """The image of the two matrices (Karoline, 2026-10-04: "as the first result, generate and show a downloadable
-image of the 2 matrices (as in Figure 3c)")."""
+image of the 2 matrices")."""
 import xml.etree.ElementTree as ET
 
 from conftest import run

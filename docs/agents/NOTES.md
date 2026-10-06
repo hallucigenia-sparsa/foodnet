@@ -15,15 +15,14 @@ gate applies.
   the parallel prefetch, the species list, selection, rates, stats, the page frame, the Cytoscape transport,
   the R transport, the gate and the packaging. The derivation, the model, the matrices, the page content,
   the legend, the help and the R package's content are new.
-- Checked against Figure 3c of the community control paper (the comparison lives with the paper, not here,
-  since the figure is unpublished). State at the end of 2026-10-05: with studies 2, 4, 7 and 9 in the second
+- Checked against a hand-checked pair of consumption and production matrices (the reference and the
+  comparison live outside this repository, since they are unpublished). State at the end of 2026-10-05: with studies 2, 4, 7 and 9 in the second
   box, a 0 to 48 h window and trehalose in the second window, 106 of 108 cells agree as booleans and every
   value of four of the five Wilkins-Chalgren species matches to three decimals. The two remaining cells are
-  R. intestinalis acetate and lactate uptake, which the figure measures from each compound's peak to the end
-  of the run (a window foodnet deliberately does not offer); R. intestinalis values differ because the figure
-  counts a duplicate deposit twice. The comparison found three errors in the figure, all corrected on the
-  paper's side: the two peak-to-end windows were undocumented, and F. duncaniae acetate production had a
-  circle the data do not support.
+  R. intestinalis acetate and lactate uptake, which the reference measures from each compound's peak to the
+  end of the run (a window foodnet deliberately does not offer). The comparison found errors in the
+  reference, all corrected there: a duplicate deposit counted twice, two undocumented peak-to-end windows,
+  and an F. duncaniae acetate production the data do not support.
 - Verified live on 2026-10-04: the page (search, Example, CRM mode, every download), Send to Cytoscape against
   Cytoscape 3.10.3 (node shapes and sizes by kind, arc colors, dashes, widths and phase transparency read back
   from the view), and Send to R through miaSim's `simulateConsumerResource` on the test-case taxa. miaSim
@@ -40,12 +39,12 @@ gate applies.
   `search.run_query` reads every study of the taxa only when the box holds a medium (it cannot know the
   matching studies before reading), and only the named studies when it holds ids alone. Refined the same
   day: ids are the scope, a medium name the value medium inside it, and with ids alone the majority rule
-  runs inside the scope (rule `majority_in_scope`); this reproduces Figure 3c from studies 2, 4, 7 and 9.
+  runs inside the scope (rule `majority_in_scope`); this reproduces the reference from studies 2, 4, 7, 9.
 
 - 2026-10-05 (Karoline): a second time window for named metabolites (`second_window_*` settings,
   `derive.changes(second=...)`); their cells have phase "window" and `matrix.columns` gives each metabolite
   only the phases it has, labeled by `matrix.interval` when intervals differ. Reproduces every trehalose
-  value of Figure 3c (studies 2, 4, 7, 9; 0 to 48 h; trehalose to the last sample).
+  value of the reference (studies 2, 4, 7, 9; 0 to 48 h; trehalose to the last sample).
 
 ## Things learned about mGrowthDB while building
 

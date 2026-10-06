@@ -30,8 +30,8 @@ def test_the_help_renders_with_the_token_in_the_style_link():
 
 
 def test_the_texts_users_read_name_no_particular_figure():
-    # Karoline, 2026-10-06: "please remove the figure 3c reference from the advanced settings. we used this
-    # tool for checking that figure, but it's a generic tool"
+    # Karoline, 2026-10-06: the advanced settings named the figure the tool was checked against, "but it's a
+    # generic tool"
     from pathlib import Path
 
     from foodnet import gui
@@ -39,4 +39,4 @@ def test_the_texts_users_read_name_no_particular_figure():
     texts = [gui.render_form("T"), help_page.render_help("T", DEFAULTS, ("A",)), help_page.render_about(),
              (root / "README.md").read_text(encoding="utf-8"), (root / "r" / "README.md").read_text(encoding="utf-8")]
     for text in texts:
-        assert "figure 3" not in text.lower() and "community control" not in text.lower()
+        assert "figure 3" not in text.lower() and "paper" not in text.lower()

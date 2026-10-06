@@ -1,7 +1,6 @@
-"""The consumed and produced matrices as one image, in the style of Figure 3c of the community control paper.
+"""The consumed and produced matrices as one image, in the style of the hand-checked reference matrices.
 
-Karoline, 2026-10-04: "as the first result, generate and show a downloadable image of the 2 matrices (as in
-Figure 3c)". An SVG drawn with the standard library, so the tool keeps no runtime dependencies; it opens in
+Karoline, 2026-10-04: "as the first result, generate and show a downloadable image of the 2 matrices". An SVG drawn with the standard library, so the tool keeps no runtime dependencies; it opens in
 a browser and imports into Inkscape, Illustrator and PowerPoint.
 
 The cell states are the figure's, and there are exactly these:

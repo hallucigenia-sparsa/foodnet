@@ -36,7 +36,7 @@ from . import selection as selecting
 from .model import genus_name
 from .stats import CORRECTIONS, paired
 
-DETECTION_LIMIT = 0.2          # mM; Figure 3c of the community control paper, where the data break
+DETECTION_LIMIT = 0.2          # mM; where the data of the hand-checked reference matrices break
 PHASE_CHOICES = ("exponential", "stationary", "both")
 PRODUCED, CONSUMED = "produced", "consumed"
 MEASURED, PRESENCE_ONLY = "measured", "presence_only"
@@ -110,7 +110,7 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
 
     `second` is the second window, {"names", "start", "end"} with `end` None for "until the last sample":
     the metabolites it names take it instead of the phases or the main window (Karoline, 2026-10-05, for
-    trehalose, which Figure 3c measures over the whole run). Their rows carry phase "window" and
+    trehalose, which the hand-checked reference measures over the whole run). Their rows carry phase "window" and
     "second": True."""
     rows, skipped = [], []
     bounds, skips = boundaries(cultures, fraction, factor, spike_factor)

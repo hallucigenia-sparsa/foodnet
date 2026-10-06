@@ -152,10 +152,10 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     read = read_cultures(client, studies, keep, excluded_metabolites, s["include_non_batch"], progress=say)
     cultures, skipped = read["cultures"], list(read["skipped"])
     grown_in = sorted({c.medium or "unnamed medium" for c in cultures})   # for the "nothing matched" note
-    # Two questions, kept apart (Karoline, 2026-10-05, reproducing Figure 3c from four study ids and
+    # Two questions, kept apart (Karoline, 2026-10-05, reproducing a hand-checked reference from four ids and
     # Wilkins-Chalgren): ids set the SCOPE, the data looked at; a medium name chooses the VALUE MEDIUM
     # within it. Without a medium name the majority rule runs inside the scope, so the scope's other media
-    # give presence, as in the figure. A medium name alone is a scope as well.
+    # give presence, as in the reference. A medium name alone is a scope as well.
     ids = {"studies": selection["studies"], "experiments": selection["experiments"], "media": []}
     media = {"studies": [], "experiments": [], "media": selection["media"]}
     scope = ids if not selecting.empty(ids) else media

@@ -242,8 +242,8 @@ def test_study_ids_with_outside_evidence_read_the_other_studies_too(client):
 
 
 def test_ids_set_the_scope_and_the_majority_rule_runs_inside_it(client):
-    # Karoline, 2026-10-05, reproducing Figure 3c from four study ids: the ids say which data, and within them
-    # the majority medium gives the values while the other media give presence, as in the figure
+    # Karoline, 2026-10-05, reproducing a hand-checked reference from four study ids: the ids say which data,
+    # and within them the majority medium gives the values while the other media give presence
     r = run(client, conditions="SMGDB00000001\nSMGDB00000002")
     assert r["value_rule"]["rule"] == "majority_in_scope"
     assert r["value_rule"]["keys"] == ["wilkins chalgren anaerobe broth"]

@@ -32,8 +32,8 @@ with metabolite data."
    times than the cells), never extrapolated past the last sample (`window_beyond_data`). Averaged over
    replicates. The split into phases replaces the need for a two-phase rule: "it does not produce/consume in
    parallel but sequentially" (Karoline, on R. intestinalis).
-4. **The detection limit is 0.2 mM**, an advanced setting, applied to the mean change (Figure 3c of the
-   community control paper, where the data break).
+4. **The detection limit is 0.2 mM**, an advanced setting, applied to the mean change (where the data of the
+   hand-checked reference matrices break).
 5. **Short records are used and flagged.** Karoline: "If metabolites are recorded for less than 24h, they
    are still being used but there should be a warning about it."
 6. **The value medium.** Karoline: "It should be the medium that supplies data for most of the taxa,
@@ -71,7 +71,7 @@ with metabolite data."
     but in advanced settings, we can switch on showing supporting evidence from other studies. By default,
     when the 2nd field is left empty, always all data are considered as discussed." The growth-rate fallback
     stays inside the limit too. Refined the same day, when four study ids pooled mMCB into the Wilkins-Chalgren
-    values while reproducing Figure 3c: ids set the scope (which data), a medium name the value medium within
+    values while reproducing the hand-checked reference: ids set the scope (which data), a medium name the value medium within
     it, and with ids alone the majority rule runs inside the scope, its other media giving presence.
 14. **A second time window for named metabolites.** Karoline, 2026-10-05: "to include the different time
     window for trehalose ... I'd like to avoid a table where each metabolite gets 1 time window. perhaps 2
@@ -79,7 +79,7 @@ with metabolite data."
     instead of the phases or the main window; an empty end is each culture's last sample. Names match the
     metabolite or the name its study recorded it under. Columns, the image, the README and the report say
     which interval each value covers. With 0 to 48 h and trehalose to the end, every trehalose value of
-    Figure 3c is reproduced.
+    the hand-checked reference is reproduced.
 15. **Values are used as mGrowthDB serves them, zeros included.** Karoline, 2026-10-05, on the isolated
     zeros in study SMGDB00000009 (B. fragilis formate at 4 h and 48 h): there is no reason to treat a zero
     as a missing value. Formerly open decision 3.
