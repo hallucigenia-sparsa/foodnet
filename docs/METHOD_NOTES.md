@@ -196,6 +196,17 @@ with metabolite data."
     curve, and a simulation grew it at half speed. The payload carries each taxon's phase mean rate, the page
     and R warn when it exceeds the fitted rate, and `growth = "phase_floor"` uses it there; the default stays
     the fitted rate (grownet's method, Karoline's choice of 2026-10-04).
+28. **A culture without an end of exponential growth gives its change over the whole run.** Karoline,
+    2026-10-06 ("the physiologist proposal sounds like a good answer"; "In the phase column, marked"). The
+    growth curve only places the boundary between the phases; it is no claim that cultures metabolize only
+    while growing. A culture with no boundary (one read as not grown, which an optical density without its
+    blank does to five Db-MM taxa of study SMGDB00000010 that made 4 to 6 mM butyrate, or one without any
+    growth curve) now gives the change from its first to its last metabolite sample, in the column of the
+    phase asked for (with Both, the exponential column; the stationary one says `no_phase`), with the
+    evidence and caution `whole_run`, arcs in phase `whole_run`, and a dashed frame in the image. Where any
+    culture of a cell has a phase value, the whole-run changes of the others are left out of it and named.
+    Whole-run values do not vote for the value medium. The CRM takes them, and its caveats name these taxa,
+    since stationary uptake is in their values.
 27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
     this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
     be read says `incomplete` in its files and the command line exits 3; the page never serves another

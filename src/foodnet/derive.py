@@ -179,10 +179,14 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                 end = second["end"] if second.get("end") is not None else series[-1][0]
                 windows = phases.phase_windows(series, None, phase, (second.get("start") or 0.0, end))
             elif window is None and boundary is None:
-                # assayed, but the culture gives no phase: a row without a value says so, so the matrices
-                # write no_phase rather than not_assayed
-                windows = {ph: (None, None, ["no_phase"]) for ph in
-                           (("exponential", "stationary") if phase == "both" else (phase,))}
+                # no end of exponential growth (a culture read as not grown, as unblanked OD can make it, or no
+                # growth curve at all): the change over the whole run, in the column of the phase asked for and
+                # marked whole_run, rather than nothing (Karoline, 2026-10-06). With Both it fills the
+                # exponential column and the stationary one says no_phase
+                column = "stationary" if phase == "stationary" else "exponential"
+                windows = {column: (series[0][0], series[-1][0], ["whole_run"])}
+                if phase == "both":
+                    windows["stationary"] = (None, None, ["no_phase"])
             else:
                 windows = phases.phase_windows(series, boundary, phase, window)
             for name, (start, end, cautions) in windows.items():
@@ -527,6 +531,14 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
     for key, members in groups.items():
         lim = limits.get(key[1], limit)
         valued = [r for r in members if r["change"] is not None]
+        whole = [r for r in valued if "whole_run" in r["cautions"]]
+        whole_note = None
+        if whole and len(whole) < len(valued):
+            # a phase value where any culture has one; the whole-run changes of the others do not mix in
+            valued = [r for r in valued if "whole_run" not in r["cautions"]]
+            members = [r for r in members if "whole_run" not in r["cautions"]]
+            whole_note = ("left out, as their change spans the whole run: " + ", ".join(sorted(
+                {cultures[r["culture"]].experiment_name or cultures[r["culture"]].experiment for r in whole})))
         cautions = set(c for r in members for c in r["cautions"])
         experiments = sorted({cultures[r["culture"]].experiment for r in members})
         studies = sorted({cultures[r["culture"]].study for r in members})
@@ -624,7 +636,10 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
             cautions.add("pair_decided")
         if test and test.get("no_variance"):
             cautions.add("no_variance")
+        if whole_note:
+            notes.append(whole_note)
         cells[key] = {"mean": mean, "sd": sd, "n": len(values), "n_experiments": len(used), "values": values,
+                      "whole_run": "whole_run" in cautions,
                       "direction": PRODUCED if k == 1 else CONSUMED if k == -1 else None, "state": STATE[k],
                       "experiments": experiments, "studies": studies, "media": media, "cautions": sorted(cautions),
                       "notes": notes, "start": statistics.mean(r["start"] for r in valued),
@@ -653,7 +668,8 @@ def presence(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True,
         out[(taxon, met, ph)][cell["direction"]].append({
             "medium": cultures[members[0]["culture"]].medium, "mean": cell["mean"], "n": cell["n"],
             "studies": cell["studies"], "experiments": cell["experiments"],
-            "exponential_h": cell["exponential_h"], "cautions": cell["cautions"]})
+            "exponential_h": cell["exponential_h"], "cautions": cell["cautions"],
+            "whole_run": cell.get("whole_run", False)})
     return {k: dict(v) for k, v in out.items()}
 
 
@@ -687,7 +703,7 @@ def _presence_arc(taxon, met, ph, direction, entries, value_cell) -> dict:
     cautions = sorted({x for e in entries for x in e["cautions"]} & {
         "short_record", "window_beyond_data", "stationary_not_reached", "single_replicate", "coarse_sampling",
         "boundaries_differ", "phase_from_other_replicates", "no_variance", "amounts_differ", "still_changing",
-        "experiment_left_out"})
+        "experiment_left_out", "whole_run"})
     notes = [f"seen in {e['medium']} ({e['mean']:+.2f} mM over {e['n']} replicate(s)); another medium than the "
              "values come from, so only its direction counts" for e in entries]
     if value_cell is not None and value_cell["n"]:
@@ -697,6 +713,8 @@ def _presence_arc(taxon, met, ph, direction, entries, value_cell) -> dict:
             cautions.append("not_detected_in_value_medium")
         else:
             notes.append(f"in the value medium it was {value_cell['direction']} instead")
+    if entries and all(e.get("whole_run") for e in entries):
+        ph = "whole_run"
     return {"taxon": taxon, "metabolite": met, "phase": ph, "direction": direction, "evidence": PRESENCE_ONLY,
             "amount": None, "change": None, "sd": None, "n": sum(e["n"] for e in entries),
             "n_experiments": len({x for e in entries for x in e["experiments"]}), "p_value": None,
@@ -706,6 +724,11 @@ def _presence_arc(taxon, met, ph, direction, entries, value_cell) -> dict:
             "study_ids": sorted({s for e in entries for s in e["studies"]}),
             "experiments": sorted({x for e in entries for x in e["experiments"]}),
             "cautions": sorted(set(cautions)), "notes": notes}
+
+
+def _arc_phase(ph: str, cell: dict) -> str:
+    """An arc's phase: the cell's, or whole_run when its change spans the whole run."""
+    return "whole_run" if cell.get("whole_run") else ph
 
 
 def arcs(value_cells: dict, presence_cells: dict, per_study_cells: dict | None = None,
@@ -720,13 +743,13 @@ def arcs(value_cells: dict, presence_cells: dict, per_study_cells: dict | None =
     if per_study_cells is None:
         for (taxon, met, ph), cell in value_cells.items():
             if cell["direction"]:
-                out.append(_measured_arc(taxon, met, ph, cell, booleans=booleans))
+                out.append(_measured_arc(taxon, met, _arc_phase(ph, cell), cell, booleans=booleans))
                 out[-1]["merged_arcs"] = len(cell["studies"])
     else:
         for study, cells in sorted(per_study_cells.items()):
             for (taxon, met, ph), cell in cells.items():
                 if cell["direction"]:
-                    out.append(_measured_arc(taxon, met, ph, cell, [study], booleans))
+                    out.append(_measured_arc(taxon, met, _arc_phase(ph, cell), cell, [study], booleans))
     for (taxon, met, ph), by_direction in presence_cells.items():
         value_cell = value_cells.get((taxon, met, ph))
         for direction, entries in by_direction.items():

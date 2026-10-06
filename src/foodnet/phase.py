@@ -27,8 +27,9 @@ E. coli later still and clipped a real one-sample peak. A boundary on fewer than
 which the arcs carry as the caution `coarse_sampling`.
 
 **A culture that did not grow** has no exponential phase. A rise below `NO_GROWTH_FACTOR` (1.5, grownet's
-default for the same question) gives no boundary, and its metabolites give no value in the phases: the
-matrices mark them `no_phase`, and a time window (which needs no boundary) gives them values.
+default for the same question) gives no boundary. An optical density read without its blank can do that to
+a culture that grew (study SMGDB00000010 starts near 0.7), so such a culture's metabolites give their change
+over the whole run instead, marked `whole_run` (Karoline, 2026-10-06), in the column of the phase asked for.
 
 **The change in a phase** is the metabolite concentration at the end of the phase minus the concentration
 at its start, from the metabolite's own series. The phases are:

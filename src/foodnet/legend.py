@@ -30,6 +30,7 @@ CAUTION_TEXT = {
     "experiment_left_out": "an inconclusive experiment that does not contradict the others is left out",
     "still_changing": "the compound kept changing right after growth slowed (a slow-down, or a second substrate)",
     "growth_rate_boundary": "growth ended where its rate fell, more than a sample before 90% of its maximum",
+    "whole_run": "no end of growth was found, so the change is over the whole run, not a phase",
     "start_differs": "the replicates' metabolite samples start apart, so they cover different stretches of the phase",
     "pair_decided": "decided on two replicates (a change, or no change); a pair errs more readily than three",
 }

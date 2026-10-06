@@ -92,7 +92,8 @@
             "enum": [
               "exponential",
               "stationary",
-              "window"
+              "window",
+              "whole_run"
             ]
           },
           "evidence": {
@@ -197,6 +198,7 @@
                 "experiment_left_out",
                 "still_changing",
                 "growth_rate_boundary",
+                "whole_run",
                 "start_differs",
                 "pair_decided"
               ]

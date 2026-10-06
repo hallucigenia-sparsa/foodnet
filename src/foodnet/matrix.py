@@ -21,8 +21,9 @@ The cell vocabulary, the same in every matrix:
 
 The evidence matrices of the pair say which, cell by cell (`EVIDENCE_WORDS`): measured, below_limit,
 single_replicate (a number or 0 that rests on one replicate; only when judging by the mean alone),
-seen_elsewhere (0 in the value medium, but another medium showed this direction), inconclusive, no_phase,
-presence_only, not_assayed.
+seen_elsewhere (0 in the value medium, but another medium showed this direction), whole_run (a number or 0
+over the whole run, for a culture without an end of exponential growth), inconclusive, no_phase, presence_only,
+not_assayed.
 
 With "Report everything as booleans" a number becomes 1 (or -1 in the signed matrix) and a presence-only
 cell counts as 1 too, since a boolean asks only whether it happened.
@@ -40,8 +41,8 @@ import zipfile
 from .model import FoodNetwork
 
 NA = "NA"
-EVIDENCE_WORDS = ("measured", "below_limit", "single_replicate", "seen_elsewhere", "inconclusive", "no_phase",
-                  "presence_only", "not_assayed")
+EVIDENCE_WORDS = ("measured", "below_limit", "whole_run", "single_replicate", "seen_elsewhere", "inconclusive",
+                  "no_phase", "presence_only", "not_assayed")
 # v1 (0.2.0): adds each taxon's biomass change over the phase, which miaSim's yields need, and the caveats
 # that make a CRM refuse to build without being told (mixed media, the stationary phase)
 CRM_FORMAT = "foodnet.crm/v1"
@@ -141,15 +142,18 @@ def entry(result: dict, taxon: str, met: str, ph: str, direction: str) -> tuple:
     booleans = _booleans(result)
     if cell is not None and cell["n"]:
         single = cell["n"] == 1        # decided on one replicate (Karoline, 2026-10-06): its own evidence
+        whole = cell.get("whole_run")  # the change over the whole run, without a phase boundary
         if cell["direction"] == direction:
-            return (1 if booleans else abs(cell["mean"])), ("single_replicate" if single else "measured")
+            return (1 if booleans else abs(cell["mean"])), ("whole_run" if whole else "single_replicate" if single
+                                                             else "measured")
         if cell.get("state") == "inconclusive":
             return None, "inconclusive"
         if seen and booleans:
             return 1, "presence_only"
         # measured in the value medium without a change this way: 0 there, whatever another medium showed,
         # and the evidence says when one did
-        return 0, ("seen_elsewhere" if seen else "single_replicate" if single else "below_limit")
+        return 0, ("seen_elsewhere" if seen else "whole_run" if whole else "single_replicate" if single
+                   else "below_limit")
     if seen:
         if booleans:
             return 1, "presence_only"
@@ -412,8 +416,9 @@ def readme(result: dict, which: str = "matrices") -> str:
               "",
               "NA is never zero. A cell is NA when the compound was not assayed for that taxon in the value "
               "medium; when it was assayed but is inconclusive (its replicates, or its experiments, do not agree "
-              "on what happened); when it was assayed but its cultures gave no phase (no end of "
-              "exponential growth, or no stationary phase)"
+              "on what happened); and in the stationary column when its cultures reached no stationary phase or had "
+              "no end of exponential growth (no_phase; the change over the whole run of the latter is in the "
+              "exponential column, marked whole_run)"
               + {"na": "; or when its change was seen only in another medium (presence only)",
                  "true": "; a change seen only in another medium is written TRUE (Advanced settings), "
                          "and its direction is the matrix it stands in",
@@ -548,6 +553,10 @@ def crm_payload(result: dict) -> dict:
                     # CRM from either unless told to
                     "mixed_media": result["value_rule"]["rule"] == "all",
                     "stationary_phase": ph == "stationary",
+                    # taxa whose values span the whole run (no end of exponential growth found): stationary
+                    # uptake is in them
+                    "whole_run": sorted({pair["taxa"][i] for i, t in enumerate(taxa) for m in mets
+                                         if (result["cells"].get((t.id, m.id, ph)) or {}).get("whole_run")}),
                     "incomplete": bool(result.get("errors")), "errors": list(result.get("errors") or []),
                     "warnings": list(result.get("warnings") or []),
                     # per value: what the evidence matrices cannot hold (cautions.csv in the zip)

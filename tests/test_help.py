@@ -21,7 +21,7 @@ def test_the_legend_names_every_value():
     for word in (*DIRECTIONS, *EVIDENCE, *CAUTIONS, "stationary", "exponential", "window"):
         assert word in svg, word
     assert set(legend.CAUTION_TEXT) == set(CAUTIONS)
-    assert set(PHASES) == {"exponential", "stationary", "window"}
+    assert set(PHASES) == {"exponential", "stationary", "window", "whole_run"}
 
 
 def test_the_help_renders_with_the_token_in_the_style_link():

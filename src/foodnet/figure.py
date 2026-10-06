@@ -17,6 +17,8 @@ The cell states are the figure's, and there are exactly these:
   * **a dash on pale green**: assayed, but its cultures gave no phase (no end of exponential growth, or no
     stationary phase reached), so there is no value in the phase asked for;
   * **a dot in the corner**: the cell rests on one replicate (single_replicate);
+  * **a dashed frame**: the change over the whole run, for a culture without an end of exponential growth
+    (whole_run; Karoline, 2026-10-06);
   * **an open circle**: the change was seen in another medium, drawn on white (the value medium measured no
     change: seen_elsewhere) or on orange (presence only).
 
@@ -128,7 +130,9 @@ def tooltip(result: dict, taxon, met, phase: str, direction: str, evidence: str,
     head = f"{taxon.name}, {met.name}, {direction} ({interval(result, met.id, phase)})"
     cell = result["cells"].get((taxon.id, met.id, phase))
     lines = [head]
-    if evidence == "single_replicate":
+    if cell is not None and cell.get("whole_run"):
+        lines.append("over the whole run: no end of exponential growth was found for this culture")
+    if evidence in ("single_replicate", "whole_run"):
         evidence = "measured" if value else "below_limit"
     if cell is not None and cell["n"]:
         limit = cell.get("limit") or result["settings"].get("detection_limit", 0.2)
@@ -179,7 +183,7 @@ def matrices_svg(result: dict) -> str:
     # comparable with them and is drawn on its own background
     values = [v for d in ("consumed", "produced") for row, ev in zip(pair[d], pair[f"evidence_{d}"], strict=True)
               for v, e in zip(row, ev, strict=True)
-              if e in ("measured", "single_replicate") and isinstance(v, (int, float))]
+              if e in ("measured", "single_replicate", "whole_run") and isinstance(v, (int, float))]
     vmax = max(values, default=0) or 1.0
     names = pair["taxa"]
     label_w = max((_text_width(n, 12) for n in names), default=60) + 12
@@ -239,10 +243,15 @@ def matrices_svg(result: dict) -> str:
                 tips.append((x, y, text))
                 out.append(f'<g id="fn-c{len(tips)}" class="fn-cell"><title>{html.escape(text)}</title>')
                 lone = evidence == "single_replicate"
-                if lone:
-                    # one replicate: drawn as what it says, with a dot in its corner
+                whole = evidence == "whole_run"
+                frame = (f'<rect x="{x + 2}" y="{y + 2}" width="{CELL_W - 4}" height="{CELL_H - 4}" fill="none" '
+                         f'stroke="{brand.MUTED}" stroke-width="1" stroke-dasharray="3 2"/>') if whole else ""
+                if lone or whole:
+                    # one replicate, or the whole run: drawn as what it says, with a dot or a dashed frame
                     evidence = "measured" if v else "below_limit"
-                    out.append(f'<circle cx="{x + CELL_W - 4:.1f}" cy="{y + 4:.1f}" r="1.8" fill="{brand.MUTED}"/>')
+                # drawn over the cell: a dot for one replicate, a dashed frame for the whole run
+                overlay = frame + (f'<circle cx="{x + CELL_W - 4:.1f}" cy="{y + 4:.1f}" r="1.8" fill="{brand.MUTED}"/>'
+                                   if lone else "")
                 if evidence == "measured":
                     share = 1.0 if booleans else math.sqrt(min(1.0, v / vmax))
                     fill = _gray(0.75 if booleans else share)
@@ -251,7 +260,7 @@ def matrices_svg(result: dict) -> str:
                         ink = "#ffffff" if share > 0.55 else brand.INK
                         out.append(f'<text x="{x + CELL_W / 2:.1f}" y="{y + CELL_H / 2 + 4:.1f}" font-size="10.5" '
                                    f'text-anchor="middle" fill="{ink}">{_number(v)}</text>')
-                    out.append("</g>")
+                    out.append(overlay + "</g>")
                     continue
                 if evidence == "presence_only" and isinstance(v, float) and not booleans:
                     out.append(f'<rect x="{x}" y="{y}" width="{CELL_W}" height="{CELL_H}" fill="{OTHER_MEDIUM}"/>')
@@ -274,7 +283,7 @@ def matrices_svg(result: dict) -> str:
                 if seen:
                     out.append(f'<circle cx="{x + CELL_W / 2:.1f}" cy="{y + CELL_H / 2:.1f}" r="4.2" fill="none" '
                                f'stroke="{brand.MUTED}" stroke-width="1.2"/>')
-                out.append("</g>")
+                out.append(overlay + "</g>")
         # the white grid between cells, as in the figure
         for j in range(len(cols) + 1):
             x = x0 + j * CELL_W
@@ -297,6 +306,8 @@ def matrices_svg(result: dict) -> str:
     if any(isinstance(v, float) and e == "presence_only" for d in ("consumed", "produced")
            for row, ev in zip(pair[d], pair[f"evidence_{d}"], strict=True) for v, e in zip(row, ev, strict=True)):
         items[-1] = (OTHER_MEDIUM, "", "value from another medium, not comparable with the gray scale")
+    if "whole_run" in shown:
+        items.append(("#ffffff", "dashed", "over the whole run (no end of growth found)"))
     if "single_replicate" in shown:
         items.append(("#ffffff", "dot", "one replicate"))
     if "inconclusive" in shown:
@@ -312,6 +323,9 @@ def matrices_svg(result: dict) -> str:
         if mark == "circle":
             out.append(f'<circle cx="{x + 8:.0f}" cy="{ky - 4}" r="3.6" fill="none" stroke="{brand.MUTED}" '
                        'stroke-width="1.2"/>')
+        elif mark == "dashed":
+            out.append(f'<rect x="{x + 2:.0f}" y="{ky - 8}" width="12" height="8" fill="none" stroke="{brand.MUTED}" '
+                       'stroke-dasharray="3 2"/>')
         elif mark == "dot":
             out.append(f'<circle cx="{x + 13:.0f}" cy="{ky - 7}" r="1.8" fill="{brand.MUTED}"/>')
         elif mark:

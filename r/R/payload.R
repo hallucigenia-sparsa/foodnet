@@ -105,6 +105,7 @@ as_foodnet_crm <- function(payload) {
                             searched_both_phases = isTRUE(caveats$searched_both_phases),
                             mixed_media = isTRUE(caveats$mixed_media),
                             stationary_phase = isTRUE(caveats$stationary_phase),
+                            whole_run = chr_vector(caveats$whole_run),
                             inconclusive = inconclusive,
                             incomplete = isTRUE(caveats$incomplete),
                             errors = chr_vector(caveats$errors),
@@ -217,6 +218,10 @@ print.foodnet_crm <- function(x, ...) {
     }
     if (x$caveats$mixed_media) {
         cat("   * values pool every medium: the starting concentrations describe no real medium.\n")
+    }
+    if (length(x$caveats$whole_run)) {
+        cat(sprintf("   * no end of growth was found for %s: their values span the whole run, stationary uptake included.\n",
+                    paste(x$caveats$whole_run, collapse = ", ")))
     }
     if (x$caveats$stationary_phase) {
         cat("   * these are stationary-phase amounts: uptake without growth, which a CRM reads as growth.\n")

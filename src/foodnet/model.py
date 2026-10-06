@@ -26,7 +26,9 @@ KNOWN_SCHEMAS = (SCHEMA,)
 
 KINDS = ("taxon", "metabolite")
 DIRECTIONS = ("produced", "consumed")
-PHASES = ("exponential", "stationary", "window")
+# whole_run: a culture without an end of exponential growth gives its change over the whole run, shown in
+# the phase column asked for and marked (Karoline, 2026-10-06)
+PHASES = ("exponential", "stationary", "window", "whole_run")
 EVIDENCE = ("measured", "presence_only")
 # what a node's id rests on: the NCBI taxon id of the strain, genus and species of its name, a genus (after
 # merging to genus), or the ChEBI id of a metabolite (or its name, when mGrowthDB gives no ChEBI id)
@@ -48,6 +50,7 @@ CAUTIONS = (
     "experiment_left_out",     # an inconclusive experiment that does not contradict the others is left out
     "still_changing",          # the compound kept changing beyond the limit right after growth slowed
     "growth_rate_boundary",    # the growth-rate rule ended growth more than one sample before the 90% rule
+    "whole_run",               # no end of exponential growth was found: the change over the whole run
     "start_differs",           # the replicates' windows start more than a quarter of the phase apart
     "pair_decided",            # an experiment of two replicates decided it (a change or no change), no interval
 )

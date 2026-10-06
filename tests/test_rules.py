@@ -135,15 +135,23 @@ def test_replicates_that_end_growth_far_apart_are_marked():
 
 # ---- the value medium --------------------------------------------------------------------------------
 
-def test_a_taxon_without_a_phase_is_no_phase_and_does_not_vote(client):
-    # C's cultures (mMCB) do not grow: its cells are no_phase, not not_assayed
+def test_a_taxon_without_a_phase_gives_its_whole_run_change_and_does_not_vote(client):
+    # C's cultures (mMCB) do not grow: its value is the change over the whole run (Karoline, 2026-10-06), marked
     for rep in ("c1", "c1b"):
         client.contexts[client.bioreplicates[rep]["measurementContexts"][0]["id"]] = \
             [(0, 0.5), (8, 0.5), (16, 0.55), (24, 0.5)]
     r = run(client, ignore_media=True)
     from foodnet import matrix
-    assert matrix.entry(r, "ncbi:3", GLC, "exponential", "consumed") == (None, "no_phase")
+    assert matrix.entry(r, "ncbi:3", GLC, "exponential", "consumed") == (5.0, "whole_run")
     assert any("no end of exponential growth" in w for w in r["warnings"])
+    arc = next(e for e in r["network"].edges if e.taxon == "ncbi:3" and e.metabolite == GLC)
+    assert arc.phase == "whole_run" and "whole_run" in arc.cautions
+    # with Both, the stationary column says no_phase
+    r = run(client, ignore_media=True, phase="both")
+    assert matrix.entry(r, "ncbi:3", GLC, "stationary", "consumed") == (None, "no_phase")
+    # and it does not vote for the value medium: mMCB keeps two taxa with phase values only for B
+    r = run(client)
+    assert r["value_rule"]["media"] == ["Wilkins-Chalgren Anaerobe Broth (WC)"]
 
 
 def test_a_taxon_with_more_data_in_another_medium_is_named():

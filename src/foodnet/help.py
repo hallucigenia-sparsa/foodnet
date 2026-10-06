@@ -182,8 +182,10 @@ phase minus its concentration at the start, interpolated between samples, averag
 over experiments, each experiment counting once. Diauxic shifts are not detected: a second growth phase counts
 as stationary. When the replicates of one experiment end growth further apart than a sampling interval, the
 value carries the caution boundaries_differ (a time window is then the safer choice). A boundary placed on fewer
-than three growth samples carries coarse_sampling. A culture that did not grow by the no-growth factor has no
-phases: its cells are no_phase, and a time window gives them values. A time window in Advanced settings
+than three growth samples carries coarse_sampling. The growth curve only places the boundary between the
+phases: a culture whose curve gives none (one that did not rise by the no-growth factor, as an optical density
+read without its blank can make it) gives its change over the whole run instead, marked whole_run, in the
+column of the phase asked for. A time window in Advanced settings
 replaces the phases. The growth curve is a per-strain count when the replicate
 has one, else the culture's own (cell counts before optical density); a curve that gives no boundary gives way
 to the replicate's next one.</p>

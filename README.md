@@ -61,7 +61,9 @@ matrices appear first under the settings, then the taxa and the arcs with the do
 2. **Growth phases.** Exponential growth ends at the first sample where the culture has risen 90% of the
    way from its start to its maximum, or earlier, where the specific growth rate has fallen below a tenth of
    its maximum over two consecutive intervals (a plateau that keeps creeping up, or a late rise that is not
-   growth, would otherwise end it late); the stationary phase runs from there to the last metabolite sample. Below the boxes,
+   growth, would otherwise end it late); the stationary phase runs from there to the last metabolite sample.
+   A culture without an end of exponential growth (an optical density read without its blank can make one
+   look not grown) gives its change over the whole run instead, marked `whole_run`. Below the boxes,
    choose Exponential phase (the default), Stationary phase or Both. A time window in Advanced settings
    replaces the phases, and a second window can be given to metabolites named there (trehalose over the whole
    run, for example), so no compound needs a window of its own. Diauxic shifts are not detected.
@@ -104,8 +106,8 @@ and a consumer-resource model built from it is a hypothesis to check against the
 **Known limits.** The defaults have not been validated on held-out studies: the checks so far reproduced a
 hand-checked matrix with settings chosen for it, and compared directions with a published figure. A net change
 hides a compound made and used again within a phase, and one failed sample at a phase end becomes the value.
-Growth on an unblanked optical density that starts high can read as no growth. See
-[docs/METHOD_NOTES.md](docs/METHOD_NOTES.md).
+Growth on an unblanked optical density that starts high can read as no growth; such cultures give their
+change over the whole run (whole_run), not a phase. See [docs/METHOD_NOTES.md](docs/METHOD_NOTES.md).
 
 Acid and base forms of one compound are one metabolite (acetic acid and acetate), since mGrowthDB records
 both and an HPLC measures one pool. A compound that was never assayed for a taxon is never written as zero.

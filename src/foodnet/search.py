@@ -249,7 +249,8 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     skipped += skips
     dropped, duplicate_lines = d.duplicates(cultures)
     rows = [r for r in rows if (cultures[r["culture"]].experiment, r["metabolite"]) not in dropped]
-    valued = {r["culture"] for r in rows if r["change"] is not None}
+    # cultures with a phase value vote for the value medium; a whole-run change is a value, but no phase's
+    valued = {r["culture"] for r in rows if r["change"] is not None and "whole_run" not in r["cautions"]}
     # the value medium is chosen among the cultures inside the scope; with outside evidence on, the cultures
     # outside it stay in the list and give presence only
     inside = [i for i, c in enumerate(cultures) if selecting.empty(selection) or selecting.matches(record(c), scope)]
@@ -426,15 +427,16 @@ def _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window) -
     if window is None:
         lost = defaultdict(set)
         for r in rows:
-            if r["culture"] in chosen and "no_phase" in r["cautions"]:
+            if r["culture"] in chosen and "whole_run" in r["cautions"]:
                 lost[cultures[r["culture"]].taxon["id"]].add(r["culture"])
         whole = sorted(taxa[t]["name"] for t, idx in lost.items()
                        if t in taxa and not any(i in valued for i in chosen if cultures[i].taxon["id"] == t))
         if whole:
             out.append(", ".join(whole) + ": no end of exponential growth was found on their growth curves (they "
-                       "did not grow by the no-growth factor, or the curve is too short), so their metabolites give "
-                       "no value in the phases (no_phase in the matrices). A time window in Advanced settings needs "
-                       "no phase and gives them values.")
+                       "did not rise by the no-growth factor, as an optical density read without its blank can make "
+                       "it, or the curve is too short), so their values are the change over the whole run, not a "
+                       "phase (evidence whole_run, arcs in phase whole_run). A CRM built on them takes in stationary "
+                       "uptake too.")
     return out
 
 
