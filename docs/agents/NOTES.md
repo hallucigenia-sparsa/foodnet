@@ -23,6 +23,17 @@ gate applies.
   end of the run (a window foodnet deliberately does not offer). The comparison found errors in the
   reference, all corrected there: a duplicate deposit counted twice, two undocumented peak-to-end windows,
   and an F. duncaniae acetate production the data do not support.
+- 2026-10-06, a second validation against a published network: Figure 3a of van de Velde et al. 2023
+  (Gut Microbes 15:2155019, mGrowthDB study SMGDB00000001), produced and consumed metabolites of monocultures
+  at 12 h in Wilkins-Chalgren. The monocultures of that paper are not in mGrowthDB, so foodnet used every
+  plain Wilkins-Chalgren monoculture there is (study 2 BT_WC and RI_WC, study 7; second box with their
+  experiment ids, since "Wilkins-Chalgren" alone also matches the mucin variant). With 0 to 12 h: 34 cells
+  agree, 2 differ (B. hydrogenotrophica trehalose uptake -0.06 mM and lactate production +0.18 mM, both
+  below the 0.2 mM limit), 2 figure arcs are not assayed in mGrowthDB (B. thetaiotaomicron trehalose,
+  B. hydrogenotrophica formate), and Collinsella aerofaciens has no Wilkins-Chalgren monoculture with
+  metabolites. With the exponential phase: 35 agree, 1 differs (B. hydrogenotrophica glucose uptake). Both
+  differences are timing: B. hydrogenotrophica grows exponentially until 32 to 48 h in study 7 and leaves
+  glucose untouched for at least 24 h, so a 12 h snapshot catches it barely started.
 - Verified live on 2026-10-04: the page (search, Example, CRM mode, every download), Send to Cytoscape against
   Cytoscape 3.10.3 (node shapes and sizes by kind, arc colors, dashes, widths and phase transparency read back
   from the view), and Send to R through miaSim's `simulateConsumerResource` on the test-case taxa. miaSim
