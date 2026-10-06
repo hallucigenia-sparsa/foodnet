@@ -126,4 +126,9 @@ test_that("a growth rate below the phase's own mean rate is named, and can be fl
     args <- suppressWarnings(as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, na = "zero",
                                        growth = "phase_floor"))
     expect_equal(args$growth_rates, c(0.4, 0.5))
+    # parameters saved by 0.1.0 have no phase rates: the floor changes nothing and loses nothing
+    crm$phase_growth_rates <- NULL
+    args <- suppressWarnings(as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, na = "zero",
+                                       growth = "phase_floor"))
+    expect_equal(args$growth_rates, c(0.4, 0.5))
 })
