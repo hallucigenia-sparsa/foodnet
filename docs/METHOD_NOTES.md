@@ -106,22 +106,25 @@ with metabolite data."
     caution ("OK"); the growth-rate fallback takes another monoculture of the taxon in the same medium ("keep
     as is, but with the stringent medium matching"), which decision 18 now makes strict.
 
-20. **The experiment is the unit, and replicates and experiments must agree.** Karoline, 2026-10-06, after a
-    review of 0.1.0 showed a study with ten replicates outvoting one with two, and +0.84 +/- 1.04 mM on a
-    27 mM background drawn as production: "experiment level + inconclusive". A cell's mean and test are over
-    its experiments' means (over the replicates when one experiment gives it); `n` stays the replicates and
-    `n_experiments` is new. Within an experiment, a change needs every replicate beyond the limit on the same
-    side and no change every replicate inside it; across experiments, every experiment that is not
-    inconclusive must say the same, its mean is the mean of those experiments, and amounts more than twofold
-    apart are the caution `amounts_differ`, not a veto. Anything else, and experiments that disagree, is
-    `inconclusive`: NA with its own evidence, never an arc and never a 0. A value from one replicate is shown
-    with the evidence `single_replicate`. A first version judged the mean plus and minus one standard
-    deviation against the limit; the second round of the review showed that is a spread, not an inference
-    (it called changes more readily with two replicates than with ten, and vetoed experiments that agreed in
-    direction but not in size), and Karoline chose agreement (2026-10-06: "Agreement"). The 0.2 mM limit
-    stays; compounds at another scale can have their own (thiamine=0.01, which also finds mGrowthDB's
-    "thiamine(1+)"). Advanced settings can judge by the mean alone, as 0.1.0 did. Identical replicates give
-    no test (`no_variance`), and the multiple-testing family is the tests that make the arcs.
+20. **The experiment is the unit, and a change must be pinned down.** Karoline, 2026-10-06, after a review
+    of 0.1.0 showed a study with ten replicates outvoting one with two, and +0.84 +/- 1.04 mM on a 27 mM
+    background drawn as production: "experiment level + inconclusive". Each experiment is judged on a
+    one-sided 90% t-interval on its replicates' mean: a change needs the near bound beyond the limit, no
+    change needs the whole interval inside it, anything else is `inconclusive` (NA with its own evidence,
+    never an arc and never a 0). Across experiments, those that decide must say the same (else `conflict`);
+    an inconclusive experiment whose mean lies beyond the limit on the other side is a conflict too, and one
+    that does not contradict is left out and named (`experiment_left_out`). The value is the mean of the
+    deciding experiments' means; `n`, `n_experiments`, the spread and the test are over them; amounts more
+    than twofold apart are the caution `amounts_differ`. One replicate is decided by itself, with the
+    evidence `single_replicate`. Two rules came first and were dropped on review: the mean plus and minus one
+    standard deviation (a spread, not an inference: it called changes more readily with two replicates than
+    with ten) and every replicate beyond the limit (one failed sample erased E. coli LF82's -8 mM pyruvate
+    uptake, seen in four of five replicates). On live data the interval gives fewer inconclusive cells than
+    either (16 in all of mGrowthDB against 24), calls more as replicates grow, and drew a false arc at most 4%
+    of the time in simulation (Karoline, 2026-10-06: "Confidence interval"). The 0.2 mM limit stays;
+    compounds at another scale can have their own (thiamine=0.01, which also finds mGrowthDB's
+    "thiamine(1+)"). Advanced settings can judge by the mean alone, as 0.1.0 did. The multiple-testing family
+    is the tests that make the arcs; the p-value is reported, the interval decides.
 21. **Merging to genus applies the detection limit**, and taxa that disagree make the genus cell
     inconclusive (`conflict`), instead of a median that can sit below the limit or hide a consumer.
 22. **One value medium per search, made stable and visible.** Karoline, 2026-10-06: "keep one, make it
@@ -147,7 +150,11 @@ with metabolite data."
     did not remove a two-point late rise, and clipped a real one-sample peak (R. intestinalis ri2_B), so it
     was dropped. The first growth curve that gives a boundary is used; relative 16S is no growth curve;
     boundaries on fewer than three samples (`coarse_sampling`) or further apart across replicates than a
-    sampling interval (`boundaries_differ`) are flagged. Not chosen: a whole-run fallback for cultures
+    sampling interval (`boundaries_differ`) are flagged, and so is a boundary the rate rule placed
+    (`growth_rate_boundary`). A third round of the review showed the rate rule ending E. coli's growth at 8 h
+    while it fermented its glucose from 8 to 12 h (after pyruvate ran out, cells +15%); Karoline chose to keep
+    the boundary and flag it: a stationary value of a compound that kept changing beyond the limit in the
+    first interval after the boundary carries `still_changing`. Not chosen: a whole-run fallback for cultures
     without a boundary (the unblanked OD of study SMGDB00000010, which starts near 0.7, still reads five
     taxa that made 4 to 6 mM butyrate as not grown; they are `no_phase`, and a time window gives them
     values), and flags for failed samples and transient peaks.
@@ -158,10 +165,12 @@ with metabolite data."
     abundance whatever E is), a negative one the by-product per unit of growth. miaSim has no uptake rate,
     so the unit of abundance sets how fast a taxon eats (a second round of the review found a first version,
     with E as a yield in cells/mL, emptying the medium within 0.1 h, with the growth rates cancelling out).
-    So each taxon gets a unit of its own, `crm_scale()` = `n * dx / (mu * C)` growth curve units, in which E
-    is `1/n` on each consumed resource and `-n * produced / C` on each by-product: alone, a taxon grows at
-    its measured rate, gains its measured biomass and makes its measured by-products in proportion to its
-    uptake, and the simulation does not depend on the unit. The payload (now `foodnet.crm/v1`) carries each
+    So each taxon gets a unit of its own, `crm_scale()` = `dx * C / (mu * S)` growth curve units (`S` the
+    sum of the squared uptakes), in which E is each consumed resource's share of the uptake and
+    `-produced * C / S` on each by-product: alone, a taxon grows at its measured rate while saturated, gains
+    its measured biomass and makes its measured by-products in proportion to its uptake, and the simulation
+    does not depend on the unit (a third round checked this, and the community's mass balance). Shares,
+    not `1/n`, so a trace substrate does not slow a taxon down. The payload (now `foodnet.crm/v1`) carries each
     taxon's biomass change over the phase, keyed by technique and unit; how uptake splits between resources
     follows the Monod constants, which foodnet does not measure, and `crm_backcheck()` simulates each taxon
     alone to test a choice, including how long it takes to grow.

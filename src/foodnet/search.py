@@ -28,10 +28,10 @@ DEFAULTS = {
     # an end of None meaning until the last sample (Karoline, 2026-10-05, for trehalose)
     "second_window_metabolites": "", "second_window_start": 0.0, "second_window_end": None,
     "detection_limit": d.DETECTION_LIMIT,
-    # the replicates of an experiment, and the experiments of a value, must agree on what happened: every
-    # replicate beyond the limit on one side, or every one inside it; else inconclusive (Karoline,
-    # 2026-10-06). Off: the mean alone decides, as in 0.1.0
-    "require_agreement": True,
+    # a change needs a one-sided 90% confidence interval on the mean beyond the limit, no change the interval
+    # inside it, and experiments must not contradict each other; else inconclusive (Karoline, 2026-10-06).
+    # Off: the mean alone decides, as in 0.1.0
+    "judge_confidence": True,
     # detection limits of their own, for compounds measured at another scale: "thiamine=0.01, riboflavin=0.005"
     "compound_limits": "",
     "ignore_media": False, "booleans": False,
@@ -242,7 +242,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     window = window_of(s)
     second = second_window_of(s)
     rows, skips = d.changes(cultures, s["phase"], window, s["fraction"], s["no_growth_factor"], s["spike_factor"],
-                            second)
+                            second, s["detection_limit"])
     second_mids = sorted({r["metabolite"] for r in rows if r.get("second")})
     unmatched = [n for n in (second or {}).get("names", [])
                  if not any(d.second_window_matches(met, [n]) for c in cultures for met in c.metabolites.values())]
@@ -262,7 +262,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     chosen = set(rule["chosen"])
     value_rows = [r for r in rows if r["culture"] in chosen]
     other_rows = [r for r in rows if r["culture"] not in chosen]
-    limit, spread = s["detection_limit"], s["require_agreement"]
+    limit, spread = s["detection_limit"], s["judge_confidence"]
     by_name = compound_limits_of(s)
     limits = {mid: by_name[n] for c in cultures for mid, met in c.metabolites.items()
               for n in by_name if d.second_window_matches(met, [n])}

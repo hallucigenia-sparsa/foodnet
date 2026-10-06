@@ -263,6 +263,8 @@ def send(net: FoodNetwork, port: int = PORT, name: str = "foodnet",
     Raises CytoscapeError with what to do when Cytoscape is not running, the port is wrong, or CyREST
     refuses the request. Nothing is sent anywhere but this port on the loopback interface.
     """
+    if net.meta.get("incomplete"):
+        name = f"{name} (INCOMPLETE)"        # records could not be read: the network says so where it lands
     root = base_url(port)
     try:
         created = _post(f"{root}/networks?title={urllib.parse.quote(name)}&collection={brand.NAME}",

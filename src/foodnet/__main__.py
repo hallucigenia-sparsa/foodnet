@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--no-growth-factor", type=float, default=DEFAULTS["no_growth_factor"])
     d.add_argument("--detection-limit", type=float, default=DEFAULTS["detection_limit"], help="mM (default 0.2)")
     d.add_argument("--mean-only", action="store_true",
-                   help="judge a change by its mean alone, without requiring replicates and experiments to agree")
+                   help="judge a change by its mean alone, not on a confidence interval")
     d.add_argument("--compound-limits", default=DEFAULTS["compound_limits"],
                    help="detection limits of their own, as name=mM, comma separated: thiamine=0.01")
     d.add_argument("--ignore-media", action="store_true", help="values from every medium, pooled")
@@ -121,7 +121,7 @@ def settings_from(a) -> dict:
     s = dict(DEFAULTS)
     s.update(phase=a.phase, fraction=a.fraction, no_growth_factor=a.no_growth_factor,
              detection_limit=a.detection_limit, ignore_media=a.ignore_media, booleans=a.booleans,
-             require_agreement=not a.mean_only, compound_limits=a.compound_limits,
+             judge_confidence=not a.mean_only, compound_limits=a.compound_limits,
              outside_evidence=a.outside_evidence, presence_entries=a.presence_entries,
              second_window_metabolites=", ".join(a.second_window or []),
              second_window_start=a.second_window_from, second_window_end=a.second_window_to,

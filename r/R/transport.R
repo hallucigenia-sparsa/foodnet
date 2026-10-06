@@ -21,7 +21,9 @@ read_request <- function(con, token, limit = 16e6, header_limit = 16384L, second
     header <- raw(header_limit)
     n <- 0L
     repeat {
-        if (Sys.time() > deadline) stop_foodnet("the request took too long")
+        left <- as.numeric(difftime(deadline, Sys.time(), units = "secs"))
+        if (left <= 0) stop_foodnet("the request took too long")
+        if (inherits(con, "sockconn")) socketTimeout(con, max(0.1, left))   # a silent peer cannot outlast it
         byte <- readBin(con, "raw", 1L)
         if (!length(byte)) break
         if (n >= header_limit) stop_foodnet("the request headers are too long to be foodnet's")
@@ -47,7 +49,9 @@ read_request <- function(con, token, limit = 16e6, header_limit = 16384L, second
     chunks <- list()
     got <- 0L
     while (got < size) {
-        if (Sys.time() > deadline) stop_foodnet("the request took too long")
+        left <- as.numeric(difftime(deadline, Sys.time(), units = "secs"))
+        if (left <= 0) stop_foodnet("the request took too long")
+        if (inherits(con, "sockconn")) socketTimeout(con, max(0.1, left))
         chunk <- readBin(con, "raw", min(65536L, size - got))
         if (!length(chunk)) break
         chunks[[length(chunks) + 1L]] <- chunk
@@ -108,12 +112,12 @@ answer <- function(con, body, status = "200 OK", type = "application/json") {
 # answered and the listener goes on waiting, so a stray request can neither stop it nor plant parameters.
 #' @noRd
 serve_one <- function(server, token) {
-    con <- socketAccept(server, blocking = TRUE, open = "a+b", timeout = 10)
+    con <- socketAccept(server, blocking = TRUE, open = "a+b", timeout = 5)
     on.exit(try(close(con), silent = TRUE), add = TRUE)
     request <- tryCatch(read_request(con, token), error = function(e) NULL)
     if (is.null(request)) {
-        return(answer(con, "{\"received\": false, \"error\": \"not a request foodnet sends\"}",
-                      status = "400 Bad Request"))
+        return(tryCatch(answer(con, "{\"received\": false, \"error\": \"not a request foodnet sends\"}",
+                               status = "400 Bad Request"), error = function(e) NULL))
     }
     if (!grepl("^POST ", request$request)) {
         # a browser or a port scan: say what this port is, and go on waiting for the real thing
@@ -166,13 +170,14 @@ serve_one <- function(server, token) {
 #' }
 #' @export
 foodnet_listen <- function(port = 8794, timeout = 300, quiet = FALSE) {
+    # the port first: a listener that cannot open it (another one holds it) must not touch that one's secret
+    server <- serverSocket(port)
+    on.exit(close(server), add = TRUE)
     token <- new_listen_token()
     path <- write_listen_token(token, listen_token_path(port))
     # removed when this listener ends, unless another one on the same port has written its own since
     on.exit(if (identical(tryCatch(readLines(path, warn = FALSE)[1], error = function(e) ""), token)) unlink(path),
             add = TRUE)
-    server <- serverSocket(port)
-    on.exit(close(server), add = TRUE)
     if (!quiet) {
         message("foodnet: listening on http://127.0.0.1:", port, " for up to ", timeout,
                 " seconds. Press Send to R on the foodnet page. (The page reads this listener's secret from ",

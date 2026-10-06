@@ -22,6 +22,7 @@ _KEYS = [
     ("g_derived_on", "graph", "derived_on", "string"),
     ("g_derived_at", "graph", "derived_at", "string"),
     ("g_phase", "graph", "phase", "string"),
+    ("g_incomplete", "graph", "incomplete", "boolean"),
     ("g_values", "graph", "values", "string"),
     ("n_name", "node", "name", "string"),
     ("n_label", "node", "label", "string"),       # Gephi takes the label from here
@@ -81,6 +82,7 @@ def to_graphml(net: FoodNetwork, pretty: bool = True) -> str:
     graph.set("edgedefault", "directed")
     for key in ("tool", "tool_version", "derived_on", "derived_at", "phase", "values"):
         _data(graph, f"g_{key}", net.meta.get(key))
+    _data(graph, "g_incomplete", "true" if net.meta.get("incomplete") else "false")
     colors = node_colors(net)
     for node in net.nodes.values():
         n = ET.SubElement(graph, f"{{{_NS}}}node")

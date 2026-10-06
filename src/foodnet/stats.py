@@ -94,6 +94,20 @@ def paired(x, y) -> dict | None:
     return {"t": t, "df": n - 1, "p": min(1.0, 2.0 * (1.0 - t_cdf(abs(t), n - 1)))}
 
 
+def t_quantile(p: float, df: float) -> float:
+    """The value t with t_cdf(t, df) == p, for 0.5 < p < 1, by bisection (one-sided 90%: p = 0.9)."""
+    low, high = 0.0, 1.0
+    while t_cdf(high, df) < p:
+        high *= 2
+    for _ in range(100):
+        mid = (low + high) / 2
+        if t_cdf(mid, df) < p:
+            low = mid
+        else:
+            high = mid
+    return (low + high) / 2
+
+
 def benjamini_hochberg(p_values) -> list:
     """Benjamini-Hochberg adjusted p-values, in the input order; None entries stay None and do not count."""
     indexed = [(p, i) for i, p in enumerate(p_values) if p is not None]

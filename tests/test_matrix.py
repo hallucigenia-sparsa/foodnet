@@ -36,7 +36,7 @@ def test_the_signed_matrix_has_production_positive_consumption_negative_and_na_f
 
 
 def test_a_measured_change_below_the_limit_is_zero_not_na(client):
-    r = run(client, phase="stationary", require_agreement=False)
+    r = run(client, phase="stationary", judge_confidence=False)
     rows = _rows(matrix.signed_csv(r["network"], r))
     # judged by the mean alone, A's stationary acetate (+1 and -1) is measured and no change, so 0; glucose -0.5
     assert rows[1] == ["Alpha alpha A1", "0", "NA", "NA", "-0.5"]

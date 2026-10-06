@@ -35,7 +35,7 @@ from collections import defaultdict
 from . import phase as phases
 from . import selection as selecting
 from .model import genus_name
-from .stats import CORRECTIONS, paired
+from .stats import CORRECTIONS, paired, t_quantile
 
 DETECTION_LIMIT = 0.2          # mM; where the data of the hand-checked reference matrices break
 PHASE_CHOICES = ("exponential", "stationary", "both")
@@ -107,7 +107,8 @@ def boundaries(cultures, fraction: float = phases.FRACTION, factor: float = phas
         if siblings:
             found[i] = {"end": statistics.median(b["end"] for b in siblings),
                         "last": all(b["last"] for b in siblings), "borrowed": True,
-                        "coarse": any(b.get("coarse") for b in siblings), "differ": c.experiment in differ}
+                        "coarse": any(b.get("coarse") for b in siblings), "differ": c.experiment in differ,
+                        "by": "rate" if any(b.get("by") == "rate" for b in siblings) else "90%"}
             if c.growth is None:
                 skipped.append((c.label, "no growth curve in this replicate; the median phase boundary of its "
                                 "experiment's other replicates is used"))
@@ -130,9 +131,23 @@ def second_window_matches(met: dict, names) -> bool:
     return any(plain(x) in wanted for x in (met.get("name"), met.get("recorded_name")))
 
 
+def _still_changing(series, boundary: float, limit: float) -> bool:
+    """Whether a metabolite moved beyond the limit between the end of exponential growth and its next sample:
+    growth had slowed, but the culture was still using or making it (E. coli LF82 ferments its glucose
+    between 8 and 12 h, after pyruvate runs out, while its cells grow by 15%; Karoline, 2026-10-06: flag it
+    rather than move the boundary)."""
+    after = [t for t, _ in series if t > boundary]
+    if not after:
+        return False
+    first, _ = phases.value_at(series, boundary)
+    nxt, _ = phases.value_at(series, after[0])
+    return abs(nxt - first) >= limit
+
+
 def changes(cultures, phase: str = "exponential", window: tuple | None = None,
             fraction: float = phases.FRACTION, factor: float = phases.NO_GROWTH_FACTOR,
-            spike_factor: float = phases.SPIKE_FACTOR, second: dict | None = None) -> tuple:
+            spike_factor: float = phases.SPIKE_FACTOR, second: dict | None = None,
+            limit: float = DETECTION_LIMIT) -> tuple:
     """(rows, skipped): one row per culture, metabolite and phase.
 
     A row: {"culture" (index), "taxon", "metabolite", "metabolite_name", "chebi_id", "phase", "change",
@@ -179,6 +194,10 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                         cautions.append("coarse_sampling")
                     if boundary.get("differ"):
                         cautions.append("boundaries_differ")
+                    if boundary.get("by") == "rate":
+                        cautions.append("growth_rate_boundary")
+                    if name == "stationary" and start is not None and _still_changing(series, start, limit):
+                        cautions.append("still_changing")
                 if start is None:
                     rows.append({"culture": i, "taxon": c.taxon["id"], "metabolite": mid,
                                  "metabolite_name": met["name"], "chebi_id": met["chebi_id"], "phase": name,
@@ -320,19 +339,20 @@ def _same_series(a, b) -> bool:
     return all(abs(da[ta] - db[tb]) <= DUPLICATE_ABS + DUPLICATE_REL * abs(da[ta]) for ta, tb in times)
 
 
-def _informative(series) -> bool:
+def _in_transit(series) -> int:
     """Whether a series moves enough that matching it is evidence of one deposit: a compound that stays at
     its medium level matches any other culture in the same medium (a review showed two experiments merged on
     two compounds that only wobbled within 1% around 30 and 12 mM), and so does one that only goes from its
     start to exhaustion or to a plateau (glucose 10, 0, 0). So the series must move by more than 1 mM and 5%
-    of its level, and hold a sample in transit, strictly between its lowest and highest values."""
+    of its level, and its samples in transit, strictly between its lowest and highest values, are what
+    count: this returns how many it has (0 for a series that does not move)."""
     values = [v for _, v in series]
     low, high = min(values), max(values)
     margin = max(DUPLICATE_MIN_RANGE, DUPLICATE_REL_RANGE * max(abs(v) for v in values))
     if high - low <= margin:
-        return False
+        return 0
     tolerance = DUPLICATE_ABS + DUPLICATE_REL * high
-    return any(low + tolerance < v < high - tolerance for v in values)
+    return sum(low + tolerance < v < high - tolerance for v in values)
 
 
 def _contained(inner, outer, shared) -> bool:
@@ -349,8 +369,9 @@ def duplicates(cultures) -> tuple:
     Two experiments of one taxon are the same deposit when they share at least two compounds and, for every
     shared compound, every replicate series of one matches a replicate series of the other at their common
     time points (within 0.011 mM plus 1%, which covers rounding to two decimals, and times within
-    DUPLICATE_TIME hours), and at least one shared compound moves (`_informative`): series that sit at the
-    medium's level match in any two cultures of one medium. Only experiments in one medium are compared: a
+    DUPLICATE_TIME hours), and the shared compounds move (`_in_transit`): series that sit at the
+    medium's level match in any two cultures of one medium, so at least two of the shared samples must be in
+    transit (`_in_transit`). Only experiments in one medium are compared: a
     second round of the review showed two genuine experiments in Wilkins-Chalgren with and without mucin
     matching on an exhausted sugar and a plateau, and the value medium's copy dropped. One direction is enough:
     study SMGDB00000002's RI_WC holds one acetate series twice, so it is contained in study SMGDB00000007's
@@ -370,7 +391,10 @@ def duplicates(cultures) -> tuple:
             shared = set().union(*(c.metabolites for c in a)) & set().union(*(c.metabolites for c in b))
             if len(shared) < 2:
                 continue
-            if not any(_informative(c.metabolites[m]["series"]) for m in shared for c in a if m in c.metabolites):
+            # at least two samples in transit over the shared compounds: one can match by chance between two
+            # cultures of one protocol (a third round of the review merged two genuine repeats on one)
+            first = {m: next(c for c in a if m in c.metabolites) for m in shared}
+            if sum(_in_transit(first[m].metabolites[m]["series"]) for m in shared) < 2:
                 continue
             b_in_a, a_in_b = _contained(b, a, shared), _contained(a, b, shared)
             if not (b_in_a or a_in_b):
@@ -398,24 +422,37 @@ def _class(mean: float | None, limit: float) -> int:
 INCONCLUSIVE = None
 
 
+CONFIDENCE = 0.9               # one-sided: the interval's lower (or upper) bound must clear the limit
+
+
 def classify(values, limit: float, agree: bool = True):
     """1 (produced), -1 (consumed), 0 (no change) or None (inconclusive) for the replicates of one experiment,
     changes in mM.
 
-    With `agree` (the default, Karoline, 2026-10-06), the replicates must agree: a change needs every one
-    beyond the limit on the same side, no change needs every one inside it, and anything else is
-    inconclusive, neither an arc nor a measured zero. A review of the first rule, the mean plus and minus
-    one standard deviation, found it was a spread and not an inference: it called changes more readily with
-    two replicates than with ten, and vetoed experiments that agreed in direction but not in size. One value
-    is judged by itself, and its cell says single_replicate. Without `agree` the mean alone decides, as in
-    0.1.0."""
+    With `agree` (the default, Karoline, 2026-10-06: "Confidence interval"), the decision is on the mean
+    and how well the replicates pin it down: a one-sided 90% t-interval on the mean. A change needs its
+    bound on the near side beyond the limit; no change needs the whole interval inside it; anything else is
+    inconclusive, neither an arc nor a measured zero. More replicates narrow the interval, so they make a
+    call easier, never harder, and one outlier widens it without vetoing a clear change. (Two rules were
+    tried first and dropped on review: the mean plus and minus one standard deviation, which favored two
+    replicates over ten, and every replicate beyond the limit, which let one failed sample erase a change
+    four replicates agreed on.) Identical replicates pin the mean exactly. One value has no interval and is
+    judged by itself; its cell says single_replicate. Without `agree` the mean alone decides, as in 0.1.0."""
     values = [v for v in values if v is not None]
     if not values:
         return INCONCLUSIVE
-    if not agree:
-        return _class(statistics.mean(values), limit)
-    classes = {_class(v, limit) for v in values}
-    return classes.pop() if len(classes) == 1 else INCONCLUSIVE
+    mean = statistics.mean(values)
+    if not agree or len(values) < 2:
+        return _class(mean, limit)
+    half = t_quantile(CONFIDENCE, len(values) - 1) * statistics.stdev(values) / math.sqrt(len(values))
+    low, high = mean - half, mean + half
+    if low >= limit:
+        return 1
+    if high <= -limit:
+        return -1
+    if -limit < low and high < limit:
+        return 0
+    return INCONCLUSIVE
 
 
 WORD = {1: "produced", -1: "consumed", 0: "below the limit", None: "inconclusive"}
@@ -449,9 +486,11 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
     several, every experiment that is not inconclusive must say the same: then that is the cell, its mean is
     the mean of those experiments' means, and experiments whose amounts differ more than twofold add the
     caution amounts_differ (a difference in size is not a difference in what happened). Experiments that say
-    different things make the cell inconclusive, with the caution conflict and a note naming them; when every
-    experiment is inconclusive, so is the cell. `sd` and the test are over the experiments' means (over the
-    replicates with one experiment); `n` is the replicates behind the cell."""
+    different things make the cell inconclusive, with the caution conflict and a note naming them; so does an
+    inconclusive experiment whose mean lies beyond the limit on the other side. An inconclusive experiment
+    that does not contradict the others is left out and named (experiment_left_out); when every experiment
+    is inconclusive, so is the cell. `sd`, the test, `n` and `n_experiments` are over the experiments the
+    value rests on."""
     limits = limits or {}
     groups = defaultdict(list)
     for r in rows:
@@ -476,7 +515,16 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
         per_exp, units = _units(valued, cultures)
         classes = {e: classify(v, lim, agree) for e, v in per_exp.items()}
         said = {c for c in classes.values() if c is not INCONCLUSIVE}
+        # an experiment too noisy to decide still disagrees when its mean lies beyond the limit on the other
+        # side of what the others say (a review: one replicate made it inconclusive and its -3 mM vanished)
+        if len(said) == 1 and next(iter(said)) in (1, -1):
+            side = next(iter(said))
+            for e, c in classes.items():
+                if c is INCONCLUSIVE and _class(statistics.mean(per_exp[e]), lim) == -side:
+                    classes[e] = -side
+            said = {c for c in classes.values() if c is not INCONCLUSIVE}
         notes = []
+        used = list(per_exp)
         if len(said) > 1:
             k = INCONCLUSIVE
             cautions.add("conflict")
@@ -486,22 +534,24 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
         elif not said:
             k = INCONCLUSIVE
             cautions.add("inconclusive")
-            notes.append("inconclusive: the replicates do not agree on a change beyond the "
-                         f"{lim:g} mM limit, or on none ("
-                         + "; ".join(f"{v:+.2f}" for v in values[:8]) + (" ..." if len(values) > 8 else "") + " mM)")
+            notes.append(f"inconclusive: the replicates do not pin the change down beyond the {lim:g} mM limit, "
+                         "or inside it (" + "; ".join(f"{v:+.2f}" for v in values[:8])
+                         + (" ..." if len(values) > 8 else "") + " mM)")
         else:
             k = said.pop()
-            agreeing = [e for e, c in classes.items() if c == k]
+            used = [e for e, c in classes.items() if c == k]
             if len(per_exp) > 1:
-                units = [statistics.mean(per_exp[e]) for e in agreeing]
+                units = [statistics.mean(per_exp[e]) for e in used]
                 unsure = sorted(names.get(e, e) for e, c in classes.items() if c is INCONCLUSIVE)
                 if unsure:
+                    cautions.add("experiment_left_out")
                     notes.append("left out as inconclusive: " + ", ".join(unsure))
                 sizes = [abs(u) for u in units]
                 if k and len(sizes) > 1 and min(sizes) > 0 and max(sizes) / min(sizes) > AMOUNTS_DIFFER:
                     cautions.add("amounts_differ")
                     notes.append("experiments agree, in amounts from " + ", ".join(
-                        f"{names.get(e, e)} {statistics.mean(per_exp[e]):+.2f}" for e in sorted(agreeing)) + " mM")
+                        f"{names.get(e, e)} {statistics.mean(per_exp[e]):+.2f}" for e in sorted(used)) + " mM")
+        values = [v for e in used for v in per_exp[e]] if len(used) < len(per_exp) else values
         mean = statistics.mean(units)
         sd = statistics.stdev(units) if len(units) > 1 else None
         test = paired(units, [0.0] * len(units))
@@ -509,7 +559,7 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
             cautions.add("single_replicate")
         if test and test.get("no_variance"):
             cautions.add("no_variance")
-        cells[key] = {"mean": mean, "sd": sd, "n": len(values), "n_experiments": len(per_exp), "values": values,
+        cells[key] = {"mean": mean, "sd": sd, "n": len(values), "n_experiments": len(used), "values": values,
                       "direction": PRODUCED if k == 1 else CONSUMED if k == -1 else None, "state": STATE[k],
                       "experiments": experiments, "studies": studies, "media": media, "cautions": sorted(cautions),
                       "notes": notes, "start": statistics.mean(r["start"] for r in valued),
@@ -571,7 +621,8 @@ def _measured_arc(taxon, met, ph, cell, studies=None, booleans=False) -> dict:
 def _presence_arc(taxon, met, ph, direction, entries, value_cell) -> dict:
     cautions = sorted({x for e in entries for x in e["cautions"]} & {
         "short_record", "window_beyond_data", "stationary_not_reached", "single_replicate", "coarse_sampling",
-        "boundaries_differ", "phase_from_other_replicates", "no_variance", "amounts_differ"})
+        "boundaries_differ", "phase_from_other_replicates", "no_variance", "amounts_differ", "still_changing",
+        "experiment_left_out"})
     notes = [f"seen in {e['medium']} ({e['mean']:+.2f} mM over {e['n']} replicate(s)); another medium than the "
              "values come from, so only its direction counts" for e in entries]
     if value_cell is not None and value_cell["n"]:

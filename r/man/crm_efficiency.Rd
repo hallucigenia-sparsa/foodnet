@@ -22,12 +22,12 @@ With \code{scale = "miasim"} (the default), \code{E} follows miaSim's own equati
 \code{x * R / (R + K)} whatever the size of \code{E} (at most 1 mM per unit of abundance per hour), and makes each
 by-product at \code{|E|} times its growth (without the growth rate). miaSim has no uptake rate of its own, so
 its unit of abundance sets how fast a taxon eats: in cells/mL a culture would empty its medium within
-minutes. foodnet therefore gives each taxon a unit of its own, \code{\link{crm_scale}}: \code{n * dx / (mu * C)} units
-of its growth curve, with \code{dx} its biomass change, \code{mu} its growth rate, \code{C} its total uptake and \code{n}
-the number of resources it consumed. In that unit, \code{E} is \code{1 / n} on each consumed resource (so a
-saturated taxon grows at its measured rate) and \code{-n * produced / C} on each produced one, and a taxon
-alone gains its measured biomass and makes its measured by-products in proportion to what it takes up,
-in about the measured time. The same data in another unit give the same simulation. How its uptake splits
+minutes. foodnet therefore gives each taxon a unit of its own, \code{\link{crm_scale}}: \code{dx * C / (mu * S)} units
+of its growth curve, with \code{dx} its biomass change, \code{mu} its growth rate, \code{C} its total uptake and \code{S} the
+sum of the squares of its uptakes. In that unit, \code{E} is each consumed resource's share of the uptake,
+\code{c / C} (they sum to 1, so a saturated taxon grows at its measured rate, and a resource it took little of
+weighs little), and \code{-produced * C / S} on each produced one, and a taxon alone gains its measured biomass
+and makes its measured by-products in proportion to what it takes up, in about the measured time. The same data in another unit give the same simulation. How its uptake splits
 between resources follows the Monod constants, which foodnet does not measure; \code{\link{crm_backcheck}} says how
 close a choice of them comes. \code{\link{as_miasim}} puts the starting abundances into these units, and
 \code{\link{crm_unscale}} turns a simulation's abundances back into each growth curve's unit.

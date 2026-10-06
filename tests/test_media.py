@@ -30,9 +30,9 @@ def _exp(description, name="x", medium="Wilkins-Chalgren Anaerobe Broth (WC)", *
     ("At monoculture grown on a minimal medium with 0.75% linoleic acid, used for measuring reactive oxygen", "x",
      ("+0.75% linoleic acid",)),
     ("At monoculture grown on a minimal medium with 0.75% linoleic acid and 1.5μm TBHQ antioxidant "
-     "(dissolved in DMSO)", "x", ("+0.75% linoleic acid", "+1.5\u00b5m tbhq antioxidant")),   # one micro sign
+     "(dissolved in DMSO)", "x", ("+0.0015mm tbhq antioxidant", "+0.75% linoleic acid")),   # in mM
     # found missed by a review (2026-10-06): an amount "added", "no supplied", and phrasings to expect
-    ("0.1mg/L pantothenate added in the culture", "x", ("+0.1mg/l pantothenate",)),
+    ("0.1mg/L pantothenate added in the culture", "x", ("+0.0001g/l pantothenate",)),
     ("No supplied pantothenate in culture", "x", ("-pantothenate",)),
     ("WC + 10 mM acetate", "x", ("+10mm acetate",)),
     ("glucose-free WC", "x", ("-glucose",)),
@@ -53,7 +53,8 @@ def test_amounts_tell_media_apart():
 
 def test_notations_of_one_amount_are_one_medium():
     for a, b in (("plus 5 g/L mucin", "plus 5 g l-1 mucin"), ("plus 0.5% mucin", "plus 0.50% mucin"),
-                 ("with 1.5\u03bcm tbhq", "with 1.5\u00b5m tbhq")):
+                 ("with 1.5\u03bcm tbhq", "with 1.5\u00b5m tbhq"), ("plus 5000 mg/L mucin", "plus 5 g/L mucin"),
+                 ("plus 1000 uM mannose", "plus 1 mM mannose")):
         assert media.alterations(_exp(a)) == media.alterations(_exp(b))
 
 

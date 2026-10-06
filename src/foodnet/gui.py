@@ -121,10 +121,10 @@ def _settings_block(settings: dict) -> str:
 <div class="row"><label>Detection limit
   <input name="detection_limit" type="text" size="5" value="{_esc(s['detection_limit'])}"> mM</label>
   <span class="muted">a mean change smaller than this, either way, counts as no change; 0.2 by default</span></div>
-<div class="row"><label><input type="checkbox" name="require_agreement" value="1"{_checked(s['require_agreement'])}>
-  Require replicates and experiments to agree</label>
-  <span class="muted">a change needs every replicate beyond the limit on the same side, and every experiment to say
-  the same; otherwise it is inconclusive (NA, no arc). On by default</span></div>
+<div class="row"><label><input type="checkbox" name="judge_confidence" value="1"{_checked(s['judge_confidence'])}>
+  Judge changes on a confidence interval</label>
+  <span class="muted">a change needs a one-sided 90% confidence interval on the mean beyond the limit, and
+  experiments must not contradict each other; otherwise it is inconclusive (NA, no arc). On by default</span></div>
 <div class="row"><label>Detection limits of their own
   <input name="compound_limits" type="text" size="30" value="{_esc(s['compound_limits'])}"></label>
   <span class="muted">for compounds measured at another scale, as name=mM, comma separated: thiamine=0.01</span></div>
@@ -583,7 +583,7 @@ def parse_settings(form: dict) -> dict:
     if form.get("correction", [""])[0] in ("bh", "by"):
         s["correction"] = form["correction"][0]
     for key in ("ignore_media", "booleans", "report_rates", "merge_arcs", "merge_genera", "outside_evidence",
-                "strict_media", "require_agreement"):
+                "strict_media", "judge_confidence"):
         s[key] = bool(form.get(key))
     for key in ("conditions", "exclude_studies", "exclude_experiments", "exclude_metabolites", "compound_limits"):
         s[key] = form.get(key, [""])[0].strip()

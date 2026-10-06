@@ -7,15 +7,23 @@ with_rate <- function() {
     foodnet:::as_foodnet_crm(payload)
 }
 
-test_that("E follows miaSim: 1/n on each consumed resource, by-products scaled to the uptake", {
+test_that("E follows miaSim: shares of uptake on consumed resources, by-products scaled to the uptake", {
     crm <- with_rate()
     E <- suppressWarnings(crm_efficiency(crm, na = "zero"))
-    # A consumed one resource (glucose 8) and made 4 acetate: 1, and -1 * 4 / 8
+    # A consumed glucose only (8; S = 64) and made 4 acetate: 1, and -4 * 8 / 64
     expect_equal(unname(E["A", ]), c(1, -0.5, 0))
-    # B consumed two (glucose 2, acetate 6; 8 in all) and made 3 butyrate: 1/2 each, and -2 * 3 / 8
-    expect_equal(unname(E["B", ]), c(0.5, 0.5, -0.75))
-    # each taxon's unit: n * dx / (mu * C); A 1 * 2 / (0.4 * 8), B 2 * 1 / (0.5 * 8)
-    expect_equal(unname(crm_scale(crm)), c(0.625, 0.5))
+    # B consumed glucose 2 and acetate 6 (C = 8, S = 40) and made 3 butyrate: 0.25, 0.75, -3 * 8 / 40
+    expect_equal(unname(E["B", ]), c(0.25, 0.75, -0.6))
+    # each taxon's unit: dx * C / (mu * S); A 2 * 8 / (0.4 * 64), B 1 * 8 / (0.5 * 40)
+    expect_equal(unname(crm_scale(crm)), c(0.625, 0.4))
+})
+
+test_that("a taxon can be left out, and unscaling checks the shape", {
+    crm <- crm_subset(with_rate(), taxa = "A")
+    expect_equal(crm$taxa, "A")
+    expect_equal(dim(crm$consumed), c(1, 3))
+    expect_equal(nrow(crm$caveats$presence_only), 0)
+    expect_error(crm_unscale(with_rate(), matrix(1, 3, 2)), "one row per taxon")
 })
 
 test_that("miaSim's units need a rate and a biomass change for every taxon", {
@@ -52,7 +60,7 @@ test_that("as_miasim needs starting abundances and Monod constants, never drawn 
     expect_equal(args$n_species, 2)
     expect_equal(args$names_resources, c("glucose", "acetate", "butyrate"))
     expect_equal(args$growth_rates, c(0.4, 0.5))
-    expect_equal(args$x0, c(0.5 / 0.625, 0.2 / 0.5))         # into each taxon's unit (crm_scale)
+    expect_equal(args$x0, c(0.5 / 0.625, 0.2 / 0.4))         # into each taxon's unit (crm_scale)
     expect_equal(crm_unscale(crm, args$x0), c(A = 0.5, B = 0.2))
     expect_equal(dim(args$monod_constant), c(2, 3))
     expect_equal(args$resources, c(10, 2, 0))

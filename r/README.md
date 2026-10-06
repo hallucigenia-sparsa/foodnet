@@ -40,13 +40,15 @@ phase.
 | `crm_resources(crm)` | the initial concentrations of the medium (mM) |
 | `crm_efficiency(crm)` | miaSim's efficiency matrix E, in each taxon's own unit of abundance |
 | `crm_scale(crm)`, `crm_unscale(crm, abundance)` | that unit, in the growth curve's unit, and simulated abundances back in the curve's unit |
+| `crm_subset(crm, taxa, resources)` | the same parameters for fewer taxa or resources |
 | `crm_backcheck(crm, monod_constant)` | each taxon simulated alone, against its own monoculture |
 | `as_miasim(crm, x0, monod_constant)` | the arguments of `miaSim::simulateConsumerResource` |
 | `crm_readme(crm)`, `crm_write(crm, dir)` | the README food**net** wrote, and the parameters as files |
 
 ```r
-crm_backcheck(crm, monod_constant = 1)
-args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0)
+# NA cells are refused unless you say how; here, as 0
+crm_backcheck(crm, monod_constant = 1, na = "zero")
+args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
 set.seed(1)
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse))
@@ -56,11 +58,13 @@ miaSim (1.18, `consumerResourceModel`) grows a taxon by its growth rate times th
 `E * R / (R + K)`, takes up each resource at `R / (R + K)` per unit of abundance whatever the size of E,
 and makes each by-product at `|E|` times its growth. It has no uptake rate, so the unit of abundance
 decides how fast a taxon eats: in cells/mL a culture would empty its medium within minutes, whatever its
-growth rate. foodnet gives each taxon a unit of its own, `crm_scale(crm)` = `n * dx / (mu * C)` growth
-curve units (biomass change `dx`, growth rate `mu`, total uptake `C`, `n` resources consumed). In it, E is
-`1 / n` on each consumed resource, so a saturated taxon grows at its measured rate, and `-n * produced / C`
-on each by-product, so a taxon alone gains its measured biomass and makes its measured by-products in
-proportion to what it takes up. The same data in another unit give the same simulation. `as_miasim` puts
+growth rate. foodnet gives each taxon a unit of its own, `crm_scale(crm)` = `dx * C / (mu * S)` growth
+curve units (biomass change `dx`, growth rate `mu`, total uptake `C`, `S` the sum of the squared uptakes).
+In it, E is each consumed resource's share of the uptake (they sum to 1, so a saturated taxon grows at its
+measured rate and a trace substrate weighs little) and `-produced * C / S` on each by-product, so a taxon
+alone gains its measured biomass and makes its measured by-products in proportion to what it takes up.
+Below saturation it grows slower than measured. `crm_subset(crm, taxa = )` leaves out a taxon a
+simulation cannot use. The same data in another unit give the same simulation. `as_miasim` puts
 the starting abundances (in each growth curve's unit, `crm$biomass_unit`) into these units, and
 `crm_unscale` turns simulated ones back. How much a taxon takes up of each resource follows the Monod
 constants, which foodnet does not measure; `crm_backcheck()` shows how close a choice comes, and how long

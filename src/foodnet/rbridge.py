@@ -122,7 +122,15 @@ def send(payload: dict, port: int = DEFAULT_PORT, timeout: float = 30.0) -> dict
         raise RError(f"something is listening on port {port}, but it did not answer the way the foodnet R "
                      f"package does ({type(e).__name__}). Check which port foodnet_listen() printed and "
                      "that no other program holds it.") from None
+    except TimeoutError:
+        raise RError(f"R on port {port} did not answer within {timeout:g} s. It may be busy, or another "
+                     "connection may be holding its listener; if R printed that the parameters arrived, they "
+                     "did. Otherwise press Send to R again.") from None
     except WIRE_ERRORS as e:
+        if isinstance(getattr(e, "reason", None), TimeoutError):
+            raise RError(f"R on port {port} did not answer within {timeout:g} s. It may be busy, or another "
+                         "connection may be holding its listener; if R printed that the parameters arrived, "
+                         "they did. Otherwise press Send to R again.") from None
         raise RError(unreachable(port, getattr(e, "reason", e))) from None
     try:
         answer = json.loads(text) if text.strip() else {}

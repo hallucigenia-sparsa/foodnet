@@ -11,9 +11,9 @@ crm_scale(x)
 \value{A named numeric vector, one per taxon.}
 \description{
 How many units of a taxon's growth curve (\code{x$biomass_unit}) one unit of its abundance in a simulation
-built by \code{\link{crm_efficiency}} and \code{\link{as_miasim}} stands for: \code{n * dx / (mu * C)}, with \code{dx} its biomass
-change over the phase, \code{mu} its growth rate, \code{C} its total uptake in mM and \code{n} the number of resources
-it consumed. In this unit miaSim's fixed uptake (1 mM per unit per hour at saturation) makes the taxon
+built by \code{\link{crm_efficiency}} and \code{\link{as_miasim}} stands for: \code{dx * C / (mu * S)}, with \code{dx} its biomass
+change over the phase, \code{mu} its growth rate, \code{C} its total uptake in mM and \code{S} the sum of the squares of
+its uptakes of each resource. In this unit miaSim's fixed uptake (1 mM per unit per hour at saturation) makes the taxon
 grow at its measured rate with its measured yield. Divide starting abundances by it (\code{\link{as_miasim}} does)
 and multiply simulated ones by it (\code{\link{crm_unscale}}).
 }

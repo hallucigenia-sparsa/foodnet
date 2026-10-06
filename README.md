@@ -6,7 +6,10 @@
 
 food**net** builds bipartite taxon and metabolite networks from the batch monocultures in
 [mGrowthDB](https://mgrowthdb.gbiomed.kuleuven.be/): which taxon produces which compound, and which consumes
-it, with the amount moved in each growth phase. It hands the result to Cytoscape, to graph formats, to two
+it, with the amount moved in each growth phase. Uptake of each resource is weighted by its share of the measured uptake, so a trace substrate weighs
+little, but a taxon grows at its full rate only while its resources are saturating: with real Monod
+constants it grows slower than measured, and `crm_backcheck()` shows by how much. `crm_subset()` leaves out a
+taxon a simulation cannot use. It hands the result to Cytoscape, to graph formats, to two
 matrix formats, and to R as the parameters of a consumer-resource model (CRM), with
 [miaSim](https://bioconductor.org/packages/release/bioc/html/miaSim.html) as the example simulator.
 
@@ -62,12 +65,16 @@ matrices appear first under the settings, then the taxa and the arcs with the do
    choose Exponential phase (the default), Stationary phase or Both. A time window in Advanced settings
    replaces the phases, and a second window can be given to metabolites named there (trehalose over the whole
    run, for example), so no compound needs a window of its own. Diauxic shifts are not detected.
-3. **A change per phase.** For each replicate and metabolite, the concentration at the end of the phase
+3. **A change per phase. Uptake of each resource is weighted by its share of the measured uptake, so a trace substrate weighs
+little, but a taxon grows at its full rate only while its resources are saturating: with real Monod
+constants it grows slower than measured, and `crm_backcheck()` shows by how much. `crm_subset()` leaves out a
+taxon a simulation cannot use.** For each replicate and metabolite, the concentration at the end of the phase
    minus the concentration at its start (interpolated between samples), averaged over replicates and then
    over experiments, each experiment counting once. A mean change below the detection limit (0.2 mM, a
-   setting; compounds can have their own) is no change. Replicates and experiments must agree: a change
-   needs every replicate beyond the limit on the same side (no change: every one inside it), and every
-   experiment to say the same; otherwise the value is inconclusive, neither an arc nor a measured zero. A
+   setting; compounds can have their own) is no change, judged on how well the replicates pin the mean
+   down: a change needs a one-sided 90% confidence interval on the mean beyond the limit, no change needs
+   the interval inside it, and experiments must not contradict each other; otherwise the value is
+   inconclusive, neither an arc nor a measured zero. A
    metabolite series shorter than 24 h is used, and flagged.
 4. **Values from one medium, presence from the others.** With the second box empty, all data are
    considered: the values come from the medium that holds data for the most taxa, and every other medium
@@ -128,7 +135,10 @@ table and in every file.
 In every matrix a number is a change beyond the detection limit, 0 is measured without one, and NA is no
 value. A change seen only in another medium is NA by default; Advanced settings can write it as TRUE or as
 the amount measured there (drawn on a background of its own in the image), and the evidence matrices mark
-it `presence_only` either way. With Both, each metabolite has a column per phase.
+it `presence_only` either way. With Both, each metabolite has a column per phase. Uptake of each resource is weighted by its share of the measured uptake, so a trace substrate weighs
+little, but a taxon grows at its full rate only while its resources are saturating: with real Monod
+constants it grows slower than measured, and `crm_backcheck()` shows by how much. `crm_subset()` leaves out a
+taxon a simulation cannot use.
 
 ## Consumer-resource models in R
 
@@ -146,9 +156,10 @@ then:
 ```r
 library(foodnet)
 crm <- foodnet_listen()                      # and press Send to R on the page
-E <- crm_efficiency(crm)                     # miaSim's efficiency matrix, in each taxon's own unit
-crm_backcheck(crm, monod_constant = 1)       # each taxon alone against its own monoculture
-args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0)
+# NA cells (never assayed, seen only elsewhere, inconclusive) are refused unless you say how: here, as 0
+E <- crm_efficiency(crm, na = "zero")                      # miaSim's E, in each taxon's own unit
+crm_backcheck(crm, monod_constant = 1, na = "zero")        # each taxon alone against its own monoculture
+args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
 set.seed(1)
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse))   # back in each growth curve's unit
@@ -161,7 +172,10 @@ growth rate and uptake so that, alone, it grows at its measured rate, gains its 
 its measured by-products in proportion to what it takes up; the same data in another unit give the same
 simulation. foodnet measures no Monod constants, and uptake of each resource follows them: choose them, and
 check the choice with `crm_backcheck()`, which also compares the time each taxon takes to grow with its
-phase. `as_miasim()` never
+phase. Uptake of each resource is weighted by its share of the measured uptake, so a trace substrate weighs
+little, but a taxon grows at its full rate only while its resources are saturating: with real Monod
+constants it grows slower than measured, and `crm_backcheck()` shows by how much. `crm_subset()` leaves out a
+taxon a simulation cannot use. `as_miasim()` never
 lets miaSim draw starting abundances or Monod constants at random, and refuses pooled media and the
 stationary phase unless allowed. With the phase choice Both, the CRM parameters use the exponential phase,
 since a consumer-resource model describes growth. See [r/README.md](r/README.md).

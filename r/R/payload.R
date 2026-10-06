@@ -173,7 +173,7 @@ print.foodnet_crm <- function(x, ...) {
     }
     unsure <- count_evidence(x, "inconclusive")
     if (unsure) {
-        cat(sprintf("   * %d cell(s) are inconclusive (NA): measured, but the spread reaches across the limit.\n",
+        cat(sprintf("   * %d cell(s) are inconclusive (NA): measured, but not pinned down beyond the limit or inside it.\n",
                     unsure))
     }
     no_phase <- count_evidence(x, "no_phase")

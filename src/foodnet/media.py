@@ -79,9 +79,12 @@ def _amount(text: str) -> str:
     found = re.match(r"(\d+(?:\.\d+)?)\s*(.*)$", text)
     if not found:
         return re.sub(r"\s+", "", text)
-    number = f"{float(found.group(1)):g}"
+    number = float(found.group(1))
     unit = re.sub(r"\s+", "", found.group(2)).replace("gl-1", "g/l").replace("\u03bc", "\u00b5")
-    return number + unit
+    # one unit per kind, so 5000 mg/L and 5 g/L are one medium, as are 1000 uM and 1 mM
+    factor, unit = {"mg/l": (1e-3, "g/l"), "mg/ml": (1.0, "g/l"), "um": (1e-3, "mm"), "\u00b5m": (1e-3, "mm"),
+                    "mmol": (1.0, "mm")}.get(unit, (1.0, unit))
+    return f"{number * factor:g}{unit}"
 
 
 def _clean(text: str) -> tuple:

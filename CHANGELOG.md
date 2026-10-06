@@ -8,9 +8,12 @@ semantic versioning.
 ### Changed
 - A cell's value counts each experiment once: the mean and its test are over the experiments' means;
   `n_experiments` is a new arc field.
-- Replicates and experiments must agree: a change needs every replicate beyond the detection limit on the
-  same side and every experiment to say the same, otherwise the value is inconclusive (NA, no arc) instead of
-  an arc or a 0; experiments that agree in direction but not in size carry the caution amounts_differ.
+- A change is judged on a one-sided 90% confidence interval on the mean against the detection limit (no
+  change: the interval inside it), and experiments must not contradict each other; otherwise the value is
+  inconclusive (NA, no arc) instead of an arc or a 0. Experiments that agree in direction but not in size
+  carry the caution amounts_differ; an inconclusive experiment that does not contradict the others is left
+  out and named (experiment_left_out). The end of exponential growth by the growth rate is marked
+  (growth_rate_boundary), and a compound still changing right after it (still_changing).
   Advanced settings can judge by the mean alone, and give compounds their own detection limits.
 - New evidence states in the matrices: inconclusive, no_phase, seen_elsewhere and single_replicate; the image
   draws them. Every matrix CSV names its value medium (and INCOMPLETE when it is) in its first header cell,

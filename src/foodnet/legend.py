@@ -26,6 +26,9 @@ CAUTION_TEXT = {
     "boundaries_differ": "the replicates end exponential growth further apart than a sampling interval",
     "no_variance": "identical replicates (rounding, or one series twice): no test",
     "amounts_differ": "the experiments agree in direction, with amounts more than twofold apart",
+    "experiment_left_out": "an inconclusive experiment that does not contradict the others is left out",
+    "still_changing": "the compound kept changing right after growth ended (a slow-down, or a second substrate)",
+    "growth_rate_boundary": "growth ended where its rate fell, before the culture reached 90% of its maximum",
 }
 
 

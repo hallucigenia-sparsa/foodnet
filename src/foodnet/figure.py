@@ -327,7 +327,8 @@ def matrices_svg(result: dict) -> str:
     second_info = result.get("second_window") or {}
     if second_info.get("metabolites"):
         what += f" (* {second_info['label']})"
-    caption = (f"Net change over the {what}, mean over experiments (over replicates within one). "
+    caption = (("INCOMPLETE: records could not be read from mGrowthDB. " if result.get("errors") else "")
+               + f"Net change over the {what}, mean over experiments (over replicates within one). "
                f"foodnet {net.meta.get('tool_version', '')}, "
                f"{net.meta.get('derived_on', '')}; mGrowthDB studies {', '.join(sorted(net.studies))}.")
     for line in _wrap(caption, width - label_w - 10, 11):

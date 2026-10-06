@@ -29,11 +29,9 @@ def _rows(changes):
 
 # ---- the spread, and the experiment as the unit -----------------------------------------------------
 
-def test_a_change_must_clear_the_limit_across_its_spread():
+def test_the_mean_alone_and_one_value_decide_as_before():
     assert derive.classify([5.0, 5.2], 0.2) == 1
     assert derive.classify([-0.2, 1.9], 0.2) is None           # +0.84 +/- 1.04: inconclusive
-    assert derive.classify([-0.4, 0.7], 0.2) is None           # opposite signs: never "no change"
-    assert derive.classify([0.05, 0.1], 0.2) == 0
     assert derive.classify([-0.2, 1.9], 0.2, agree=False) == 1
     assert derive.classify([0.9], 0.2) == 1                     # one value: judged by itself
 
@@ -170,11 +168,21 @@ def test_a_taxon_with_more_data_in_another_medium_is_named():
 
 # ---- agreement (round 2) ------------------------------------------------------------------------------
 
-def test_replicates_must_agree_and_more_replicates_never_make_a_change_easier():
-    assert derive.classify([0.25, 0.3], 0.2) == 1
-    assert derive.classify([0.25, 0.3, 0.1], 0.2) is None          # one replicate inside the limit
-    assert derive.classify([0.05, -0.1, 0.12], 0.2) == 0
+def test_a_change_is_decided_on_a_confidence_interval_that_more_replicates_narrow():
+    assert derive.classify([0.25, 0.3], 0.2) is None                  # two close replicates near the limit
+    assert derive.classify([0.25, 0.3, 0.28, 0.27, 0.29], 0.2) == 1    # five pin it down beyond it
+    assert derive.classify([0.05, -0.1, 0.12, 0.0], 0.2) == 0
     assert derive.classify([-0.4, 0.7], 0.2) is None
+    # one failed sample does not erase what four replicates agree on (E. coli LF82 pyruvate)
+    assert derive.classify([0.37, -8.56, -8.17, -8.06, -8.11], 0.2) == -1
+
+
+def test_an_experiment_that_contradicts_the_others_is_a_conflict_even_when_noisy():
+    cultures = [_culture("E1", [0, 1, 2, 3]) for _ in range(3)] + \
+        [_culture("E2", [0, 1, 2, 3], study="S2") for _ in range(3)]
+    rows = _rows([(0, 1.0), (1, 1.1), (2, 0.9), (3, -3.0), (4, -3.1), (5, 0.1)])
+    cell = derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]
+    assert cell["state"] == "inconclusive" and "conflict" in cell["cautions"]
 
 
 def test_experiments_that_agree_in_direction_but_not_in_size_stay_a_change():
@@ -188,6 +196,7 @@ def test_experiments_that_agree_in_direction_but_not_in_size_stay_a_change():
 def test_an_inconclusive_experiment_does_not_veto_the_others_but_is_named():
     cultures = [_culture("E1", [0, 1, 2, 3]), _culture("E1", [0, 1, 2, 3]),
                 _culture("E2", [0, 1, 2, 3], study="S2"), _culture("E2", [0, 1, 2, 3], study="S2")]
-    cell = derive.pool(_rows([(0, 1.0), (1, 1.2), (2, -0.5), (3, 1.5)]), cultures, 0.2)[("t1", "x", "exponential")]
+    cell = derive.pool(_rows([(0, 1.0), (1, 1.2), (2, -0.1), (3, 1.5)]), cultures, 0.2)[("t1", "x", "exponential")]
     assert cell["state"] == "produced" and cell["mean"] == pytest.approx(1.1)
-    assert any("left out as inconclusive" in n for n in cell["notes"])
+    assert any("left out as inconclusive" in n for n in cell["notes"]) and "experiment_left_out" in cell["cautions"]
+    assert cell["n"] == 2 and cell["n_experiments"] == 1           # what the value rests on

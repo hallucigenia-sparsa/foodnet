@@ -44,6 +44,9 @@ CAUTIONS = (
     "boundaries_differ",       # the replicates' phase boundaries lie further apart than a sampling interval
     "no_variance",             # the replicates are identical (rounding, or one series deposited twice): no test
     "amounts_differ",          # the experiments agree in direction, with amounts more than twofold apart
+    "experiment_left_out",     # an inconclusive experiment that does not contradict the others is left out
+    "still_changing",          # the metabolite kept changing beyond the limit right after growth ended
+    "growth_rate_boundary",    # the growth-rate rule, not the 90% rule, placed the end of exponential growth
 )
 
 # words before a genus that are not a genus (the same rule as grownet)
