@@ -74,8 +74,10 @@ gate applies.
   main settings through every output on the synthetic data (found and fixed: a taxon with a growth rate and
   no arc broke the report); HTML through every route of the page (escaped everywhere); a clean wheel install
   and the page smoke test; All live (25 studies, 93 cultures, about 37 s, valid); mGrowthDB unreachable (a
-  clear error); R CMD check OK; CI green on every job. Not rechecked live: Send to Cytoscape after the arcs
-  gained `exponential_h` (the payload is tested; the transport is grownet's). Left for the release pull
+  clear error); R CMD check OK; CI green on every job. Send to Cytoscape rechecked live the same day against
+  Karoline's Cytoscape: counts equal, shapes, sizes, colors, dashes, phase shading and widths read back from
+  the view, `exponential_h` a Double column, no amount on a presence-only arc, and a second send updates the
+  style in place. Left for the release pull
   request: the changelog date and CITATION.cff's date-released; then PyPI trusted publishing (RELEASING.md).
 
 ## Things learned about mGrowthDB while building
