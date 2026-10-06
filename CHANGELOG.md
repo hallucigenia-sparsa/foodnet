@@ -20,7 +20,8 @@ semantic versioning.
 - CRM mode: growth rates and initial medium concentrations, downloadable or sent to R, and an R companion
   package that builds miaSim's consumer-resource arguments.
 - The local page, the command line, the Windows program, and grownet's guardrail gate and release checks.
-- The consumed and produced matrices as an image (SVG), shown first among the results and downloadable.
+- The consumed and produced matrices as an image (SVG), shown first among the results and downloadable;
+  hovering over a cell shows its value and the studies, experiments and medium behind it.
 - The length of the exponential phase per arc, in the result table and every output.
 - A filled second box limits the search: study or experiment ids set the scope, a medium name the value
   medium, and with ids alone the majority medium within them gives the values and their other media

@@ -87,7 +87,8 @@ Every decision and its reason is in [docs/METHOD_NOTES.md](docs/METHOD_NOTES.md)
 - **The matrices as an image**, shown first under the settings: consumed and produced side by side (or one
   above the other when they are wide): a number on a gray for a change, white for
   measured without one, pale orange for not assayed, an open circle for a change seen only in another medium.
-  Downloadable as SVG, and in the matrices zip.
+  Downloadable as SVG, and in the matrices zip. Hovering over a cell shows its value, its replicates and the
+  studies, experiments and medium behind it (also in the downloaded SVG, opened in a browser).
 - **Network**: JSON (the canonical format, [schema](schema/metabolite_network.schema.json)) or GraphML.
 - **Taxa x metabolites matrix** (CSV): one cell per taxon and metabolite, the mean change in mM, positive
   when produced and negative when consumed.

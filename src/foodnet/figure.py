@@ -69,6 +69,45 @@ def _number(v: float) -> str:
     return f"{v:.1f}" if v >= 1 else f"{v:.2f}"
 
 
+def _studies(result: dict, ids) -> str:
+    """Study ids with their titles, as mGrowthDB names them."""
+    studies = result["network"].studies
+    return "; ".join(f"{sid} ({studies[sid].citation})" if sid in studies and studies[sid].citation not in ("", sid)
+                     else sid for sid in ids)
+
+
+def tooltip(result: dict, taxon, met, phase: str, direction: str, evidence: str, value) -> str:
+    """The text a mouseover shows for one cell: what it is, its value and the studies behind it."""
+    from .matrix import interval
+    head = f"{taxon.name}, {met.name}, {direction} ({interval(result, met.id, phase)})"
+    cell = result["cells"].get((taxon.id, met.id, phase))
+    lines = [head]
+    if cell is not None and cell["n"]:
+        limit = result["settings"].get("detection_limit", 0.2)
+        if evidence == "measured":
+            if result["settings"].get("booleans"):
+                amount = "yes"
+            else:
+                spread = "" if cell["sd"] is None else f" \u00b1 {cell['sd']:.2g}"
+                amount = f"{value:.3g}{spread} mM"
+            lines.append(f"{amount}, {cell['n']} replicate(s)")
+        else:
+            lines.append(f"measured, no change beyond {limit:g} mM in this direction "
+                         f"(mean {cell['mean']:+.3g} mM, {cell['n']} replicate(s))")
+        lines.append("Studies: " + _studies(result, cell["studies"]))
+        lines.append("Experiments: " + ", ".join(cell["experiments"]))
+        lines.append("Medium: " + "; ".join(cell["media"]))
+        if cell["cautions"]:
+            lines.append("Cautions: " + ", ".join(cell["cautions"]))
+        lines += cell["notes"]
+    else:
+        lines.append("not assayed in the medium the values come from")
+    for entry in (result["presence"].get((taxon.id, met.id, phase)) or {}).get(direction, []):
+        lines.append(f"Seen in {entry['medium']} ({entry['mean']:+.3g} mM, {entry['n']} replicate(s)): "
+                     + _studies(result, entry["studies"]))
+    return "\n".join(lines)
+
+
 def matrices_svg(result: dict) -> str:
     """Both matrices, side by side or stacked when that would be too wide, with their key, as an SVG."""
     net = result["network"]
@@ -130,6 +169,10 @@ def matrices_svg(result: dict) -> str:
             for j, (m, ph, _) in enumerate(cols):
                 x, y = x0 + j * CELL_W, top + i * CELL_H
                 v, evidence = pair[direction][i][j], pair[f"evidence_{direction}"][i][j]
+                # each cell is a group with a title, which a browser shows on mouseover: what the cell is and
+                # the studies behind it (Karoline, 2026-10-06: "a mouseover will show the source studies")
+                tip = html.escape(tooltip(result, t, m, ph, direction, evidence, v))
+                out.append(f'<g><title>{tip}</title>')
                 if evidence == "measured":
                     share = 1.0 if booleans else math.sqrt(min(1.0, v / vmax))
                     fill = _gray(0.75 if booleans else share)
@@ -138,6 +181,7 @@ def matrices_svg(result: dict) -> str:
                         ink = "#ffffff" if share > 0.55 else brand.INK
                         out.append(f'<text x="{x + CELL_W / 2:.1f}" y="{y + CELL_H / 2 + 4:.1f}" font-size="10.5" '
                                    f'text-anchor="middle" fill="{ink}">{_number(v)}</text>')
+                    out.append("</g>")
                     continue
                 cell = result["cells"].get((t.id, m.id, ph))
                 assayed = cell is not None and cell["n"]
@@ -147,6 +191,7 @@ def matrices_svg(result: dict) -> str:
                 if seen:
                     out.append(f'<circle cx="{x + CELL_W / 2:.1f}" cy="{y + CELL_H / 2:.1f}" r="4.2" fill="none" '
                                f'stroke="{brand.MUTED}" stroke-width="1.2"/>')
+                out.append("</g>")
         # the white grid between cells, as in the figure
         for j in range(len(cols) + 1):
             x = x0 + j * CELL_W

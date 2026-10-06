@@ -77,3 +77,17 @@ def test_second_window_columns_carry_a_star_that_the_caption_explains(client):
     texts = _texts(figure.matrices_svg(run(client, second_window_metabolites="glucose")))
     assert "glucose *" in texts and "acetate" in texts          # no suffix on the columns of the phase
     assert any("(* 0 h to the last sample)" in t for t in texts)
+
+
+def test_every_cell_names_its_source_studies_on_mouseover(client):
+    # Karoline, 2026-10-06: "make fields in the output matrices interactive, so a mouseover will show the
+    # source studies". An SVG title, which every browser shows as a tooltip, without JavaScript.
+    root = ET.fromstring(figure.matrices_svg(run(client)))
+    titles = ["".join(t.itertext()) for t in root.iter(f"{SVG}title")]
+    acetate = next(t for t in titles if t.startswith("Alpha alpha A1, acetate, produced"))
+    assert "4 \u00b1 0 mM, 2 replicate(s)" in acetate          # both replicates +4, so sd 0
+    assert "SMGDB00000001 (Synthetic study one)" in acetate and "EMGDB000000001" in acetate
+    formate = next(t for t in titles if t.startswith("Beta beta B1, formate, produced"))
+    assert "not assayed" in formate and "Seen in mMCB (+5 mM, 1 replicate(s)): SMGDB00000002" in formate
+    # one title per cell: 3 taxa x 4 metabolites x 2 matrices
+    assert len(titles) == 24
