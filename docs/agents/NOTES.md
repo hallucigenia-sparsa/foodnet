@@ -7,6 +7,10 @@ gate applies.
 
 ## Current state
 
+- 2026-10-06: **0.1.0 released**: on PyPI (wheel and source archive) and as a GitHub release with
+  `foodnet-v0.1.0-windows.zip`, from tag v0.1.0 on 7ebe84b. Karoline tested the Windows program, Cytoscape and
+  R beforehand. The first tag went on before the release commit and the release check stopped that run
+  (nothing published); the tag was moved. A release needs the dated changelog and CITATION.cff first.
 - 2026-10-04: 0.1.0 built in one session by Karoline's agent from Karoline's specification (her decisions
   are in [docs/METHOD_NOTES.md](../METHOD_NOTES.md), in her words). Public repository
   hallucigenia-sparsa/foodnet created the same day (Karoline's choice of public); CI passed on every job.
