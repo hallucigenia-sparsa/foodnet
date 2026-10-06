@@ -34,8 +34,8 @@ CAUTION_TEXT = {
     "not_grown": "the culture did not grow (neither 1.5-fold nor, in OD, by 0.1) nor metabolize: no value, no arc",
     "growth_unclear": "its curve shows no growth (often an OD read without its blank), but it metabolized",
     "growth_unknown": "no growth curve at all: whole-run change, growth never checked",
-    "within_scatter": "a change within its window's own scatter; it keeps its vote, inconclusive only if all are",
-    "within_evaporation": "no growth: a rise evaporation could explain (a set share); it keeps its vote, as above",
+    "within_scatter": "a change within its window's own scatter: it can stop a call, not make one",
+    "within_evaporation": "no growth: a rise evaporation could explain (a set share): it can stop a call, not make one",
     "start_differs": "the replicates' metabolite samples start apart, so they cover different stretches of the phase",
     "pair_decided": "decided on two replicates (a change, or no change); a pair errs more readily than three",
 }

@@ -54,9 +54,9 @@ CAUTIONS = (
     "not_grown",               # the culture grew by neither the fold rule nor an OD rise of 0.1: no value
     "growth_unclear",          # whole_run: the curve shows no growth, but its compounds moved as metabolism does
     "growth_unknown",          # whole_run: the culture has no growth curve at all
-    "within_scatter",          # a change within twice its window's own scatter: it keeps its vote, and the cell is
-                               # inconclusive only when every value is so
-    "within_evaporation",      # growth_unclear: a rise evaporation could account for (the evaporation setting)
+    "within_scatter",          # a change within twice its window's own scatter: it keeps its vote, so it can stop a
+                               # call, but a change needs two unflagged replicates that show it
+    "within_evaporation",      # growth_unclear: a rise evaporation could account for (the setting); as above
     "start_differs",           # the replicates' windows start more than a quarter of the phase apart
     "pair_decided",            # an experiment of two replicates decided it (a change or no change), no interval
 )

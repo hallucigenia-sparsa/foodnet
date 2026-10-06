@@ -235,7 +235,9 @@ with metabolite data."
     within the window the change spans (the spread of its sample-to-sample steps, so a sharp depletion is no
     scatter) and only to changes beyond the limit, so a flat series stays a measured 0; and a value flagged
     by either test keeps its vote (a fourteenth round showed that dropping it selects replicates by their
-    values): the cell is inconclusive only when every value is flagged, and otherwise the caution says which.
+    values), so it can stop a call, but cannot make one: a change needs at least two unflagged replicates
+    that show it themselves (a fifteenth round found a Bacteroides pair, +0.20 and a flagged +0.21 mM, read as
+    butyrate production).
 27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
     this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
     be read says `incomplete` in its files and the command line exits 3; the page never serves another
