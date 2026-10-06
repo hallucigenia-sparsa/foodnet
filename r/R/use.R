@@ -384,7 +384,11 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     if (!identical(dim(K), c(n, m)) || anyNA(K)) stop_foodnet("monod_constant needs one number or a ", n, " by ",
                                                              m, " matrix")
     rates <- crm_rates(x, missing = missing_rate)
-    if (growth == "phase_floor") rates <- pmax(rates, x$phase_growth_rates, na.rm = TRUE)
+    if (growth == "phase_floor") {
+        # the same rule as the scale and E (crm_growth), and never a stand-in for a missing rate
+        floored <- suppressWarnings(crm_growth(x, "phase_floor"))
+        rates <- ifelse(is.na(x$growth_rates), rates, floored)
+    }
     if (anyNA(rates)) {
         stop_foodnet("no growth rate for ", paste(names(rates)[is.na(rates)], collapse = ", "),
                      ": a CRM simulation needs one for every taxon. Give as_miasim(x, missing_rate = ) a ",

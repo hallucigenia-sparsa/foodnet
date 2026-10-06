@@ -120,4 +120,10 @@ test_that("a growth rate below the phase's own mean rate is named, and can be fl
     args <- suppressWarnings(as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, na = "zero",
                                        growth = "phase_floor"))
     expect_equal(args$growth_rates, c(0.8, 0.5))
+    # a phase rate only a little above the fitted one changes nothing anywhere (the scale's own rule)
+    payload$phase_growth_rates <- list(0.42, 0.5)
+    crm <- foodnet:::as_foodnet_crm(payload)
+    args <- suppressWarnings(as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, na = "zero",
+                                       growth = "phase_floor"))
+    expect_equal(args$growth_rates, c(0.4, 0.5))
 })
