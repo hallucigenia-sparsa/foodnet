@@ -7,6 +7,16 @@ gate applies.
 
 ## Current state
 
+- 2026-10-06, after 0.1.0: **a six-round adversarial review** (physiology, statistics, consumer-resource
+  modeling, software security, and a critic; each round re-attacked the version fixed after the last) led to
+  0.2.0.dev0 on main, in commits 6a83eb4 to 247c946, **not pushed and not released**. Karoline's decisions are
+  METHOD_NOTES 20 to 27; the accepted trade-offs are under Known limits. The biggest changes: values judged on
+  a confidence interval (pairs by agreement, one replicate inconclusive) with each experiment counted once;
+  growth ending at the 90% rule or earlier where the growth rate drops (E. coli LF82 at 8 h); new evidence
+  states (inconclusive, no_phase, seen_elsewhere); CRM parameters rebuilt on miaSim's equations with a unit of
+  abundance per taxon (crm_scale) and crm_backcheck(); a secret for the R listener; INCOMPLETE and every
+  warning carried into every file. The Figure 3c reproduction recipe in the paper folder was made with 0.1.0
+  rules and must be rerun before it is cited with 0.2.0.
 - 2026-10-06: **0.1.0 released**: on PyPI (wheel and source archive) and as a GitHub release with
   `foodnet-v0.1.0-windows.zip`, from tag v0.1.0 on 7ebe84b. Karoline tested the Windows program, Cytoscape and
   R beforehand. The first tag went on before the release commit and the release check stopped that run
