@@ -173,7 +173,14 @@ or consumed: those arcs are presence_only (dashed) and their cells NA in the val
 filled, study or experiment ids limit the data to them and a medium name chooses the value medium; with ids
 and no medium name, the medium holding most taxa within the ids gives the values and their other media
 presence. Include supporting evidence outside the second box adds presence from the rest.
-Ignore media differences pools every medium.
+Ignore media differences pools every medium.</p>
+<p>What counts as one medium: mGrowthDB names a medium but does not report its composition systematically, so an
+added or removed compound often appears only in an experiment's description or name ("WC plus mucin beads",
+"without glucose", "+Ac"). Such an experiment, or one with another recorded atmosphere, counts as another
+medium. A medium name typed in the second box therefore gives the values from the medium it matches for the
+most taxa; the others it matches (Wilkins-Chalgren with mucin, for "Wilkins-Chalgren") give presence only, and
+the page names them. Tell media apart by their descriptions and atmosphere switches this off; Exclude these
+experiments leaves out an experiment by id. The report lists every medium found.
 Studies in the value medium are pooled; when their experiments disagree on what happened, the value carries the
 caution conflict and the report names the experiments. The same experiment deposited under two studies is counted
 once.</p>

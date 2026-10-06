@@ -1,14 +1,13 @@
-"""The statistics foodnet reports, in the standard library only.
+"""The statistics foodnet reports, in the standard library only (grownet's module, unchanged).
 
-Welch's t-test compares the per-replicate log2 values with and without a partner, and Benjamini-Hochberg
-corrects the resulting p-values for the number of comparisons tested in one derivation. Neither decides
-whether an edge exists (that is the mean plus or minus its standard deviation, see
-`foodnet.derive.classify`): a significant result supports an edge, and a non-significant one is not
-informative (Karoline, on #40). They are reported on each edge so a reader can weigh the evidence.
+foodnet uses the paired test with zeros as a one-sample t-test of a value's replicate changes against zero,
+and Benjamini-Hochberg (or Benjamini-Yekutieli) to correct the p-values over every value of a search. Neither
+decides anything: whether a compound was produced or consumed is the detection limit's business. They are
+reported beside each value so a reader can weigh it.
 
 The t distribution comes from the regularized incomplete beta function (continued fraction, as in
 Numerical Recipes), since the standard library has no Student's t. It is checked against printed
-critical values in the tests.
+critical values in grownet's tests.
 """
 from __future__ import annotations
 
@@ -112,7 +111,7 @@ def benjamini_yekutieli(p_values) -> list:
 
     Valid under any dependence between the tests. Benjamini-Hochberg needs independence or positive
     regression dependence, which the shared replicate sets of one derivation plausibly give, so it is the
-    default and this is the conservative alternative (Karoline, on #54).
+    default and this is the conservative alternative (Karoline, on grownet #54).
     """
     m = sum(1 for p in p_values if p is not None)
     c = sum(1.0 / i for i in range(1, m + 1)) if m else 1.0

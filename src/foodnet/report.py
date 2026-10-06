@@ -91,11 +91,13 @@ def report_text(result: dict) -> str:
         lines += ["", "Seen in other media (presence only):"] + [f"  * {x}" for x in other]
     if s.get("report_rates"):
         lines += ["", "Growth rates (1/h):"]
-        for tid, r in sorted(result["rates"].items(), key=lambda kv: net.nodes[kv[0]].name):
-            lines.append(f"  {net.nodes[tid].name}: {r['rate']:.3f} (median of {r['n']}, from {r['source']}, "
+        # a taxon can have a rate without having an arc, so names come from every taxon with data
+        names = result.get("names", {})
+        for tid, r in sorted(result["rates"].items(), key=lambda kv: names.get(kv[0], kv[0])):
+            lines.append(f"  {names.get(tid, tid)}: {r['rate']:.3f} (median of {r['n']}, from {r['source']}, "
                          f"{r['method']})")
         for tid, why in result["without_a_rate"].items():
-            lines.append(f"  {net.nodes[tid].name if tid in net.nodes else tid}: none, {why}")
+            lines.append(f"  {names.get(tid, tid)}: none, {why}")
     if result["initial"]:
         lines += ["", "Initial concentrations in the value medium (mM, mean of the first samples):"]
         for _, v in sorted(result["initial"].items(), key=lambda kv: kv[1]["name"]):

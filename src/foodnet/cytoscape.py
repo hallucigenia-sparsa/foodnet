@@ -196,7 +196,7 @@ class CytoscapeError(RuntimeError):
 
 # What can go wrong on the wire: urllib's own errors, and http.client's for a listener that answers with
 # something that is not HTTP (a database, a dev server on the wrong port), which is not a URLError and
-# escaped as a traceback before (found by Craig's agent, #70). TimeoutError and OSError cover a socket
+# escaped as a traceback before (found by Craig's agent, grownet #70). TimeoutError and OSError cover a socket
 # that times out or resets outside urllib's wrapping.
 WIRE_ERRORS = (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError)
 
@@ -285,7 +285,7 @@ def send(net: FoodNetwork, port: int = PORT, name: str = "foodnet",
         try:
             _ensure_style(root, timeout)
             # applying a style or a layout is a GET in CyREST; a POST is refused (405), which is how the
-            # style went missing before (#76)
+            # style went missing before (grownet #76)
             _get(f"{root}/apply/styles/{urllib.parse.quote(STYLE_NAME)}/{suid}", timeout)
             applied = STYLE_NAME
             if layout:

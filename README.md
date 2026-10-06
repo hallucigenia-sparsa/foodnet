@@ -45,8 +45,8 @@ foodnet gui
 ```
 
 opens the page in your browser. Type taxa in the first box (a species, a strain, a genus or an NCBI taxon
-id, one per line), or press Example, and press Get taxon-metabolite network. The arcs appear under the settings, with
-the downloads above them.
+id, one per line), or press Example, and press Get taxon-metabolite network. The consumed and produced
+matrices appear first under the settings, then the taxa and the arcs with the downloads.
 
 ![the legend](docs/legend.svg)
 
@@ -66,9 +66,10 @@ the downloads above them.
    24 h is used, and flagged.
 4. **Values from one medium, presence from the others.** With the second box empty, all data are
    considered: the values come from the medium that holds data for the most taxa, and every other medium
-   only says whether a compound was produced or consumed (`presence_only` arcs, NA matrix cells). In the
-   second box, study or experiment ids limit the data to them, and a medium name chooses the value medium;
-   with ids and no medium, the majority rule runs within the ids. "Include supporting evidence outside the
+   only says whether a compound was produced or consumed (`presence_only` arcs, NA matrix cells). A filled
+   second box limits the data to what matches it: study or experiment ids, or a medium name, which gives the
+   values from the medium it matches for the most taxa; with ids and no medium, the majority rule runs within
+   the ids. "Include supporting evidence outside the
    second box" adds the rest as presence. Because mGrowthDB does not report a medium's composition
    systematically, an experiment whose description says something was added or taken away ("WC plus mucin
    beads", "without glucose", "+Ac"), or whose recorded atmosphere differs, counts as another medium; this

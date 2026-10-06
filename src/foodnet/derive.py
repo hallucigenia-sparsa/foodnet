@@ -60,7 +60,7 @@ def boundaries(cultures, fraction: float = phases.FRACTION, factor: float = phas
         ratio = phases.spike(c.growth["values"], spike_factor)
         if ratio:
             skipped.append((c.label, f"growth curve spikes ({ratio:.0f} times its neighbors); its phase boundary "
-                            "is taken from the other replicates"))
+                            "is taken from the other replicates of its experiment, if any has one"))
             continue
         try:
             own[i] = phases.exponential_end(c.growth["times"], c.growth["values"], fraction, factor)

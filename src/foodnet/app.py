@@ -1,4 +1,4 @@
-"""The entry point of the self-contained program (the Windows build, #26).
+"""The entry point of the self-contained program (the Windows build, grownet #26).
 
 Double-clicked, with no arguments, it opens the local page in the browser, as `foodnet gui` does, and the
 console window it runs in shows the address and stops the tool when it is closed. Given arguments it is

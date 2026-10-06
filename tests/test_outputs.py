@@ -68,3 +68,12 @@ def test_the_example_fixture_is_valid():
     path = os.path.join(os.path.dirname(__file__), "fixtures", "example_network.json")
     with open(path, encoding="utf-8") as f:
         assert validate_document(json.load(f)) == []
+
+
+def test_a_taxon_with_a_growth_rate_but_no_arc_is_reported_by_name(client):
+    # found in the pre-release audit: with values from mMCB only and the stationary phase, Beta beta has a
+    # growth rate and no arc, and the report looked its name up among the network's nodes
+    r = run(client, phase="stationary", booleans=True, conditions="mMCB", report_rates=True, rate_window=3)
+    assert "ncbi:2" not in r["network"].nodes
+    text = report_text(r)
+    assert "Beta beta B1:" in text

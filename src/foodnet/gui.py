@@ -354,7 +354,6 @@ def _outputs(token: str, result: dict) -> str:
     t = _esc(token)
     job = _esc(result.get("job", ""))
     tail = f"&amp;job={job}" if job else ""
-    net = result["network"]
     options = "".join(f"<option value=\"{k}\">{label}</option>" for k, label in FORMATS)
     download = (f"<form class=\"inline\" method=\"get\" action=\"/download\">"
                 f"<input type=\"hidden\" name=\"token\" value=\"{t}\">"
@@ -387,7 +386,7 @@ def _outputs(token: str, result: dict) -> str:
     missing = result.get("without_a_rate") or {}
     missing_note = ""
     if with_rates and missing:
-        names = [net.nodes[k].name if k in net.nodes else k for k in missing]
+        names = [result.get("names", {}).get(k, k) for k in missing]
         missing_note = (f"<p class=\"hint\">No growth rate for {_esc(', '.join(names[:6]))}"
                         f"{' and more' if len(names) > 6 else ''}: a consumer-resource model needs one from "
                         "elsewhere; the report says why.</p>")
@@ -512,6 +511,27 @@ def _number(form, key, cast=float, positive=True):
     except ValueError:
         return None
     return abs(value) if positive else value
+
+
+def window_problem(form: dict) -> str:
+    """Why a time window typed in Advanced settings cannot be used, or "" when it can (or none was typed)."""
+    for prefix, name in (("window", "The time window"), ("second_window", "The second time window")):
+        raw_start = (form.get(f"{prefix}_start", [""])[0] or "").strip()
+        raw_end = (form.get(f"{prefix}_end", [""])[0] or "").strip()
+        if prefix == "window" and not (raw_start or raw_end):
+            continue
+        if prefix == "second_window" and not raw_end:
+            continue                                        # an empty end is "until the last sample"
+        try:
+            start = float(raw_start or 0)
+            end = float(raw_end)
+        except ValueError:
+            return f"{name} needs numbers in hours; it was {raw_start or '(empty)'} to {raw_end or '(empty)'}."
+        if prefix == "window" and not raw_start:
+            return f"{name} needs a start as well as an end, in hours."
+        if end <= start:
+            return f"{name} ends at {end:g} h, which is not after its start at {start:g} h."
+    return ""
 
 
 def parse_settings(form: dict) -> dict:
@@ -780,6 +800,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
         if not [e for e in entries if e.strip()]:
             self._send(render_form(self.token, settings=settings, message="Type at least one taxon.",
+                                   conditions=settings.get("conditions", "")))
+            return
+        if window_problem(form):
+            # a window that cannot be used is said, not silently dropped (found in the pre-release audit)
+            self._send(render_form(self.token, "\n".join(entries), settings, message=window_problem(form),
                                    conditions=settings.get("conditions", "")))
             return
         job = self._start(entries, settings)

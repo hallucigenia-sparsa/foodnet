@@ -125,3 +125,13 @@ def test_metabolite_nodes_carry_their_chebi_id(client):
     net = run(client)["network"]
     assert {n.name: n.chebi_id for n in net.metabolites()} == {
         "acetate": "30089", "butyrate": "17968", "formate": "15740", "glucose": "17234"}
+
+
+def test_a_window_that_cannot_be_used_is_said_not_dropped():
+    # found in the pre-release audit: a window ending before its start was silently ignored
+    assert gui.window_problem({"window_start": ["10"], "window_end": ["5"]}).startswith(
+        "The time window ends at 5 h, which is not after its start at 10 h")
+    assert "needs numbers" in gui.window_problem({"window_start": ["a"], "window_end": ["5"]})
+    assert "needs a start" in gui.window_problem({"window_end": ["5"]})
+    assert gui.window_problem({"second_window_start": ["0"], "second_window_end": [""]}) == ""
+    assert gui.window_problem({"window_start": ["0"], "window_end": ["48"]}) == ""

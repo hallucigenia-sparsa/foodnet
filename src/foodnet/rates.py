@@ -1,6 +1,6 @@
-"""Growth rates from a growth curve, two ways, standard library only (#41).
+"""Growth rates from a growth curve, two ways, standard library only (grownet #41).
 
-Karoline decided on 2026-09-19 (on #41) that the growth rate ships as a metric with two implementations,
+Karoline decided on 2026-09-19 (on grownet #41) that the growth rate ships as a metric with two implementations,
 and on 2026-09-27 that the implementation is its own option:
 
 * `easylinear` (the default): the maximum specific growth rate by the method of Hall et al. (2014) as the

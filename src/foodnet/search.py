@@ -332,6 +332,8 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
             "unresolved": resolved["unresolved"], "taxon_ids": resolved["taxon_ids"], "all": all_studies,
             "excluded": left_out, "studies": studies, "network": net, "cells": matrix_cells,
             "taxa_nodes": taxa_nodes, "metabolite_nodes": metabolite_nodes, "second_window": second_info,
+            # every taxon and metabolite with data by name, whether or not it has an arc in the network
+            "names": {n.id: n.name for n in taxa_nodes + metabolite_nodes},
             "presence": matrix_presence, "value_rule": rule, "duplicates": duplicate_lines,
             "rates": organism_rates, "without_a_rate": without_rate, "initial": initial,
             "cultures": len(cultures), "value_cultures": len(chosen), "warnings": warnings,

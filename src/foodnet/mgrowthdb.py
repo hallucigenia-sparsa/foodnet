@@ -9,7 +9,7 @@ bioreplicate beside the growth curves; foodnet derives production and consumptio
 foodnet.derive). Public data needs no auth. mGrowthDB is open (see docs/DATA_GOVERNANCE.md); foodnet pulls
 from it but never commits raw or pulled data.
 
-The client is the one foodnet uses, unchanged apart from its name.
+The client is grownet's, unchanged apart from its name.
 
 The client works for ANY study id (get_study, get_experiment, study_experiments). It caches responses
 in memory for the life of the client (and optionally on disk via `cache_dir`) so repeated pulls of the
