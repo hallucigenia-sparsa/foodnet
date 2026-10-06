@@ -270,12 +270,20 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     }
     x$initial <- x$initial[keep_r]
     kept <- x$taxa[keep_t]
+    removed <- setdiff(x$taxa, kept)
     x$taxa <- kept
     x$resources <- x$resources[keep_r]
     p <- x$caveats$presence_only
     x$caveats$presence_only <- p[p$taxon %in% kept & p$resource %in% x$resources, , drop = FALSE]
     x$caveats$without_a_rate <- intersect(x$caveats$without_a_rate, kept)
     x$caveats$whole_run <- intersect(x$caveats$whole_run, kept)
+    # the page's warnings were written for the whole search: keep those that name no taxon left out, and the
+    # ones that name none (counts over the whole search are marked as such)
+    if (length(x$caveats$warnings) && length(removed)) {
+        names_any <- function(w) any(vapply(removed, function(t) grepl(t, w, fixed = TRUE), logical(1)))
+        x$caveats$warnings <- c(paste("(for the whole search)", x$caveats$warnings[!vapply(x$caveats$warnings,
+                                                                                           names_any, logical(1))]))
+    }
     for (name in c("cautions", "inconclusive")) {
         rows <- x$caveats[[name]]
         if (NROW(rows)) x$caveats[[name]] <- rows[rows$taxon %in% kept & rows$resource %in% x$resources, , drop = FALSE]

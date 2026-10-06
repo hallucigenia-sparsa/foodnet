@@ -47,15 +47,17 @@ never extrapolated: the nearest sample is used and the arc is marked `window_bey
 from __future__ import annotations
 
 import math
+import statistics
 
 FRACTION = 0.9               # the share of the maximal abundance that ends exponential growth
 NO_GROWTH_FACTOR = 1.5       # below this rise (maximum over start) the culture did not grow
 # ... unless its optical density rose by this much: an OD read without its blank starts high, so a culture that
 # grew can rise less than 1.5-fold (study SMGDB00000010 starts near 0.7 and rises by 0.3; Karoline, 2026-10-06)
 OD_RISE = 0.1
-# and an OD that grew by the fold rule must still rise by this much: near the blank, a fold is noise (a
-# culture from 0.020 to 0.031 is 1.55-fold; Karoline, 2026-10-06)
-OD_MIN_RISE = 0.05
+# a share of a compound's level that evaporation could account for over a run: a culture that did not grow
+# counts as metabolically active only with changes beyond it (Karoline, 2026-10-06: "raise the threshold ...
+# so it exceeds what would be expected based on evaporation")
+EVAPORATION = 0.1
 SHORT_RECORD_H = 24.0        # a metabolite series shorter than this is flagged (Karoline, 2026-10-04)
 
 # time units to hours
@@ -101,7 +103,7 @@ def rate_end(times, values, fraction: float = RATE_FRACTION) -> float | None:
 
 
 def exponential_end(times, values, fraction: float = FRACTION, factor: float = NO_GROWTH_FACTOR,
-                    min_rise: float = 0.0) -> dict:
+                    smoothed: bool = False) -> dict:
     """{"end": time, "index": i, "last": bool, "coarse": bool, "by": "90%" or "rate"}: where exponential
     growth ends on one growth curve: the earlier of the 90% rule and `rate_end`.
 
@@ -123,10 +125,14 @@ def exponential_end(times, values, fraction: float = FRACTION, factor: float = N
     if start is None:
         raise NoBoundary("no positive abundance in the growth curve")
     top = max(v for _, v in pairs)
-    if top < factor * start:
-        raise NoBoundary(f"did not grow: the maximum is {top / start:.2g} times the start, below {factor:g}")
-    if top - start < min_rise:
-        raise NoBoundary(f"did not grow: it rose by {top - start:.3g}, below {min_rise:g}")
+    # for OD, the growth test reads the maximum of a running median of three: near the blank one high reading
+    # is noise (0.020 to 0.031 is 1.55-fold), while low-density growth rises over several samples (Variovorax
+    # from 0.002 to 0.05); Karoline, 2026-10-06: "Smoothed fold, no floor"
+    values_only = [v for _, v in pairs]
+    grown_top = max([statistics.median(values_only[i - 1:i + 2]) for i in range(1, len(values_only) - 1)]
+                    + [values_only[0]]) if smoothed and len(values_only) >= 3 else top
+    if grown_top < factor * start:
+        raise NoBoundary(f"did not grow: the maximum is {grown_top / start:.3g} times the start, below {factor:g}")
     threshold = start + fraction * (top - start)
     end, by = next(t for t, v in pairs if v >= threshold), "90%"
     times = [t for t, _ in pairs]

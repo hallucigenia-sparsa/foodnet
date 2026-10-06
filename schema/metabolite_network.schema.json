@@ -202,6 +202,8 @@
                 "not_grown",
                 "growth_unclear",
                 "growth_unknown",
+                "within_scatter",
+                "within_evaporation",
                 "start_differs",
                 "pair_decided"
               ]

@@ -272,14 +272,26 @@ def test_a_taxon_with_phase_cultures_takes_its_biomass_from_them_only():
 def test_a_culture_that_shows_no_growth_but_metabolizes_gives_its_whole_run_change():
     curve = {"times": [0, 4, 8, 12], "technique": "od", "level": "", "unit": "od", "values": [0.63, 0.62, 0.63, 0.62]}
     c = _culture("E1", [0, 1, 2, 3], growth=[curve])
-    c.metabolites = {"lactate": {"name": "lactate", "chebi_id": "", "series": [(0, 1.0), (12, 0.0)]},
-                     "butyrate": {"name": "butyrate", "chebi_id": "", "series": [(0, 1.2), (12, 3.8)]}}
+    def met(name, values):
+        return {"name": name, "chebi_id": "", "series": list(zip((0, 4, 8, 12), values, strict=True))}
+    c.metabolites = {"lactate": met("lactate", (1.0, 0.6, 0.1, 0.0)), "butyrate": met("butyrate", (1.2, 2.0, 3.1, 3.8))}
     rows, _ = derive.changes([c], "exponential")
     assert all(r["cautions"][:2] == ["whole_run", "growth_unclear"] and r["change"] is not None for r in rows)
     assert c.not_grown
 
 
-def test_a_fold_on_near_blank_od_is_no_growth():
-    with pytest.raises(phase.NoBoundary, match="rose by"):
-        phase.exponential_end([0, 4, 8, 12, 16, 24], [0.020, 0.024, 0.019, 0.031, 0.027, 0.022], min_rise=0.05)
-    assert phase.exponential_end([0, 4, 8, 12], [0.01, 0.03, 0.08, 0.08], min_rise=0.05)["end"] == 8
+def test_a_fold_on_near_blank_od_is_no_growth_but_low_density_growth_is():
+    with pytest.raises(phase.NoBoundary, match="did not grow"):
+        phase.exponential_end([0, 4, 8, 12, 16, 24], [0.020, 0.024, 0.019, 0.031, 0.027, 0.022], smoothed=True)
+    # Variovorax-like: from 0.002, rising over several samples
+    assert phase.exponential_end([0, 4, 8, 12, 16], [0.002, 0.006, 0.02, 0.04, 0.045], smoothed=True)["end"] == 16
+
+
+def test_evaporation_is_not_metabolism():
+    curve = {"times": [0, 4, 8, 12], "technique": "od", "level": "", "unit": "od", "values": [0.5, 0.5, 0.5, 0.5]}
+    c = _culture("E1", [0, 1, 2, 3], growth=[curve])
+    # 10% volume loss: lactate concentrates steadily, volatile ethanol falls steadily
+    def met(name, values):
+        return {"name": name, "chebi_id": "", "series": list(zip((0, 4, 8, 12), values, strict=True))}
+    c.metabolites = {"lactate": met("lactate", (20, 20.7, 21.5, 22.2)), "ethanol": met("ethanol", (5, 4.7, 4.3, 4.0))}
+    assert not derive.active(c)

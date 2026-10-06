@@ -219,6 +219,16 @@ with metabolite data."
     compounds did not move so. An OD curve that grew by the fold rule must also rise by 0.05, since near the
     blank a fold is noise; a culture without any growth curve is marked `growth_unknown`. The whole-run
     taxa are named in the first header cell of every matrix, and their names stay the same in every file.
+    A twelfth round showed that test too lenient (noise passed it in up to 85% of simulated non-growing
+    cultures, and evaporation read as production and consumption) and the 0.05 floor too strict (Variovorax's
+    low inoculum, 0.002 to 0.05 OD). Karoline, 2026-10-06: "raise the threshold on change in metabolite
+    concentrations for non-growing organisms so it exceeds what would be expected based on evaporation", and
+    "Smoothed fold, no floor". So a culture that did not grow counts as active only when a compound was used
+    up (to below the limit, or falling as a trend) and another made (rising as a trend: Spearman's rank
+    correlation with time of 0.8 or more), each by more than the larger of the limit and 10% of its level
+    (what evaporation could account for); its whole-run values must clear the same threshold
+    (`within_evaporation`), and any whole-run value must exceed twice its series' own scatter
+    (`within_scatter`). For OD, the 1.5-fold test reads the maximum of a running median of three.
 27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
     this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
     be read says `incomplete` in its files and the command line exits 3; the page never serves another

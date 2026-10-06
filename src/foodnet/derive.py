@@ -66,8 +66,7 @@ def _own_boundary(c, fraction, factor, spike_factor) -> tuple:
             continue
         try:
             od = (curve.get("technique") or "").casefold() == "od"
-            found = phases.exponential_end(curve["times"], curve["values"], fraction, factor,
-                                           phases.OD_MIN_RISE if od else 0.0)
+            found = phases.exponential_end(curve["times"], curve["values"], fraction, factor, smoothed=od)
         except phases.NoBoundary as e:
             reasons.append(f"{curve['technique'] or 'growth'} curve: {e}")
             flat.append(str(e).startswith("did not grow") and not phases.grown_by_od(curve))
@@ -228,6 +227,12 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                                  "exponential_h": duration, "cautions": cautions})
                     continue
                 d = phases.change(series, start, end)
+                if "whole_run" in cautions and abs(d["change"]) < 2 * _scatter(series):
+                    # a whole-run change smaller than the series' own scatter is no change anyone measured
+                    cautions.append("within_scatter")
+                elif "growth_unclear" in cautions and abs(d["change"]) <= beyond_evaporation(series, limit):
+                    # a culture that did not grow: a change evaporation could account for is no value
+                    cautions.append("within_evaporation")
                 if d["beyond"] and "window_beyond_data" not in cautions:
                     cautions.append("window_beyond_data")
                 rows.append({"culture": i, "taxon": c.taxon["id"], "metabolite": mid,
@@ -238,13 +243,69 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
     return rows, skipped
 
 
+def _ranks(values) -> list:
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    ranks = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            ranks[order[k]] = (i + j) / 2
+        i = j + 1
+    return ranks
+
+
+TREND = 0.8                    # Spearman's rank correlation with time a trend must reach
+
+
+def _steady(series, limit: float, sign: int) -> bool:
+    """Whether a series moves one way over time, as a trend and not as scatter: Spearman's rank correlation
+    with time at least TREND in that direction (a single dip does not undo a rise: butyrate 2.60, 2.23, 2.72,
+    3.29, 3.50, 3.75), and more than twice the limit overall."""
+    values = [v for _, v in series]
+    if len(values) < 4 or sign * (values[-1] - values[0]) <= 2 * limit:
+        return False
+    a, b = _ranks(list(range(len(values)))), _ranks(values)
+    ma, mb = statistics.mean(a), statistics.mean(b)
+    den = math.sqrt(sum((x - ma) ** 2 for x in a) * sum((y - mb) ** 2 for y in b))
+    return den > 0 and sign * sum((x - ma) * (y - mb) for x, y in zip(a, b, strict=True)) / den >= TREND
+
+
+def beyond_evaporation(series, limit: float) -> float:
+    """The change a culture that did not grow must exceed to count: the detection limit, or the share of the
+    compound's level that evaporation could account for over the run (phase.EVAPORATION), whichever is larger."""
+    level = max(abs(series[0][1]), abs(series[-1][1]))
+    return max(limit, phases.EVAPORATION * level)
+
+
 def active(culture, limit: float = DETECTION_LIMIT) -> bool:
-    """Whether a culture's compounds moved as metabolism moves them over its run: one used up beyond the limit
-    and another made beyond it. A culture whose growth curve shows no growth can still do this (A. soehngenii in
-    study SMGDB00000010, on an optical density read without its blank, turns glucose and lactate into butyrate;
-    Karoline, 2026-10-06: "Activity counts"), and drift, evaporation or a dead inoculum cannot."""
-    moved = [s[-1][1] - s[0][1] for s in (m["series"] for m in culture.metabolites.values()) if len(s) > 1]
-    return any(d <= -limit for d in moved) and any(d >= limit for d in moved)
+    """Whether a culture's compounds moved as metabolism moves them over its run: one used up (to below the limit
+    from above twice it, or falling steadily) and another made (rising steadily), each by more than evaporation
+    could account for (`beyond_evaporation`). A culture whose growth curve shows no growth can still do this (A.
+    soehngenii in study SMGDB00000010, on an optical density read without its blank, turns glucose and lactate
+    into butyrate; Karoline, 2026-10-06: "Activity counts"), and drift, evaporation or a dead inoculum cannot.
+    Endpoints alone are not enough: a twelfth review round found scatter of +/-0.5 mM passing an endpoint test
+    in 13 of 20 cultures, and evaporation concentrating one compound while a volatile one fell."""
+    series = [m["series"] for m in culture.metabolites.values() if len(m["series"]) > 2]
+
+    def moved(s, sign):
+        return sign * (s[-1][1] - s[0][1]) > beyond_evaporation(s, limit)
+
+    used = any(moved(s, -1) and ((s[0][1] >= 2 * limit and s[-1][1] < limit) or _steady(s, limit, -1))
+               for s in series)
+    made = any(moved(s, 1) and _steady(s, limit, 1) for s in series)
+    return used and made
+
+
+def _scatter(series) -> float:
+    """How much a series jumps between neighboring samples beyond its trend: the median absolute second
+    difference over two (0 for a straight or short series)."""
+    v = [x for _, x in series]
+    if len(v) < 3:
+        return 0.0
+    return statistics.median(abs(v[i - 1] - 2 * v[i] + v[i + 1]) for i in range(1, len(v) - 1)) / 2
 
 
 def exponential_hours(culture, boundary) -> float | None:
@@ -553,7 +614,8 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
     cells = {}
     for key, members in groups.items():
         lim = limits.get(key[1], limit)
-        valued = [r for r in members if r["change"] is not None]
+        valued = [r for r in members if r["change"] is not None
+                  and not {"within_scatter", "within_evaporation"} & set(r["cautions"])]
         whole = [r for r in valued if "whole_run" in r["cautions"]]
         whole_note = None
         if whole and len(whole) < len(valued):

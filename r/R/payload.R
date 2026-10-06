@@ -238,6 +238,11 @@ print.foodnet_crm <- function(x, ...) {
         cat(sprintf("   * %d value(s) have experiments that disagree (NA): crm_readme(x) names them.\n",
                     length(x$caveats$conflicts)))
     }
+    shrunk <- names(x$biomass_change)[!is.na(x$biomass_change) & x$biomass_change <= 0]
+    if (length(shrunk)) {
+        cat(sprintf("   * no biomass gain for %s: a miaSim simulation cannot scale it; leave it out (crm_subset)\n",
+                    paste(shrunk, collapse = ", ")))
+    }
     if (length(x$caveats$without_a_rate)) {
         cat(sprintf("   * %d taxon(s) have no growth rate: %s\n", length(x$caveats$without_a_rate),
                     paste(x$caveats$without_a_rate, collapse = ", ")))
