@@ -78,6 +78,10 @@ the downloads above them.
    the taxon, and its width is the amount in mM. One arc per study by default; "Merge arcs across studies"
    and "Merge to genus" are advanced settings, as in grow**net**.
 
+**What a taxon produces and consumes alone is not necessarily what it does in a community.** Competition,
+cross-feeding, pH and regulation all change it, so the network is a map of capabilities and candidate links,
+and a consumer-resource model built from it is a hypothesis to check against the community itself.
+
 Acid and base forms of one compound are one metabolite (acetic acid and acetate), since mGrowthDB records
 both and an HPLC measures one pool. A compound that was never assayed for a taxon is never written as zero.
 Every decision and its reason is in [docs/METHOD_NOTES.md](docs/METHOD_NOTES.md).

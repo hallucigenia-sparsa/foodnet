@@ -433,7 +433,10 @@ def _figure(token: str, result: dict) -> str:
         return ""
     job = result.get("job", "")
     href = f"/matrices.svg?token={_esc(token)}" + (f"&amp;job={_esc(job)}" if job else "")
-    return (f"<h2>Consumed and produced</h2><div class=\"scroll figure\">{matrices_svg(result)}</div>"
+    return (f"<h2>Consumed and produced</h2>"
+            "<p class=\"muted\">Hover over a cell to see its value, its replicates and the studies, experiments and "
+            "medium behind it.</p>"
+            f"<div class=\"scroll figure\">{matrices_svg(result)}</div>"
             f"<p class=\"bar\"><a class=\"btn\" href=\"{href}\">Download the image (.svg)</a>"
             "<span class=\"muted\">the same matrices are in the downloads below, as numbers</span></p>")
 

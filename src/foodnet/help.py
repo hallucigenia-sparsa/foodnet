@@ -100,7 +100,8 @@ EDGE_FIELDS = {
     "merged_taxa": "With merging to genus, the taxa behind the arc.",
 }
 
-SECTIONS = (("what", "What foodnet does"), ("phases", "Growth phases"), ("values", "Values, media and presence"),
+SECTIONS = (("what", "What foodnet does"), ("alone", "Alone is not in a community"),
+            ("phases", "Growth phases"), ("values", "Values, media and presence"),
             ("matrices", "The two matrix formats"), ("crm", "Consumer-resource models and R"),
             ("cytoscape", "Cytoscape and the downloads"), ("empty", "When a search gives nothing"),
             ("settings", "Every setting"), ("fields", "Every field"), ("cli", "The command line"))
@@ -136,6 +137,20 @@ width is the amount produced or removed. It is the sister tool of <a href="{GROW
 interaction networks from co-cultures, and works the same way: two boxes, a button, and the results under them.</p>
 <p>Try the Example ({_e(", ".join(example))}), or type taxa: a species, a strain, a genus (all its species) or an
 NCBI taxon id, one per line.</p>
+<h2 id="alone">Alone is not in a community</h2>
+<p class="note"><strong>What a taxon produces and consumes on its own is not necessarily what it does in a
+community.</strong> Every arc comes from a monoculture: one strain, alone, in one medium, in a batch culture. It
+shows what the strain can do under those conditions, not what it will do among other species.</p>
+<p>In a community many things change. Partners compete for the same substrates, so a strain may never reach a
+compound it uses alone, or may switch to another one it prefers less. Partners also feed it: compounds that are
+absent from the medium appear as others produce them, and a strain that only produced a compound alone may take
+it up once a partner makes more of it. Its own products, the pH and the densities reached differ, and partners
+can switch pathways on or off. A culture that is continuously fed, as in a chemostat, never goes through the
+starvation a batch culture ends in, so neither of foodnet's two growth phases need describe it. And a net change
+can hide a compound that is produced and consumed at the same time.</p>
+<p>So read the network as a map of capabilities and candidate links, not as a prediction. A consumer-resource
+model built from these parameters is a hypothesis about the community: check it against measurements of the
+community itself before relying on what it predicts.</p>
 <h2 id="phases">Growth phases</h2>
 <p>What a culture makes or takes up while it grows can differ from what it does once growth has stopped, so every
 value belongs to a phase. Exponential growth ends at the first sample at which the culture reaches 90% of its
