@@ -85,7 +85,7 @@ Every decision and its reason is in [docs/METHOD_NOTES.md](docs/METHOD_NOTES.md)
 ## The outputs
 
 - **The matrices as an image**, shown first under the settings: consumed and produced side by side (or one
-  above the other when they are wide), in the style of Figure 3c: a number on a gray for a change, white for
+  above the other when they are wide): a number on a gray for a change, white for
   measured without one, pale orange for not assayed, an open circle for a change seen only in another medium.
   Downloadable as SVG, and in the matrices zip.
 - **Network**: JSON (the canonical format, [schema](schema/metabolite_network.schema.json)) or GraphML.

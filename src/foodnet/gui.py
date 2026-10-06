@@ -107,8 +107,8 @@ def _settings_block(settings: dict) -> str:
   <label>from <input name="second_window_start" type="text" size="5" value="{_field(s['second_window_start'])}">
   h to <input name="second_window_end" type="text" size="5" value="{_field(s['second_window_end'])}"> h</label>
   <span class="muted">comma separated metabolite names, measured over this window instead of the phases or the
-  window above, for a compound still being used when they end (trehalose in Figure 3c). An empty end means until
-  each culture's last sample. Empty by default</span></div>
+  window above, for a compound still being used when they end, such as a slowly consumed sugar. An empty end
+  means until each culture's last sample. Empty by default</span></div>
 <div class="row"><label>Exponential growth ends at
   <input name="fraction" type="text" size="5" value="{_esc(round(s['fraction'] * 100, 6))}"> % of the maximal
   abundance</label>

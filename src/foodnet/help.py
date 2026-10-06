@@ -24,8 +24,8 @@ SETTINGS = {
                   "sample and marks the value window_beyond_data.",
     "second_window_metabolites": "Metabolites measured over a second time window instead of the phases or the "
                                  "main window, comma separated, by name (acid or base form alike); empty by "
-                                 "default. For a compound still being used when the phase ends, such as "
-                                 "trehalose in Figure 3c of the community control paper.",
+                                 "default. For a compound still being used when the phase ends, such as a "
+                                 "slowly consumed sugar.",
     "second_window_start": "The second window's start, in hours since inoculation.",
     "second_window_end": "The second window's end, in hours; empty means until each culture's last sample.",
     "fraction": "Exponential growth ends at the first sample where the culture reaches this share of its maximal "
@@ -148,8 +148,7 @@ named in the second box. With the second box empty, every other medium only says
 or consumed: those arcs are presence_only (dashed) and their cells NA in the value matrices. With the second box
 filled, study or experiment ids limit the data to them and a medium name chooses the value medium; with ids
 and no medium name, the medium holding most taxa within the ids gives the values and their other media
-presence, which is how Figure 3c of the community control paper was made. Include supporting evidence outside
-the second box adds presence from the rest.
+presence. Include supporting evidence outside the second box adds presence from the rest.
 Ignore media differences pools every medium.
 Studies in the value medium are pooled; when their experiments disagree on what happened, the value carries the
 caution conflict and the report names the experiments. The same experiment deposited under two studies is counted
