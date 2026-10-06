@@ -658,6 +658,17 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
         values = [r["change"] for r in valued]
         per_exp, units = _units(valued, cultures)
         classes = {e: classify(v, lim, agree) for e, v in per_exp.items()}
+        if agree:
+            # a replicate within its series' scatter (or evaporation) keeps its vote, so it can stop a call, but
+            # cannot make one: a change needs two replicates outside it that show it themselves (a fifteenth
+            # review round: a Bacteroides pair at +0.20 and a flagged +0.21 mM read as butyrate production)
+            clean = defaultdict(list)
+            for r in valued:
+                if not {"within_scatter", "within_evaporation"} & set(r["cautions"]):
+                    clean[cultures[r["culture"]].experiment].append(r["change"])
+            for e, c in classes.items():
+                if c in (1, -1) and sum(_class(v, lim) == c for v in clean.get(e, [])) < 2:
+                    classes[e] = INCONCLUSIVE
         said = {c for c in classes.values() if c is not INCONCLUSIVE}
         # an experiment too noisy to decide still disagrees when its mean lies beyond the limit on the other
         # side of what the others say (a review: one replicate made it inconclusive and its -3 mM vanished)

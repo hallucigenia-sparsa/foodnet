@@ -318,3 +318,12 @@ def test_a_replicate_within_its_own_scatter_keeps_its_vote():
     for r in rows:
         r["cautions"] = ["within_scatter"]        # all within scatter: inconclusive
     assert derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]["state"] == "inconclusive"
+
+
+def test_a_flagged_replicate_can_stop_a_call_but_not_make_one():
+    cultures = [_culture("E1", [0, 1, 2, 3]) for _ in range(2)]
+    rows = _rows([(0, 0.20), (1, 0.21)])
+    rows[1]["cautions"] = ["within_scatter"]
+    assert derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]["state"] == "inconclusive"
+    rows = _rows([(0, 1.0), (1, 1.1)])
+    assert derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]["state"] == "produced"

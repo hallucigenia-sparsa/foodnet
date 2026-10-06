@@ -151,4 +151,9 @@ test_that("subsetting keeps the warnings about kept taxa only, once marked, and 
     payload$caveats$warnings <- list("no growth curve for Roseburia intestinalis", "2 values are inconclusive")
     kept <- crm_subset(foodnet:::as_foodnet_crm(payload), taxa = "Bacteroides fragilis")
     expect_equal(kept$caveats$warnings, "(for the whole search) 2 values are inconclusive")
+    # a removed name inside a kept one, not at its start
+    payload$taxa <- list("Clostridium", "[Clostridium] scindens")
+    payload$caveats$warnings <- list("no rate for [Clostridium] scindens", "Clostridium has more data elsewhere")
+    kept <- crm_subset(foodnet:::as_foodnet_crm(payload), taxa = "[Clostridium] scindens")
+    expect_equal(kept$caveats$warnings, "(for the whole search) no rate for [Clostridium] scindens")
 })

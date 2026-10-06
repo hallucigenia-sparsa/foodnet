@@ -280,14 +280,18 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     # the page's warnings were written for the whole search: keep those that name no taxon left out, and the
     # ones that name none (counts over the whole search are marked as such)
     if (length(x$caveats$warnings) && length(removed)) {
-        # a removed taxon is named where its name appears and is not the start of a kept taxon's longer name
-        # ("Escherichia coli" removed, "Escherichia coli LF82" kept)
+        # a removed taxon is named where its name appears outside every occurrence of a kept taxon's name
+        # ("Escherichia coli" removed, "Escherichia coli LF82" kept; "Clostridium" removed, "[Clostridium]
+        # scindens" kept)
         whole_name <- function(t, w) {
             at <- gregexpr(t, w, fixed = TRUE)[[1]]
             if (at[1] < 0) return(FALSE)
-            longer <- kept[nchar(kept) > nchar(t) & startsWith(kept, t)]
-            if (!length(longer)) return(TRUE)
-            any(vapply(at, function(p) !any(substr(w, p, p + nchar(longer) - 1) == longer), logical(1)))
+            covered <- integer(0)
+            for (k in kept[nchar(kept) > nchar(t) & grepl(t, kept, fixed = TRUE)]) {
+                ks <- gregexpr(k, w, fixed = TRUE)[[1]]
+                if (ks[1] > 0) for (q in ks) covered <- c(covered, q:(q + nchar(k) - 1))
+            }
+            any(vapply(at, function(p) !all(p:(p + nchar(t) - 1) %in% covered), logical(1)))
         }
         names_any <- function(w) any(vapply(removed, whole_name, logical(1), w = w))
         left <- x$caveats$warnings[!vapply(x$caveats$warnings, names_any, logical(1))]
