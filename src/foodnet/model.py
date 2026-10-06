@@ -38,6 +38,7 @@ CAUTIONS = (
     "window_beyond_data",      # the phase or window starts before the first or ends after the last sample
     "stationary_not_reached",  # the growth curve was still rising at its last point: no stationary phase
     "conflict",                # experiments (or, merged to genus, taxa) disagree: no value, no arc
+    "inconclusive",            # the replicates pin no change down, nor no change: no value, no arc
     "not_detected_in_value_medium",  # seen in another medium, assayed and not seen in the value medium
     "phase_from_other_replicates",   # this replicate had no growth curve; the boundary of its siblings is used
     "coarse_sampling",         # the phase boundary rests on fewer than three growth samples

@@ -20,6 +20,7 @@ CAUTION_TEXT = {
     "window_beyond_data": "the phase or window starts before the first or ends after the last sample; it stands in",
     "stationary_not_reached": "the culture was still growing at its last sample: no stationary phase",
     "conflict": "experiments (or taxa, merged to genus) disagree: inconclusive, no arc",
+    "inconclusive": "the replicates pin down neither a change nor no change: NA, no arc (cautions.csv)",
     "not_detected_in_value_medium": "seen in another medium, and measured without a change in the value medium",
     "phase_from_other_replicates": "no growth curve in this replicate; its experiment's median boundary is used",
     "coarse_sampling": "the phase boundary rests on fewer than three growth samples",

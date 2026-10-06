@@ -10,6 +10,7 @@ import html
 
 from . import __version__, brand, rbridge
 from .brand import COMMAND, NAME, REPOSITORY
+from .model import CAUTIONS
 
 ISSUES = f"{REPOSITORY}/issues"
 MGROWTHDB = "https://mgrowthdb.gbiomed.kuleuven.be"
@@ -113,9 +114,7 @@ EDGE_FIELDS = {
     "medium": "The medium (or media) the arc rests on.",
     "study_ids": "The studies the arc rests on.",
     "experiments": "The mGrowthDB experiments behind it.",
-    "cautions": "single_replicate, short_record, window_beyond_data, stationary_not_reached, conflict, "
-                "not_detected_in_value_medium, phase_from_other_replicates, coarse_sampling, boundaries_differ, "
-                "no_variance (see the legend).",
+    "cautions": ", ".join(CAUTIONS) + " (see the legend).",
     "notes": "Remarks in words: what disagreed, what another medium showed.",
     "merged_arcs": "With merged arcs, how many studies the arc joins.",
     "merged_taxa": "With merging to genus, the taxa behind the arc.",

@@ -187,6 +187,7 @@
                 "window_beyond_data",
                 "stationary_not_reached",
                 "conflict",
+                "inconclusive",
                 "not_detected_in_value_medium",
                 "phase_from_other_replicates",
                 "coarse_sampling",
