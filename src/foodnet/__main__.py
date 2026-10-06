@@ -74,6 +74,10 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--min-studies", type=int, default=DEFAULTS["min_studies"])
     d.add_argument("--merge-genera", action="store_true", help="one node per genus")
     d.add_argument("--exclude-studies", default=DEFAULTS["exclude_studies"])
+    d.add_argument("--exclude-experiments", default=DEFAULTS["exclude_experiments"],
+                   help="experiment ids never used, comma separated")
+    d.add_argument("--no-strict-media", action="store_true",
+                   help="tell media apart by their names only, not by altered composition or atmosphere")
     d.add_argument("--exclude-metabolites", default=DEFAULTS["exclude_metabolites"])
     d.add_argument("--include-non-batch", action="store_true",
                    help="also read chemostat and serial dilution monocultures")
@@ -113,6 +117,7 @@ def settings_from(a) -> dict:
              merge_arcs=a.merge_arcs, min_studies=a.min_studies, merge_genera=a.merge_genera,
              conditions="\n".join(x.strip() for x in a.conditions.split(",") if x.strip()),
              exclude_studies=a.exclude_studies, exclude_metabolites=a.exclude_metabolites,
+             exclude_experiments=a.exclude_experiments, strict_media=not a.no_strict_media,
              include_non_batch=a.include_non_batch, spike_factor=a.spike_factor, correction=a.correction)
     if a.window:
         start, end = a.window

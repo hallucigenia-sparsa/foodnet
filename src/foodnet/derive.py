@@ -188,12 +188,34 @@ def value_set(cultures, experiments: dict, selection: dict | None = None, ignore
         return {"rule": "all", "media": sorted({n for v in names.values() for n in v}), "keys": sorted(taxa),
                 "taxa_per_medium": per_medium, "tie": [], "chosen": chosen}
     if not selecting.empty(selection):
-        chosen = [i for i, c in enumerate(cultures)
-                  if selecting.matches(experiments.get(c.experiment, {"id": c.experiment, "studyId": c.study}),
-                                       selection)]
+        # each entry gives the values from the medium it matches for the most taxa: "Wilkins-Chalgren" also
+        # matches Wilkins-Chalgren with mucin added, which the strict medium rule tells apart (Karoline,
+        # 2026-10-06), and a reader typing a medium means one medium. The others it matches are named, and
+        # give presence only. Ids are matched exactly and choose their experiments as they are.
+        chosen, also = set(), set()
+        for kind in ("media", "experiments", "studies"):
+            for entry in selection.get(kind, ()):
+                one = {"media": [], "experiments": [], "studies": [], kind: [entry]}
+                matched = [i for i, c in enumerate(cultures)
+                           if selecting.matches(experiments.get(c.experiment, {"id": c.experiment, "studyId": c.study}),
+                                                one)]
+                if kind != "media":
+                    chosen.update(matched)
+                    continue
+                by_key = defaultdict(list)
+                for i in matched:
+                    by_key[cultures[i].medium_key].append(i)
+                if not by_key:
+                    continue
+                best = sorted(by_key, key=lambda k: (-len({cultures[i].taxon["id"] for i in by_key[k]}),
+                                                     -len(by_key[k]), k))[0]
+                chosen.update(by_key[best])
+                also.update(cultures[i].medium for k, idx in by_key.items() if k != best for i in idx)
+        chosen = sorted(chosen)
         keys = sorted({cultures[i].medium_key for i in chosen})
-        return {"rule": "selected", "media": sorted({cultures[i].medium for i in chosen}), "keys": keys,
-                "taxa_per_medium": per_medium, "tie": [], "chosen": chosen}
+        media = sorted({cultures[i].medium for i in chosen})
+        return {"rule": "selected", "media": media, "keys": keys, "taxa_per_medium": per_medium, "tie": [],
+                "chosen": chosen, "also_matched": sorted(also - set(media))}
     if not taxa:
         return {"rule": "majority", "media": [], "keys": [], "taxa_per_medium": {}, "tie": [], "chosen": []}
     ranked = sorted(taxa, key=lambda k: (-per_medium[k], -count[k], k))

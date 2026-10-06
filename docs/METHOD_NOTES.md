@@ -91,11 +91,21 @@ with metabolite data."
 17. **Studies are found through the species list**, not mGrowthDB's search, which matches per-strain
     measurements only and so misses a monoculture measured at the culture level (study SMGDB00000009).
 
+18. **A medium is told apart by its alterations and atmosphere.** Karoline, 2026-10-06, on "Wilkins-Chalgren"
+    also matching Wilkins-Chalgren with mucin: users "will not put by themselves '-mucin' unless they have extra
+    knowledge ... we're basically hitting a limitation in mGrowthDB, which does not systematically report
+    medium composition. To fix the issue ...: instead of just matching, check descriptions that suggest
+    something altered the medium or atmosphere and treat it as another medium if you do. This default can be
+    switched off in the advanced settings." `foodnet.media` reads what a description or name says was added or
+    taken away, and the recorded gas composition (an unrecorded one does not split a medium). A medium name in
+    the second box gives values from the medium it matches for the most taxa; the others it matches give
+    presence only and are named. Experiments can also be excluded by id.
+19. **Settled 2026-10-06 (Karoline), formerly open:** the end of exponential growth at 90% of the maximal
+    abundance on the linear scale ("OK"); CRM parameters with Both use the exponential phase ("OK, but
+    document": the help, the CRM README and the README say so); single-replicate values are shown with a
+    caution ("OK"); the growth-rate fallback takes another monoculture of the taxon in the same medium ("keep
+    as is, but with the stringent medium matching"), which decision 18 now makes strict.
+
 ## Open decisions
 
-1. **The 90% boundary** (decision 2): the share, and linear against log scale.
-2. **"Both" for the CRM**: the exponential phase is used. Alternatives: the stationary phase, or both
-   phases as separate parameter sets.
-3. **Single replicates** are shown, flagged. Whether to hide them by default, as grow**net** once did.
-4. **The growth-rate fallback** takes any monoculture of the taxon in the value medium. Whether it should
-   also require the same study.
+None at the moment.

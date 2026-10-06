@@ -52,6 +52,11 @@ SETTINGS = {
     "outside_evidence": "With the second box filled, also take presence-only evidence from every other medium and "
                         "study holding the taxa; the values still come from the second box.",
     "exclude_studies": "Study ids never read.",
+    "exclude_experiments": "Experiment ids left out, comma separated; empty by default.",
+    "strict_media": "Tell media apart by what an experiment's description or name says was added or taken away "
+                    "(\"plus mucin\", \"without glucose\", \"+Ac\") and by a recorded atmosphere, since "
+                    "mGrowthDB does not report a medium's composition systematically. On by default; off, only "
+                    "the medium names count.",
     "exclude_metabolites": "Metabolites left out by name, comma separated.",
     "include_non_batch": "Command line only: also read chemostat and serial dilution monocultures. Their changes "
                          "are not net changes in the vessel, so this is for exploring, not for values.",

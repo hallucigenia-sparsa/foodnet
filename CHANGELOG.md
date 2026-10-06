@@ -23,6 +23,9 @@ semantic versioning.
 - The consumed and produced matrices as an image (SVG), shown first among the results and downloadable;
   hovering over a cell shows its value and the studies, experiments and medium behind it.
 - The length of the exponential phase per arc, in the result table and every output.
+- Media are told apart by what their descriptions say was added or taken away and by a recorded atmosphere
+  (on by default, switchable); a medium named in the second box gives values from the medium it matches for
+  the most taxa, the others it matches presence. Experiments can be excluded by id.
 - An advanced setting for matrix cells seen only in another medium: NA (default), TRUE, or the amount
   measured there, drawn on its own background in the image.
 - A filled second box limits the search: study or experiment ids set the scope, a medium name the value

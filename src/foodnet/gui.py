@@ -165,6 +165,15 @@ def _settings_block(settings: dict) -> str:
 <div class="row"><label>Leave out these metabolites
   <input name="exclude_metabolites" type="text" size="30" value="{_esc(s['exclude_metabolites'])}"></label>
   <span class="muted">comma separated metabolite names; empty by default</span></div>
+<div class="row"><label><input type="checkbox" name="strict_media" value="1"{_checked(s['strict_media'])}>
+  Tell media apart by their descriptions and atmosphere</label>
+  <span class="muted">mGrowthDB names a medium but does not report its composition systematically, so an added or
+  removed compound often appears only in the description ("WC plus mucin beads", "without glucose", "+Ac"). On by
+  default: such experiments, and ones with another recorded atmosphere, count as another medium. The report lists
+  every medium found</span></div>
+<div class="row"><label>Exclude these experiments
+  <input name="exclude_experiments" type="text" size="30" value="{_esc(s['exclude_experiments'])}"></label>
+  <span class="muted">comma separated experiment ids never used; empty by default</span></div>
 <div class="row"><label>Exclude these studies
   <input name="exclude_studies" type="text" size="30" value="{_esc(s['exclude_studies'])}"></label>
   <span class="muted">comma separated study ids never read; empty by default</span></div>
@@ -535,9 +544,10 @@ def parse_settings(form: dict) -> dict:
         s["presence_entries"] = form["presence_entries"][0]
     if form.get("correction", [""])[0] in ("bh", "by"):
         s["correction"] = form["correction"][0]
-    for key in ("ignore_media", "booleans", "report_rates", "merge_arcs", "merge_genera", "outside_evidence"):
+    for key in ("ignore_media", "booleans", "report_rates", "merge_arcs", "merge_genera", "outside_evidence",
+                "strict_media"):
         s[key] = bool(form.get(key))
-    for key in ("conditions", "exclude_studies", "exclude_metabolites"):
+    for key in ("conditions", "exclude_studies", "exclude_experiments", "exclude_metabolites"):
         s[key] = form.get(key, [""])[0].strip()
     return s
 

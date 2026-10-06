@@ -69,7 +69,10 @@ the downloads above them.
    only says whether a compound was produced or consumed (`presence_only` arcs, NA matrix cells). In the
    second box, study or experiment ids limit the data to them, and a medium name chooses the value medium;
    with ids and no medium, the majority rule runs within the ids. "Include supporting evidence outside the
-   second box" adds the rest as presence. "Ignore media differences" pools
+   second box" adds the rest as presence. Because mGrowthDB does not report a medium's composition
+   systematically, an experiment whose description says something was added or taken away ("WC plus mucin
+   beads", "without glucose", "+Ac"), or whose recorded atmosphere differs, counts as another medium; this
+   can be switched off, and experiments can be excluded by id. "Ignore media differences" pools
    every medium; "Report everything as booleans" drops the amounts.
 5. **Pooling, with what does not agree reported.** Studies in the value medium are pooled. Experiments
    that disagree on what happened make a `conflict`, named in the report. The same experiment deposited
@@ -131,7 +134,8 @@ tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_stor
 ```
 
 The matrices are measured amounts, not model parameters: `crm_efficiency()` turns them into an efficiency
-matrix, and how to scale it is a modeling choice. See [r/README.md](r/README.md).
+matrix, and how to scale it is a modeling choice. With the phase choice Both, the CRM parameters use the
+exponential phase, since a consumer-resource model describes growth. See [r/README.md](r/README.md).
 
 ## The command line
 

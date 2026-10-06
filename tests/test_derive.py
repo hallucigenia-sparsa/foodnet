@@ -290,3 +290,47 @@ def test_a_second_window_with_an_end_and_a_name_given_as_the_recorded_acid(clien
 def test_a_second_window_name_that_matches_nothing_is_reported(client):
     r = run(client, second_window_metabolites="trehalose")
     assert any("trehalose, which no culture" in w for w in r["warnings"])
+
+
+def _with_mucin_variant():
+    """Study one gains Alpha alpha in WC plus mucin beads, where it takes up 2 mM of glucose more."""
+    import conftest
+    conftest.STUDIES["SMGDB00000001"]["experiments"].append({"id": "EMGDB000000006", "name": "A_MUCIN"})
+    exp = conftest._experiment("EMGDB000000006", "SMGDB00000001", 1, "Wilkins-Chalgren Anaerobe Broth", ["a3"])
+    exp["description"] = "Alpha with WC plus mucin beads"
+    conftest.EXPERIMENTS["EMGDB000000006"] = exp
+    series = dict(conftest.SERIES)
+    series["a3"] = {"growth": ("fc", conftest.FAST), "glucose": [(0, 10), (6, 6), (12, 0), (24, 0)]}
+    return FakeClient(series)
+
+
+def _drop_mucin_variant():
+    import conftest
+    conftest.STUDIES["SMGDB00000001"]["experiments"].pop()
+    del conftest.EXPERIMENTS["EMGDB000000006"]
+
+
+def test_a_medium_altered_in_its_description_gives_presence_not_values():
+    # Karoline, 2026-10-06: "check descriptions that suggest something altered the medium ... and treat it as
+    # another medium". "Wilkins" matches both; plain WC gives the values (A's glucose -8 as before)
+    client = _with_mucin_variant()
+    try:
+        r = run(client, conditions="Wilkins")
+        assert r["cells"][(A, GLC, "exponential")]["mean"] == pytest.approx(-8.0)
+        assert r["value_rule"]["also_matched"] == ["Wilkins-Chalgren Anaerobe Broth (+mucin)"]
+        assert any("also matched" in w for w in r["warnings"])
+        # switched off, the mucin variant pools into the values: -8, -8 and -10, mean -8.67
+        r = run(client, conditions="Wilkins", strict_media=False)
+        assert r["cells"][(A, GLC, "exponential")]["mean"] == pytest.approx(-26 / 3)
+    finally:
+        _drop_mucin_variant()
+
+
+def test_experiments_can_be_excluded_by_id():
+    client = _with_mucin_variant()
+    try:
+        r = run(client, conditions="Wilkins", strict_media=False, exclude_experiments="EMGDB000000006")
+        assert r["cells"][(A, GLC, "exponential")]["mean"] == pytest.approx(-8.0)
+        assert any("Exclude these experiments" in reason for _, reason in r["skipped"])
+    finally:
+        _drop_mucin_variant()

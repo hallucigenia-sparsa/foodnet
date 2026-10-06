@@ -64,6 +64,12 @@ gate applies.
   Cells and boxes must stay direct children of the `<svg>` for the `~` rule. Testing hover in the pane:
   screenshot coordinates are twice the page's CSS pixels there.
 
+- 2026-10-06 (Karoline): `foodnet.media` decides what one medium is (names, alterations stated in the
+  description or name, recorded atmosphere). Its patterns were written against all 559 experiment
+  descriptions in mGrowthDB; `tests/test_media.py` holds those phrasings. A new phrasing is not recognized
+  until a pattern is added; check new studies' descriptions when they appear. `derive.value_set` gives each
+  medium entry of the second box its best-matching medium and names the rest (`also_matched`).
+
 ## Things learned about mGrowthDB while building
 
 - **Search misses culture-level monocultures.** `search.json?strainNcbiIds=` matches per-strain measurement

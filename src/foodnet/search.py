@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from . import crm, rates
 from . import derive as d
+from . import media as media_rules
 from . import phase as phases
 from . import selection as selecting
 from .mgrowthdb import MGrowthDBError, data_versions, provenance
@@ -31,7 +32,10 @@ DEFAULTS = {
     # off by default: a rate costs a fit per growth curve; CRM mode turns it on
     "report_rates": False, "rate_method": rates.DEFAULT_METHOD, "rate_window": rates.DEFAULT_WINDOW,
     "merge_arcs": False, "min_studies": 1, "merge_genera": False,
-    "conditions": "", "exclude_studies": "",
+    "conditions": "", "exclude_studies": "", "exclude_experiments": "",
+    # tell media apart by the alterations their descriptions state and by a recorded atmosphere (Karoline,
+    # 2026-10-06), since mGrowthDB does not report a medium's composition systematically
+    "strict_media": True,
     # off: a filled second box limits the search to what matches it; on: everything else the taxa were grown
     # in adds presence-only evidence (Karoline, 2026-10-05)
     "outside_evidence": False,
@@ -154,6 +158,21 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     excluded_metabolites = [m.strip() for m in s["exclude_metabolites"].split(",") if m.strip()]
     read = read_cultures(client, studies, keep, excluded_metabolites, s["include_non_batch"], progress=say)
     cultures, skipped = read["cultures"], list(read["skipped"])
+    # experiments the user excludes by id (Advanced settings), like whole studies
+    excluded_exps = {e.strip().upper() for e in s["exclude_experiments"].replace("\n", ",").split(",") if e.strip()}
+    if excluded_exps:
+        gone = sorted({c.experiment for c in cultures + read["growth_only"] if c.experiment.upper() in excluded_exps})
+        if gone:
+            skipped.append(("excluded experiments", ", ".join(gone) + ": left out, as Exclude these experiments asks"))
+        cultures = [c for c in cultures if c.experiment.upper() not in excluded_exps]
+        read["growth_only"] = [c for c in read["growth_only"] if c.experiment.upper() not in excluded_exps]
+    # what makes two experiments' media one medium: the names, and with the strict rule (default) the
+    # alterations their descriptions state and the recorded atmosphere (foodnet.media)
+    everyone = cultures + read["growth_only"]
+    idents = media_rules.assign_atmospheres([
+        media_rules.identity(read["experiments"].get(c.experiment, {}), s["strict_media"]) for c in everyone])
+    for c, ident in zip(everyone, idents, strict=True):
+        c.medium_key, c.medium = ident["key"], ident["label"]
     grown_in = sorted({c.medium or "unnamed medium" for c in cultures})   # for the "nothing matched" note
     # Two questions, kept apart (Karoline, 2026-10-05, reproducing a hand-checked reference from four ids and
     # Wilkins-Chalgren): ids set the SCOPE, the data looked at; a medium name chooses the VALUE MEDIUM
@@ -354,6 +373,11 @@ def _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown
     if conflicts:
         out.append(f"{conflicts} value(s) pool experiments that disagree on the direction or on whether the "
                    "compound changed beyond the detection limit (caution conflict); the report names them.")
+    if rule.get("also_matched"):
+        out.append("The second box also matched " + "; ".join(rule["also_matched"]) + ", which "
+                   + ("differ from the medium giving the values by what their descriptions say was added or taken "
+                      "away, or by their atmosphere; they give presence only. Name them in the second box to use "
+                      "them for values, or exclude them in Advanced settings."))
     if rule["tie"]:
         out.append("Media tied for the most taxa: " + ", ".join(rule["tie"]) + f". Values come from "
                    f"{rule['keys'][0]}; name a medium in the second box to choose.")
