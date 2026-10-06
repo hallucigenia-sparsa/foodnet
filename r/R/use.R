@@ -145,6 +145,16 @@ amounts <- function(x, na = "stop", booleans_ok = FALSE) {
         consumed[is.na(consumed)] <- 0
         produced[is.na(produced)] <- 0
     }
+    moving <- x$caveats$cautions
+    moving <- if (is.null(moving)) character(0) else
+        paste(moving$taxon, moving$resource)[grepl("still_changing", moving$cautions)]
+    if (length(moving)) {
+        # a script that never prints the parameters still hears it
+        warning(length(moving), " value(s) miss use that went on after growth slowed (still_changing), so E ",
+                "underrates them: ", paste(utils::head(moving, 4), collapse = ", "),
+                if (length(moving) > 4) " and more" else "", ". A time window over both phases gives the whole change.",
+                call. = FALSE)
+    }
     elsewhere <- sum(x$evidence_consumed == "presence_only" & consumed > 0, na.rm = TRUE) +
         sum(x$evidence_produced == "presence_only" & produced > 0, na.rm = TRUE)
     if (elsewhere) {

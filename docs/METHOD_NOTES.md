@@ -206,6 +206,14 @@ with metabolite data."
   called beyond it about one time in ten; in simulation a true zero gave an arc in at most 4% of cells with
   two or more replicates. Over the 80 or so values of a search of all of mGrowthDB a few arcs are expected to
   be false; the q-values are reported, not used to decide.
+- **Pairs err more readily than triplicates.** A pair decides when both replicates lie beyond the limit, with
+  no estimate of noise: on noisy data (a standard deviation of 1 mM) about a third of pair-decided arcs on a
+  true zero are false, against about one in seven for three replicates. Such values carry `pair_decided`.
+  Identical replicates count as one only within twice the limit, so 0.39 mM three times is inconclusive and
+  0.41 mM three times is a change.
+- **The exponential phase can miss a slow-down.** Where the growth rate ends growth early (E. coli LF82),
+  part of a compound's use falls in the stationary phase; the values say `still_changing`, the page, the
+  zips, crm.json and the R package warn, and a time window over both phases gives the whole change.
 - **A net change hides what was made and used again** within a phase (formate in E. coli), and a single
   failed sample at a phase end becomes the value; neither is flagged.
 

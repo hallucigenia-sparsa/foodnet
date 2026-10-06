@@ -182,8 +182,10 @@ print.foodnet_crm <- function(x, ...) {
     if (nrow(flagged)) {
         moving <- flagged[grepl("still_changing", flagged$cautions), , drop = FALSE]
         if (nrow(moving)) {
-            cat(sprintf("   * %d value(s) miss use that went on after growth slowed (still_changing): %s\n",
-                        nrow(moving), paste(utils::head(paste(moving$taxon, moving$resource), 6), collapse = ", ")))
+            named <- paste(moving$taxon, moving$resource)
+            cat(sprintf("   * %d value(s) miss use that went on after growth slowed (still_changing): %s%s\n",
+                        nrow(moving), paste(utils::head(named, 6), collapse = ", "),
+                        if (length(named) > 6) paste0(" and ", length(named) - 6, " more") else ""))
         }
         cat(sprintf("   * %d value(s) carry cautions: x$caveats$cautions lists them.\n", nrow(flagged)))
     }
