@@ -3,12 +3,12 @@
 \alias{crm_efficiency}
 \title{The efficiency matrix of a consumer-resource model}
 \usage{
-crm_efficiency(x, scale = c("miasim", "shares", "none"), na = c("zero", "stop"))
+crm_efficiency(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero"))
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
 \item{scale}{\code{"miasim"}, \code{"shares"} or \code{"none"}, as above.}
-\item{na}{\code{"zero"} or \code{"stop"}, as above.}
+\item{na}{\code{"stop"} or \code{"zero"}, as above.}
 }
 \value{A numeric matrix, taxa by resources.}
 \description{
@@ -36,12 +36,13 @@ close a choice of them comes. \code{\link{as_miasim}} puts the starting abundanc
 are shares of uptake and produced entries by-product per unit taken up; for other models.
 \code{scale = "none"} is consumed minus produced, in mM.
 
-\code{NA} cells have no size. With \code{na = "zero"} they count as 0, and a warning says how many of each kind
-were set to 0: never assayed, seen only in another medium (a real link), inconclusive (measured, but its
-spread reaches across the limit) and without a phase. \code{"stop"} refuses until you fill them yourself.
+\code{NA} cells have no size, and foodnet never writes one as zero, so by default (\code{na = "stop"}) this refuses
+until you fill them yourself or say how. With \code{na = "zero"} they count as 0, and a warning says how many
+of each kind were set to 0: never assayed, seen only in another medium (a real link), inconclusive
+(measured, but its replicates or experiments disagree) and without a phase.
 }
 \examples{
 \dontrun{
-E <- crm_efficiency(crm)
+E <- crm_efficiency(crm, na = "zero")
 }
 }

@@ -51,11 +51,15 @@ class RError(RuntimeError):
 WIRE_ERRORS = (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError)
 
 
-def token_path() -> str:
-    """Where `foodnet_listen()` leaves this session's secret: R's `tools::R_user_dir("foodnet", "cache")`,
-    computed the way R computes it, plus "listen-token". Base R cannot bind a listening port to this machine
-    alone, so the R side accepts parameters only from a request that carries the secret, and only this user
-    can read the file."""
+def token_path(port: int = DEFAULT_PORT) -> str:
+    """Where `foodnet_listen()` leaves the secret of its listener on `port`: R's
+    `tools::R_user_dir("foodnet", "cache")`, computed the way R computes it, plus "listen-token-<port>". Base R
+    cannot bind a listening port to this machine alone, so the R side accepts parameters only from a request
+    that carries the secret, and only this user can read the file. R may compute another directory when its
+    own startup files (~/.Renviron) set R_USER_CACHE_DIR or XDG_CACHE_HOME; FOODNET_R_TOKEN_DIR, or the
+    same variables set for this program, then point here."""
+    if os.environ.get("FOODNET_R_TOKEN_DIR"):
+        return os.path.join(os.environ["FOODNET_R_TOKEN_DIR"], f"listen-token-{int(port)}")
     if os.environ.get("R_USER_CACHE_DIR"):
         root = os.environ["R_USER_CACHE_DIR"]
     elif os.environ.get("XDG_CACHE_HOME"):
@@ -66,13 +70,13 @@ def token_path() -> str:
         root = os.path.join(os.path.expanduser("~"), "Library", "Caches", "org.R-project.R")
     else:
         root = os.path.join(os.path.expanduser("~"), ".cache")
-    return os.path.join(root, "R", "foodnet", "listen-token")
+    return os.path.join(root, "R", "foodnet", f"listen-token-{int(port)}")
 
 
-def listen_token(path: str | None = None) -> str:
-    """The secret of the R session listening now, or "" when none has written one."""
+def listen_token(port: int = DEFAULT_PORT, path: str | None = None) -> str:
+    """The secret of the R session listening on `port`, or "" when none has written one."""
     try:
-        with open(path or token_path(), encoding="utf-8") as f:
+        with open(path or token_path(port), encoding="utf-8") as f:
             return f.read().strip()
     except OSError:
         return ""
@@ -98,9 +102,10 @@ def send(payload: dict, port: int = DEFAULT_PORT, timeout: float = 30.0) -> dict
     """
     url = _local(f"{base_url(port)}{PATH}")
     body = json.dumps(payload).encode("utf-8")
-    token = listen_token()
+    token = listen_token(port)
     if not token:
-        raise RError(unreachable(port, "no foodnet_listen() secret found at " + token_path()))
+        raise RError(unreachable(port, f"no foodnet_listen() secret at {token_path(port)}; if R is listening, it "
+                                       "printed where it wrote its secret: set FOODNET_R_TOKEN_DIR to that folder"))
     request = urllib.request.Request(url, data=body, method="POST",
                                      headers={"Content-Type": "application/json", "X-Foodnet-Token": token})
     try:
@@ -109,8 +114,8 @@ def send(payload: dict, port: int = DEFAULT_PORT, timeout: float = 30.0) -> dict
     except urllib.error.HTTPError as e:
         if e.code == 403:
             raise RError(f"the R session on port {port} refused the parameters: the secret foodnet_listen() wrote "
-                         f"was not the one sent (read from {token_path()}). Start foodnet_listen() again, and check "
-                         "that R and this page run as the same user.") from None
+                         f"was not the one sent (read from {token_path(port)}). Start foodnet_listen() again, and "
+                         "check that R and this page run as the same user.") from None
         raise RError(f"the R session refused the parameters ({e.code} {e.reason}). Check that the foodnet "
                      "package there is up to date.") from None
     except http.client.HTTPException as e:

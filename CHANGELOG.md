@@ -6,19 +6,24 @@ semantic versioning.
 ## [Unreleased]
 
 ### Changed
-- A cell's value counts each experiment once: the mean, its spread and its test are over the experiments'
-  means; `n_experiments` is a new arc field.
-- A change must clear the detection limit across the replicates' spread; a spread across the limit, or
-  experiments that disagree, is inconclusive (NA, no arc) instead of an arc or a 0. Advanced settings can
-  judge by the mean alone, and give compounds their own detection limits.
-- New evidence states in the matrices: inconclusive, no_phase and seen_elsewhere; the image draws the first
-  two. Every matrix CSV names its value medium in its first header cell.
+- A cell's value counts each experiment once: the mean and its test are over the experiments' means;
+  `n_experiments` is a new arc field.
+- Replicates and experiments must agree: a change needs every replicate beyond the detection limit on the
+  same side and every experiment to say the same, otherwise the value is inconclusive (NA, no arc) instead of
+  an arc or a 0; experiments that agree in direction but not in size carry the caution amounts_differ.
+  Advanced settings can judge by the mean alone, and give compounds their own detection limits.
+- New evidence states in the matrices: inconclusive, no_phase, seen_elsewhere and single_replicate; the image
+  draws them. Every matrix CSV names its value medium (and INCOMPLETE when it is) in its first header cell,
+  and the zips hold cautions.csv and the page's warnings in their README.
 - Only taxa with values vote for the value medium; the page names taxa with more data in another medium, a
   narrow win, and taxa without a growth phase.
 - Merging to genus applies the detection limit and makes disagreeing taxa inconclusive.
-- The end of exponential growth is read on a smoothed growth curve; the first curve that gives one is used;
-  coarse sampling and replicates that end growth far apart are flagged.
-- Media are told apart by the amounts their descriptions state and by more phrasings.
+- Exponential growth ends at the 90% rule or earlier, where the growth rate has fallen below a tenth of its
+  maximum over two consecutive intervals (E. coli LF82 now ends at 8 h, not 84 to 108 h); the first growth
+  curve that gives a boundary is used; coarse sampling and replicates that end growth far apart are flagged.
+- `crm_efficiency()` and `as_miasim()` refuse NA cells unless told `na = "zero"`; each listener on a port has
+  its own secret; a request that has not sent its headers within 5 s is dropped.
+- Media are told apart by the amounts their descriptions state (in one notation) and by more phrasings.
 - CRM parameters (`foodnet.crm/v1`) carry each taxon's biomass change; the R package builds miaSim's
   efficiency matrix from its equations, requires starting abundances and Monod constants, refuses pooled
   media and the stationary phase unless allowed, and adds `crm_backcheck()`.

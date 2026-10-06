@@ -43,6 +43,7 @@ CAUTIONS = (
     "coarse_sampling",         # the phase boundary rests on fewer than three growth samples
     "boundaries_differ",       # the replicates' phase boundaries lie further apart than a sampling interval
     "no_variance",             # the replicates are identical (rounding, or one series deposited twice): no test
+    "amounts_differ",          # the experiments agree in direction, with amounts more than twofold apart
 )
 
 # words before a genus that are not a genus (the same rule as grownet)

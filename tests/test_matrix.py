@@ -36,7 +36,7 @@ def test_the_signed_matrix_has_production_positive_consumption_negative_and_na_f
 
 
 def test_a_measured_change_below_the_limit_is_zero_not_na(client):
-    r = run(client, phase="stationary", judge_spread=False)
+    r = run(client, phase="stationary", require_agreement=False)
     rows = _rows(matrix.signed_csv(r["network"], r))
     # judged by the mean alone, A's stationary acetate (+1 and -1) is measured and no change, so 0; glucose -0.5
     assert rows[1] == ["Alpha alpha A1", "0", "NA", "NA", "-0.5"]
@@ -56,14 +56,15 @@ def test_a_spread_across_the_limit_is_inconclusive_never_zero(client):
 def test_the_pair_holds_magnitudes_and_says_why_a_cell_is_na(client):
     r = run(client)
     z = zipfile.ZipFile(io.BytesIO(matrix.pair_package(r)))
-    assert sorted(z.namelist()) == ["README.txt", "consumed.csv", "evidence_consumed.csv",
+    assert sorted(z.namelist()) == ["README.txt", "cautions.csv", "consumed.csv", "evidence_consumed.csv",
                                     "evidence_produced.csv", "matrices.svg", "produced.csv", "signed.csv"]
     consumed = _rows(z.read("consumed.csv").decode())
     produced = _rows(z.read("produced.csv").decode())
     assert consumed[1] == ["Alpha alpha A1", "0", "NA", "NA", "8"]       # acetate measured, went up: 0 here
     assert produced[1] == ["Alpha alpha A1", "4", "NA", "NA", "0"]
     evidence = _rows(z.read("evidence_produced.csv").decode())
-    assert evidence[2] == ["Beta beta B1", "not_assayed", "measured", "presence_only", "below_limit"]
+    # B has one replicate in WC, so its measured cells say single_replicate
+    assert evidence[2] == ["Beta beta B1", "not_assayed", "single_replicate", "presence_only", "single_replicate"]
 
 
 def test_booleans_count_presence_in_another_medium_as_one(client):
@@ -104,7 +105,8 @@ def test_with_both_phases_the_crm_takes_the_exponential_one(client):
 def test_the_crm_package_holds_every_file(client):
     r = run(client, report_rates=True)
     z = zipfile.ZipFile(io.BytesIO(matrix.crm_package(r)))
-    assert sorted(z.namelist()) == ["README.txt", "biomass.csv", "consumed.csv", "crm.json", "evidence_consumed.csv",
+    assert sorted(z.namelist()) == ["README.txt", "biomass.csv", "cautions.csv", "consumed.csv", "crm.json",
+                                    "evidence_consumed.csv",
                                     "evidence_produced.csv", "growth_rates.csv", "initial_concentrations.csv",
                                     "produced.csv"]
 

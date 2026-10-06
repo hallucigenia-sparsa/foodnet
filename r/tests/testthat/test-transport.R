@@ -45,3 +45,17 @@ test_that("a saved payload can be read from a file, which is the fetch path with
     expect_equal(crm$taxa, c("A", "B"))
     expect_equal(crm$caveats$without_a_rate, "B")
 })
+
+test_that("a request without this listener's secret is not read past its headers", {
+    raw_request <- function(text) rawConnection(charToRaw(text))
+    con <- raw_request("POST /foodnet/crm HTTP/1.1\r\nContent-Length: 5\r\n\r\nhello")
+    on.exit(close(con))
+    expect_equal(foodnet:::read_request(con, token = "s3cret")$body, "")
+    con2 <- raw_request("POST /foodnet/crm HTTP/1.1\r\nX-Foodnet-Token: s3cret\r\nContent-Length: 5\r\n\r\nhello")
+    on.exit(close(con2), add = TRUE)
+    expect_equal(foodnet:::read_request(con2, token = "s3cret")$body, "hello")
+})
+
+test_that("each port has its own secret file", {
+    expect_false(identical(foodnet:::listen_token_path(8794), foodnet:::listen_token_path(8795)))
+})

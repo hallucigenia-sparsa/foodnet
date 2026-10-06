@@ -47,3 +47,23 @@ def test_the_command_line_exits_with_an_error_on_an_incomplete_result(monkeypatc
 def test_a_name_a_spreadsheet_would_run_is_written_inert():
     text = matrix._csv(["taxon", "=HYPERLINK(1)"], [["@SUM(A1)", "-1.5", "+x"]])
     assert "'=HYPERLINK(1)" in text and "'@SUM(A1)" in text and ",-1.5," in text and "'+x" in text
+
+
+def test_an_incomplete_result_says_so_in_every_file(monkeypatch):
+    import io
+    import zipfile
+    result = run_query(_Broken(), TAXA, {"report_rates": True}, index=species_index(_Broken()))
+    assert matrix.signed_csv(result["network"], result).startswith("taxon [INCOMPLETE; ")
+    z = zipfile.ZipFile(io.BytesIO(matrix.pair_package(result)))
+    assert "INCOMPLETE" in z.read("README.txt").decode()
+    payload = matrix.crm_payload(result)
+    assert payload["caveats"]["incomplete"] is True and payload["caveats"]["errors"]
+    assert "INCOMPLETE" in payload["readme"]
+
+
+def test_an_incomplete_result_is_not_sent_on(monkeypatch, tmp_path):
+    from foodnet import __main__ as cli
+    from foodnet import mgrowthdb
+    monkeypatch.setattr(mgrowthdb, "MGrowthDBClient", _Broken)
+    assert cli.main(["derive", "--taxa", *TAXA, "--out", str(tmp_path / "n.json"), "--crm-mode", "--to-r"]) \
+        == cli.INCOMPLETE

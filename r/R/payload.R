@@ -104,7 +104,10 @@ as_foodnet_crm <- function(payload) {
                             searched_both_phases = isTRUE(caveats$searched_both_phases),
                             mixed_media = isTRUE(caveats$mixed_media),
                             stationary_phase = isTRUE(caveats$stationary_phase),
-                            inconclusive = inconclusive),
+                            inconclusive = inconclusive,
+                            incomplete = isTRUE(caveats$incomplete),
+                            errors = chr_vector(caveats$errors),
+                            warnings = chr_vector(caveats$warnings)),
              readme = chr(payload$readme),
              tool = chr(payload$tool, "foodnet"),
              tool_version = chr(payload$tool_version),
@@ -152,7 +155,18 @@ print.foodnet_crm <- function(x, ...) {
     if (length(x$caveats$media)) {
         cat("  values from: ", paste(x$caveats$media, collapse = " / "), "\n", sep = "")
     }
+    if (x$caveats$incomplete) {
+        cat("  INCOMPLETE: records could not be read from mGrowthDB, so these numbers may lack data:\n")
+        cat(paste0("   * ", x$caveats$errors, "\n"), sep = "")
+    }
     cat("  Read before you simulate:\n")
+    if (length(x$caveats$warnings)) {
+        cat(paste0("   * ", x$caveats$warnings, "\n"), sep = "")
+    }
+    single <- count_evidence(x, "single_replicate")
+    if (single) {
+        cat(sprintf("   * %d cell(s) rest on one replicate (single_replicate).\n", single))
+    }
     not_assayed <- count_evidence(x, "not_assayed")
     if (not_assayed) {
         cat(sprintf("   * %d cell(s) were never assayed (NA): no evidence either way.\n", not_assayed))

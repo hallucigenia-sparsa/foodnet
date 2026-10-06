@@ -3,7 +3,7 @@
 \alias{as_miasim}
 \title{Shape the parameters for miaSim}
 \usage{
-as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource = NULL, allow = character())
+as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource = NULL, allow = character(), na = c("stop", "zero"))
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
@@ -13,6 +13,7 @@ as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource
 \item{missing_rate}{A growth rate for the taxa that have none, or \code{NULL} to stop when any does.}
 \item{missing_resource}{A starting concentration for the resources that have none, or \code{NULL} to stop.}
 \item{allow}{Caveats to accept: \code{"mixed_media"}, \code{"stationary_phase"}.}
+\item{na}{What \code{\link{crm_efficiency}} does with NA cells: \code{"stop"} (the default) or \code{"zero"}.}
 }
 \value{A list with \code{n_species}, \code{n_resources}, \code{names_species}, \code{names_resources}, \code{E}, \code{x0}, \code{resources}, \code{growth_rates} and \code{monod_constant}.}
 \description{
@@ -33,7 +34,7 @@ real medium) or come from the stationary phase (uptake without growth), unless \
 }
 \examples{
 \dontrun{
-args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0)
+args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
 set.seed(1)
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 cells <- crm_unscale(crm, SummarizedExperiment::assay(tse))

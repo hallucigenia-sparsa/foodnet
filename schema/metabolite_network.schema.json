@@ -191,7 +191,8 @@
                 "phase_from_other_replicates",
                 "coarse_sampling",
                 "boundaries_differ",
-                "no_variance"
+                "no_variance",
+                "amounts_differ"
               ]
             }
           },

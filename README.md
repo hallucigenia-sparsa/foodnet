@@ -56,16 +56,18 @@ matrices appear first under the settings, then the taxa and the arcs with the do
    strains). food**net** reads every batch monoculture of those strains that has metabolite measurements.
    A culture-level growth curve counts in a monoculture, since it measures the one strain.
 2. **Growth phases.** Exponential growth ends at the first sample where the culture has risen 90% of the
-   way from its start to its maximum, read on the growth curve smoothed by a running median of three; the
-   stationary phase runs from there to the last metabolite sample. Below the boxes,
+   way from its start to its maximum, or earlier, where the specific growth rate has fallen below a tenth of
+   its maximum over two consecutive intervals (a plateau that keeps creeping up, or a late rise that is not
+   growth, would otherwise end it late); the stationary phase runs from there to the last metabolite sample. Below the boxes,
    choose Exponential phase (the default), Stationary phase or Both. A time window in Advanced settings
    replaces the phases, and a second window can be given to metabolites named there (trehalose over the whole
    run, for example), so no compound needs a window of its own. Diauxic shifts are not detected.
 3. **A change per phase.** For each replicate and metabolite, the concentration at the end of the phase
    minus the concentration at its start (interpolated between samples), averaged over replicates and then
    over experiments, each experiment counting once. A mean change below the detection limit (0.2 mM, a
-   setting; compounds can have their own) is no change, and a change must clear the limit across the
-   replicates' spread: a spread reaching across it is inconclusive, neither an arc nor a measured zero. A
+   setting; compounds can have their own) is no change. Replicates and experiments must agree: a change
+   needs every replicate beyond the limit on the same side (no change: every one inside it), and every
+   experiment to say the same; otherwise the value is inconclusive, neither an arc nor a measured zero. A
    metabolite series shorter than 24 h is used, and flagged.
 4. **Values from one medium, presence from the others.** With the second box empty, all data are
    considered: the values come from the medium that holds data for the most taxa, and every other medium
@@ -90,6 +92,12 @@ matrices appear first under the settings, then the taxa and the arcs with the do
 **What a taxon produces and consumes alone is not necessarily what it does in a community.** Competition,
 cross-feeding, pH and regulation all change it, so the network is a map of capabilities and candidate links,
 and a consumer-resource model built from it is a hypothesis to check against the community itself.
+
+**Known limits.** The defaults have not been validated on held-out studies: the checks so far reproduced a
+hand-checked matrix with settings chosen for it, and compared directions with a published figure. A net change
+hides a compound made and used again within a phase, and one failed sample at a phase end becomes the value.
+Growth on an unblanked optical density that starts high can read as no growth. See
+[docs/METHOD_NOTES.md](docs/METHOD_NOTES.md).
 
 Acid and base forms of one compound are one metabolite (acetic acid and acetate), since mGrowthDB records
 both and an HPLC measures one pool. A compound that was never assayed for a taxon is never written as zero.

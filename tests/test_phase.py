@@ -8,7 +8,7 @@ def test_the_boundary_is_the_first_sample_at_ninety_percent_of_the_maximum():
     # the docstring's example: start 1, maximum 1000, threshold 1 + 0.9 * 999 = 900.1; 900 at 16 h is just
     # below it, so the first sample at or above is 24 h, which is also the last point
     b = phase.exponential_end([0, 4, 8, 12, 16, 24], [1, 10, 100, 500, 900, 1000])
-    assert b == {"end": 24.0, "index": 5, "last": True, "coarse": False}
+    assert b == {"end": 24.0, "index": 5, "last": True, "coarse": False, "by": "90%"}
 
 
 def test_the_boundary_ignores_the_decline_after_the_maximum():
@@ -87,3 +87,25 @@ def test_a_spiked_growth_curve_is_found():
     # 1e5 between neighbors of 10 and 30: 3333 times the larger neighbor
     assert phase.spike([1, 10, 1e5, 30, 40]) == pytest.approx(1e5 / 30)
     assert phase.spike([1, 10, 100, 1000]) is None
+
+
+def test_a_plateau_that_keeps_creeping_up_ends_growth_where_the_rate_drops():
+    # E. coli LF82 in study SMGDB00000009, rounded: fast growth to 8 h, then +20% over five days; 90% of the
+    # final maximum is reached only at 84 h, the growth rate falls below a tenth of its maximum at 8 h
+    times = [0, 4, 8, 12, 20, 24, 32, 40, 48, 72, 84, 96, 108, 120, 168]
+    values = [3.7e5, 3.3e7, 8.4e8, 9.4e8, 1.0e9, 9.7e8, 1.0e9, 9.2e8, 9.7e8, 9.8e8, 1.11e9, 1.04e9, 1.09e9,
+              1.12e9, 1.14e9]
+    b = phase.exponential_end(times, values)
+    assert b["end"] == 8 and b["by"] == "rate"
+
+
+def test_a_late_rise_after_a_plateau_is_not_growth():
+    # B. hydrogenotrophica BH_16 in study SMGDB00000004, rounded: a plateau from 14 h, then qPCR rises again
+    times = [0.2, 2, 3.3, 4.7, 6, 7.3, 8.7, 10, 11.3, 12.7, 14, 15.3, 16.7, 18, 19.3, 24.2, 30.2, 48.2]
+    values = [3.3e7, 6.4e7, 1.1e8, 1.5e8, 1.3e8, 3.4e8, 4.6e8, 6.6e8, 1.1e9, 1.8e9, 2.1e9, 2.4e9, 2.4e9, 2.0e9,
+              1.7e9, 1.7e9, 2.2e9, 5.1e9]
+    assert phase.exponential_end(times, values)["end"] < 20
+
+
+def test_a_coarse_curve_is_left_to_the_ninety_percent_rule():
+    assert phase.rate_end([0, 24, 48], [0.7, 1.4, 1.4]) is None

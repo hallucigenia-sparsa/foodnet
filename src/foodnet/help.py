@@ -29,13 +29,15 @@ SETTINGS = {
     "second_window_start": "The second window's start, in hours since inoculation.",
     "second_window_end": "The second window's end, in hours; empty means until each culture's last sample.",
     "fraction": "Exponential growth ends at the first sample where the culture has risen this share of the way "
-                "from its start to its maximum, on the growth curve smoothed by a running median of three (so one "
-                "stray point does not move it): 90% by default.",
+                "from its start to its maximum (90% by default), or earlier where its growth rate has fallen below "
+                "a tenth of its maximum over two consecutive intervals.",
     "no_growth_factor": "A culture that rose less than this many times did not grow and has no phases (1.5).",
     "detection_limit": "A mean change smaller than this, in either direction, counts as no change (0.2 mM).",
-    "judge_spread": "A change must clear the detection limit across the replicates' spread (mean plus and minus "
-                    "one standard deviation), not only in its mean; a spread reaching across the limit is "
-                    "inconclusive, neither an arc nor a measured zero. On by default; off, the mean alone decides.",
+    "require_agreement": "A change needs every replicate of an experiment beyond the detection limit on the same "
+                         "side (no change: every one inside it), and every experiment of a value to say the same; "
+                         "otherwise the value is inconclusive, neither an arc nor a measured zero. Experiments that "
+                         "agree in direction but differ in amount are a caution, not a veto. On by default; off, the "
+                         "mean alone decides.",
     "compound_limits": "Detection limits of their own for compounds measured at another scale, as name=mM, comma "
                        "separated: thiamine=0.01. Empty by default: every compound takes the detection limit.",
     "ignore_media": "Values from every medium, pooled, instead of only from the value medium.",
@@ -173,16 +175,17 @@ community itself before relying on what it predicts.</p>
 <h2 id="phases">Growth phases</h2>
 <p>What a culture makes or takes up while it grows can differ from what it does once growth has stopped, so every
 value belongs to a phase. Exponential growth ends at the first sample at which the culture has risen 90% of the
-way from its start to its maximum (an advanced setting), read on the growth curve smoothed by a running median of
-three so a single stray point does not move it; the stationary phase runs from there to the last metabolite
-sample. A value is the metabolite's concentration at the end of the phase minus its concentration at the start,
-interpolated between samples, averaged over replicates, and then over experiments, each experiment counting once.
-Diauxic shifts are not detected: a second growth phase counts as stationary. Neither is a slow late rise: a
-culture whose plateau keeps creeping up can end its phase late, and when the replicates of one experiment end it
-further apart than a sampling interval the value carries the caution boundaries_differ (a time window is then the
-safer choice). A boundary placed on fewer than three growth samples carries coarse_sampling. A culture that did
-not grow by the no-growth factor has no phases: its cells are no_phase, and a time window gives them values. A
-time window in Advanced settings replaces the phases. The growth curve is a per-strain count when the replicate
+way from its start to its maximum (an advanced setting), or earlier, at the first sample after which the specific
+growth rate stays below a tenth of its maximum over two consecutive intervals: a plateau that keeps creeping up,
+or a late rise in a qPCR count from lysing cells, would otherwise end the phase days late. The stationary phase
+runs from there to the last metabolite sample. A value is the metabolite's concentration at the end of the
+phase minus its concentration at the start, interpolated between samples, averaged over replicates, and then
+over experiments, each experiment counting once. Diauxic shifts are not detected: a second growth phase counts
+as stationary. When the replicates of one experiment end growth further apart than a sampling interval, the
+value carries the caution boundaries_differ (a time window is then the safer choice). A boundary placed on fewer
+than three growth samples carries coarse_sampling. A culture that did not grow by the no-growth factor has no
+phases: its cells are no_phase, and a time window gives them values. A time window in Advanced settings
+replaces the phases. The growth curve is a per-strain count when the replicate
 has one, else the culture's own (cell counts before optical density); a curve that gives no boundary gives way
 to the replicate's next one.</p>
 <p>A metabolite series shorter than 24 h is still used, and its values carry the caution short_record; the page
@@ -204,9 +207,10 @@ the page names them. Tell media apart by their descriptions and atmosphere switc
 experiments leaves out an experiment by id. The report lists every medium found.
 Studies in the value medium are pooled, each experiment counting once; when their experiments disagree on what
 happened, the value is inconclusive (NA, no arc), carries the caution conflict, and the report names the
-experiments. A change must also clear the detection limit across the replicates' spread: a mean of +0.8 mM with a
-standard deviation of 1.0 mM is inconclusive, not production. The same experiment deposited under two studies is
-counted once.</p>
+experiments. Within an experiment, the replicates must agree too: a change needs every replicate beyond the
+detection limit on the same side, so replicates of -0.2 and +1.9 mM are inconclusive, not production. A value
+from one replicate is shown, and its matrix cell says single_replicate. The same experiment deposited under two
+studies is counted once.</p>
 <p>Because the value medium is chosen for the whole search, a taxon's values can change with the other taxa
 searched with it: when a taxon has more data in another medium, the page says so. Name a medium in the second box
 to fix the choice.</p>

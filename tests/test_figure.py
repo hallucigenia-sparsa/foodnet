@@ -26,8 +26,11 @@ def test_cell_states_have_their_own_marks(client):
     root = ET.fromstring(figure.matrices_svg(run(client)))
     fills = [r.get("fill") for r in root.iter(f"{SVG}rect")]
     assert figure.NOT_ASSAYED in fills                       # C's acetate, never assayed in WC
-    # presence only: B's formate and C's glucose, one circle each, plus the one in the key
-    assert len(list(root.iter(f"{SVG}circle"))) == 3
+    circles = list(root.iter(f"{SVG}circle"))
+    # presence only: B's formate and C's glucose, one open circle each, plus the one in the key
+    assert len([c for c in circles if c.get("fill") == "none"]) == 3
+    # B rests on one replicate: a dot on its four measured cells (butyrate and glucose, both panels) and the key
+    assert len([c for c in circles if c.get("fill") != "none"]) == 5
 
 
 def test_booleans_print_no_numbers(client):

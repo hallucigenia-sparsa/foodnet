@@ -22,7 +22,7 @@ def test_exponential_phase_values_are_the_mean_net_change(client):
 
 
 def test_the_stationary_phase_starts_at_the_boundary(client):
-    r = run(client, phase="stationary", judge_spread=False)
+    r = run(client, phase="stationary", require_agreement=False)
     # A's glucose from 12 h to 24 h: 0 and -1, mean -0.5, beyond the 0.2 mM limit (judged by the mean alone;
     # by default its spread reaches across the limit, test_matrix.py)
     assert r["cells"][(A, GLC, "stationary")]["mean"] == pytest.approx(-0.5)
@@ -196,7 +196,7 @@ def test_initial_concentrations_are_the_value_medium_first_samples(client):
 
 
 def test_every_tested_arc_carries_its_q_value_and_identical_replicates_none(client):
-    net = run(client, phase="stationary", judge_spread=False)["network"]
+    net = run(client, phase="stationary", require_agreement=False)["network"]
     arc = next(e for e in net.edges if e.taxon == A and e.metabolite == GLC)
     # A's stationary glucose (0 and -1) is tested, and corrected within the family of the per-study arcs
     assert arc.q_value is not None and arc.p_value is not None

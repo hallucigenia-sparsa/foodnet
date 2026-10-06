@@ -45,10 +45,10 @@ def listener(tmp_path, monkeypatch):
     it received)."""
     monkeypatch.setenv("R_USER_CACHE_DIR", str(tmp_path))
     (tmp_path / "R" / "foodnet").mkdir(parents=True)
-    (tmp_path / "R" / "foodnet" / "listen-token").write_text(_Listener.token + "\n")
     _Listener.received = []
     server = http.server.HTTPServer(("127.0.0.1", 0), _Listener)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    (tmp_path / "R" / "foodnet" / f"listen-token-{server.server_address[1]}").write_text(_Listener.token + "\n")
     yield server.server_address[1], _Listener.received
     server.shutdown()
 
@@ -64,7 +64,7 @@ def test_the_payload_reaches_r_and_r_says_what_it_holds(listener, client):
 
 def test_a_wrong_secret_is_refused_and_says_why(listener, tmp_path):
     port, received = listener
-    (tmp_path / "R" / "foodnet" / "listen-token").write_text("stale")
+    (tmp_path / "R" / "foodnet" / f"listen-token-{port}").write_text("stale")
     with pytest.raises(rbridge.RError, match="secret"):
         rbridge.send({"format": "x"}, port=port)
     assert not received
@@ -72,7 +72,7 @@ def test_a_wrong_secret_is_refused_and_says_why(listener, tmp_path):
 
 def test_the_secret_is_read_where_r_writes_it(monkeypatch, tmp_path):
     monkeypatch.setenv("R_USER_CACHE_DIR", str(tmp_path))
-    assert rbridge.token_path() == str(tmp_path / "R" / "foodnet" / "listen-token")
+    assert rbridge.token_path(8794) == str(tmp_path / "R" / "foodnet" / "listen-token-8794")
     monkeypatch.delenv("R_USER_CACHE_DIR")
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "x"))
     assert rbridge.token_path().startswith(str(tmp_path / "x"))

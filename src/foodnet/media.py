@@ -71,8 +71,17 @@ NAME_REMOVED = re.compile(r"(?:^|\s)[-\u2212]\s*([A-Za-z]+)")
 
 
 def _amount(text: str) -> str:
-    """An amount as one spelling: "1 mM " and "1mM" are "1mm"."""
-    return re.sub(r"\s+|of$", "", (text or "").strip()) if text else ""
+    """An amount as one spelling: "1 mM ", "1mM" and "1.0 mM" are "1mm"; "5 g l-1" is "5g/l"; the micro sign
+    and the Greek mu are one."""
+    if not text:
+        return ""
+    text = re.sub(r"\s+of\s*$", "", text.strip())
+    found = re.match(r"(\d+(?:\.\d+)?)\s*(.*)$", text)
+    if not found:
+        return re.sub(r"\s+", "", text)
+    number = f"{float(found.group(1)):g}"
+    unit = re.sub(r"\s+", "", found.group(2)).replace("gl-1", "g/l").replace("\u03bc", "\u00b5")
+    return number + unit
 
 
 def _clean(text: str) -> tuple:

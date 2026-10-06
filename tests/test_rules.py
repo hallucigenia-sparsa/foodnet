@@ -34,7 +34,7 @@ def test_a_change_must_clear_the_limit_across_its_spread():
     assert derive.classify([-0.2, 1.9], 0.2) is None           # +0.84 +/- 1.04: inconclusive
     assert derive.classify([-0.4, 0.7], 0.2) is None           # opposite signs: never "no change"
     assert derive.classify([0.05, 0.1], 0.2) == 0
-    assert derive.classify([-0.2, 1.9], 0.2, spread=False) == 1
+    assert derive.classify([-0.2, 1.9], 0.2, agree=False) == 1
     assert derive.classify([0.9], 0.2) == 1                     # one value: judged by itself
 
 
@@ -91,6 +91,8 @@ def test_two_experiments_that_only_sit_at_the_medium_level_are_not_one_deposit()
 def test_a_deposit_rounded_in_time_is_still_found():
     a = _culture("E1", [0.0, 2.0, 5.0, 9.0], times=(0, 8.333, 16.667, 25.0))
     b = _culture("E2", [0.0, 2.0, 5.0, 9.0], study="S2", times=(0, 8.33, 16.67, 25.0))
+    exhausted = [_culture("E3", [10.0, 0.0, 0.0, 0.0]), _culture("E4", [10.0, 0.0, 0.0, 0.0], study="S2")]
+    assert derive.duplicates(exhausted) == (set(), [])         # exhaustion alone identifies nothing
     dropped, found = derive.duplicates([a, b])
     assert dropped and found
 
@@ -164,3 +166,28 @@ def test_a_taxon_with_more_data_in_another_medium_is_named():
     # in the plain world C has data only in mMCB, so it is named, and A and B (with data in WC) are not
     told = [w for w in run(FakeClient())["warnings"] if "has more data" in w]
     assert len(told) == 1 and "Gamma gamma C1 has more data in mMCB" in told[0] and "Alpha" not in told[0]
+
+
+# ---- agreement (round 2) ------------------------------------------------------------------------------
+
+def test_replicates_must_agree_and_more_replicates_never_make_a_change_easier():
+    assert derive.classify([0.25, 0.3], 0.2) == 1
+    assert derive.classify([0.25, 0.3, 0.1], 0.2) is None          # one replicate inside the limit
+    assert derive.classify([0.05, -0.1, 0.12], 0.2) == 0
+    assert derive.classify([-0.4, 0.7], 0.2) is None
+
+
+def test_experiments_that_agree_in_direction_but_not_in_size_stay_a_change():
+    cultures = [_culture("E1", [0, 1, 2, 3]), _culture("E1", [0, 1, 2, 3]),
+                _culture("E2", [0, 1, 2, 3], study="S2"), _culture("E2", [0, 1, 2, 3], study="S2")]
+    cell = derive.pool(_rows([(0, 0.5), (1, 0.6), (2, 3.0), (3, 3.2)]), cultures, 0.2)[("t1", "x", "exponential")]
+    assert cell["state"] == "produced" and "amounts_differ" in cell["cautions"]
+    assert cell["mean"] == pytest.approx((0.55 + 3.1) / 2)
+
+
+def test_an_inconclusive_experiment_does_not_veto_the_others_but_is_named():
+    cultures = [_culture("E1", [0, 1, 2, 3]), _culture("E1", [0, 1, 2, 3]),
+                _culture("E2", [0, 1, 2, 3], study="S2"), _culture("E2", [0, 1, 2, 3], study="S2")]
+    cell = derive.pool(_rows([(0, 1.0), (1, 1.2), (2, -0.5), (3, 1.5)]), cultures, 0.2)[("t1", "x", "exponential")]
+    assert cell["state"] == "produced" and cell["mean"] == pytest.approx(1.1)
+    assert any("left out as inconclusive" in n for n in cell["notes"])

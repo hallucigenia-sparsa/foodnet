@@ -85,20 +85,21 @@ crm_resources <- function(x, missing = NULL) {
 #' are shares of uptake and produced entries by-product per unit taken up; for other models.
 #' `scale = "none"` is consumed minus produced, in mM.
 #'
-#' `NA` cells have no size. With `na = "zero"` they count as 0, and a warning says how many of each kind
-#' were set to 0: never assayed, seen only in another medium (a real link), inconclusive (measured, but its
-#' spread reaches across the limit) and without a phase. `"stop"` refuses until you fill them yourself.
+#' `NA` cells have no size, and foodnet never writes one as zero, so by default (`na = "stop"`) this refuses
+#' until you fill them yourself or say how. With `na = "zero"` they count as 0, and a warning says how many
+#' of each kind were set to 0: never assayed, seen only in another medium (a real link), inconclusive
+#' (measured, but its replicates or experiments disagree) and without a phase.
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param scale `"miasim"`, `"shares"` or `"none"`, as above.
-#' @param na `"zero"` or `"stop"`, as above.
+#' @param na `"stop"` or `"zero"`, as above.
 #' @return A numeric matrix, taxa by resources.
 #' @examples
 #' \dontrun{
-#' E <- crm_efficiency(crm)
+#' E <- crm_efficiency(crm, na = "zero")
 #' }
 #' @export
-crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("zero", "stop")) {
+crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero")) {
     stopifnot(inherits(x, "foodnet_crm"))
     scale <- match.arg(scale)
     na <- match.arg(na)
@@ -123,7 +124,7 @@ crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("zer
 
 # The consumed and produced amounts with every NA set to 0 and counted by kind, or a stop.
 #' @noRd
-amounts <- function(x, na = "zero", booleans_ok = FALSE) {
+amounts <- function(x, na = "stop", booleans_ok = FALSE) {
     if (identical(x$values, "booleans") && !booleans_ok) {
         stop_foodnet("these parameters are booleans (1 = it happened), not amounts: an efficiency matrix ",
                      "needs amounts. Run the search again without Report everything as booleans.")
@@ -261,18 +262,20 @@ crm_write <- function(x, dir) {
 #' @param missing_rate A growth rate for the taxa that have none, or `NULL` to stop when any does.
 #' @param missing_resource A starting concentration for the resources that have none, or `NULL` to stop.
 #' @param allow Caveats to accept: `"mixed_media"`, `"stationary_phase"`.
+#' @param na What [crm_efficiency()] does with NA cells: `"stop"` (the default) or `"zero"`.
 #' @return A list with `n_species`, `n_resources`, `names_species`, `names_resources`, `E`, `x0`,
 #'   `resources`, `growth_rates` and `monod_constant`.
 #' @examples
 #' \dontrun{
-#' args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0)
+#' args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
 #' set.seed(1)
 #' tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 #' cells <- crm_unscale(crm, SummarizedExperiment::assay(tse))
 #' }
 #' @export
 as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource = NULL,
-                      allow = character()) {
+                      allow = character(), na = c("stop", "zero")) {
+    na <- match.arg(na)
     stopifnot(inherits(x, "foodnet_crm"))
     if (x$caveats$mixed_media && !"mixed_media" %in% allow) {
         stop_foodnet("these values pool every medium (Ignore media differences): their starting concentrations ",
@@ -308,8 +311,12 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
         stop_foodnet("no starting concentration for ", paste(names(resources)[is.na(resources)], collapse = ", "),
                      ": give as_miasim(x, missing_resource = ) a number (0 for a resource the medium lacks).")
     }
+    if (x$caveats$incomplete) {
+        warning("these parameters are incomplete: records could not be read from mGrowthDB (print(x) lists ",
+                "them)", call. = FALSE)
+    }
     if (is.null(E)) {
-        E <- crm_efficiency(x)
+        E <- crm_efficiency(x, na = na)
         x0 <- as.numeric(x0) / crm_scale(x)       # into each taxon's own unit (crm_scale)
     }
     list(n_species = n, n_resources = m, names_species = x$taxa, names_resources = x$resources, E = E,
@@ -329,20 +336,22 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param monod_constant Monod constants in mM: one number, or a taxa by resources matrix.
 #' @param missing_resource A starting concentration for resources with none (default 0).
+#' @param na What [crm_efficiency()] does with NA cells: `"stop"` (the default) or `"zero"`.
 #' @return A data frame: taxon, what (`"biomass"`, `"hours to grow"`, or a resource), direction, measured,
 #'   simulated and their ratio. Biomass is in each growth curve's unit.
 #' @examples
 #' \dontrun{
-#' crm_backcheck(crm, monod_constant = 1)
+#' crm_backcheck(crm, monod_constant = 1, na = "zero")
 #' }
 #' @export
-crm_backcheck <- function(x, monod_constant, missing_resource = 0) {
+crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop", "zero")) {
+    na <- match.arg(na)
     stopifnot(inherits(x, "foodnet_crm"))
     if (!requireNamespace("miaSim", quietly = TRUE)) {
         stop_foodnet("crm_backcheck() runs miaSim: install it with BiocManager::install(\"miaSim\")")
     }
     if (missing(monod_constant)) stop_foodnet("give monod_constant, in mM; foodnet measures none")
-    E <- crm_efficiency(x)
+    E <- crm_efficiency(x, na = na)
     scale <- crm_scale(x)
     n <- length(x$taxa)
     m <- length(x$resources)

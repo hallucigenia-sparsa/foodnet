@@ -14,10 +14,14 @@ http_response <- function(body, status = "200 OK", type = "application/json") {
 # Content-Length. Headers are small, so they are read a byte at a time into a fixed buffer until the blank
 # line, which keeps this free of any parsing library and its cost linear in what arrives.
 #' @noRd
-read_request <- function(con, limit = 64e6, header_limit = 16384L) {
+read_request <- function(con, token, limit = 16e6, header_limit = 16384L, seconds = 5) {
+    # one deadline for the whole request: a peer that sends a byte now and then cannot hold the listener (and
+    # the R session waiting in it) beyond it
+    deadline <- Sys.time() + seconds
     header <- raw(header_limit)
     n <- 0L
     repeat {
+        if (Sys.time() > deadline) stop_foodnet("the request took too long")
         byte <- readBin(con, "raw", 1L)
         if (!length(byte)) break
         if (n >= header_limit) stop_foodnet("the request headers are too long to be foodnet's")
@@ -31,15 +35,27 @@ read_request <- function(con, limit = 64e6, header_limit = 16384L) {
         found <- grep(paste0("^", name, ":"), lines, ignore.case = TRUE, value = TRUE)
         if (length(found)) trimws(sub("^[^:]*:", "", found[1])) else NA_character_
     }
+    request <- list(request = first, body = "", token = field("x-foodnet-token"), origin = field("origin"))
+    # the secret is checked before the body is read, so nobody without it can make R read one
+    if (!grepl("^POST ", first) || !is.na(request$origin) || is.na(request$token) ||
+        !identical(request$token, token)) {
+        return(request)
+    }
     size <- suppressWarnings(as.integer(field("content-length")))
     if (is.na(size)) size <- 0L
     if (size < 0 || size > limit) stop_foodnet("the request body is not a size we accept")
-    body <- ""
-    if (size > 0) {
-        body <- rawToChar(readBin(con, "raw", size))
-        Encoding(body) <- "UTF-8"
+    chunks <- list()
+    got <- 0L
+    while (got < size) {
+        if (Sys.time() > deadline) stop_foodnet("the request took too long")
+        chunk <- readBin(con, "raw", min(65536L, size - got))
+        if (!length(chunk)) break
+        chunks[[length(chunks) + 1L]] <- chunk
+        got <- got + length(chunk)
     }
-    list(request = first, body = body, token = field("x-foodnet-token"), origin = field("origin"))
+    request$body <- rawToChar(do.call(c, c(list(raw(0)), chunks)))
+    Encoding(request$body) <- "UTF-8"
+    request
 }
 
 # Where foodnet_listen() leaves the secret the page must send, readable by this user only. The foodnet page
@@ -47,16 +63,22 @@ read_request <- function(con, limit = 64e6, header_limit = 16384L) {
 # from another machine, or from a web page open in a browser, cannot carry it: base R cannot bind a server
 # socket to 127.0.0.1 alone, so the port is reachable from the network and the secret is what keeps it ours.
 #' @noRd
-listen_token_path <- function() file.path(tools::R_user_dir("foodnet", "cache"), "listen-token")
+listen_token_path <- function(port) {
+    file.path(tools::R_user_dir("foodnet", "cache"), paste0("listen-token-", as.integer(port)))
+}
 
 #' @noRd
 new_listen_token <- function() {
-    bytes <- if (file.exists("/dev/urandom")) {
+    bytes <- if (requireNamespace("openssl", quietly = TRUE)) {
+        openssl::rand_bytes(24L)
+    } else if (file.exists("/dev/urandom")) {
         source <- file("/dev/urandom", "rb", raw = TRUE)
         on.exit(close(source), add = TRUE)
         readBin(source, "raw", 24L)
     } else {
-        # no system source of randomness (Windows): R's generator, leaving the session's own stream untouched
+        # no system source of randomness (Windows without the openssl package): R's generator, seeded from
+        # the time and the process, leaving the session's own stream untouched; weaker, so the listener
+        # also answers one request at a time for a few minutes at most
         seed <- if (exists(".Random.seed", envir = globalenv())) get(".Random.seed", envir = globalenv())
         on.exit(if (is.null(seed)) rm(".Random.seed", envir = globalenv()) else
             assign(".Random.seed", seed, envir = globalenv()), add = TRUE)
@@ -67,7 +89,7 @@ new_listen_token <- function() {
 }
 
 #' @noRd
-write_listen_token <- function(token, path = listen_token_path()) {
+write_listen_token <- function(token, path) {
     dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
     if (file.exists(path)) file.remove(path)
     file.create(path)
@@ -88,7 +110,7 @@ answer <- function(con, body, status = "200 OK", type = "application/json") {
 serve_one <- function(server, token) {
     con <- socketAccept(server, blocking = TRUE, open = "a+b", timeout = 10)
     on.exit(try(close(con), silent = TRUE), add = TRUE)
-    request <- tryCatch(read_request(con), error = function(e) NULL)
+    request <- tryCatch(read_request(con, token), error = function(e) NULL)
     if (is.null(request)) {
         return(answer(con, "{\"received\": false, \"error\": \"not a request foodnet sends\"}",
                       status = "400 Bad Request"))
@@ -145,13 +167,16 @@ serve_one <- function(server, token) {
 #' @export
 foodnet_listen <- function(port = 8794, timeout = 300, quiet = FALSE) {
     token <- new_listen_token()
-    path <- write_listen_token(token)
-    on.exit(unlink(path), add = TRUE)
+    path <- write_listen_token(token, listen_token_path(port))
+    # removed when this listener ends, unless another one on the same port has written its own since
+    on.exit(if (identical(tryCatch(readLines(path, warn = FALSE)[1], error = function(e) ""), token)) unlink(path),
+            add = TRUE)
     server <- serverSocket(port)
     on.exit(close(server), add = TRUE)
     if (!quiet) {
         message("foodnet: listening on http://127.0.0.1:", port, " for up to ", timeout,
-                " seconds. Press Send to R on the foodnet page.")
+                " seconds. Press Send to R on the foodnet page. (The page reads this listener's secret from ",
+                path, ".)")
     }
     deadline <- Sys.time() + timeout
     repeat {

@@ -12,10 +12,11 @@ The cell states are the figure's, and there are exactly these:
   * **white**: measured in the value medium, and no change beyond the limit in this direction;
   * **pale orange**: never assayed for this taxon in the value medium, a color outside the gray scale, so the
     absence of a measurement never reads as a measured zero;
-  * **a question mark on pale yellow**: assayed, but inconclusive: the replicates' spread, or the
-    experiments, reach across the detection limit (Karoline, 2026-10-06);
+  * **a question mark on pale yellow**: assayed, but inconclusive: its replicates, or its experiments, do not
+    agree on what happened (Karoline, 2026-10-06);
   * **a dash on pale green**: assayed, but its cultures gave no phase (no end of exponential growth, or no
     stationary phase reached), so there is no value in the phase asked for;
+  * **a dot in the corner**: the cell rests on one replicate (single_replicate);
   * **an open circle**: the change was seen in another medium, drawn on white (the value medium measured no
     change: seen_elsewhere) or on orange (presence only).
 
@@ -127,13 +128,16 @@ def tooltip(result: dict, taxon, met, phase: str, direction: str, evidence: str,
     head = f"{taxon.name}, {met.name}, {direction} ({interval(result, met.id, phase)})"
     cell = result["cells"].get((taxon.id, met.id, phase))
     lines = [head]
+    if evidence == "single_replicate":
+        evidence = "measured" if value else "below_limit"
     if cell is not None and cell["n"]:
         limit = cell.get("limit") or result["settings"].get("detection_limit", 0.2)
         experiments = (f", {cell['n_experiments']} experiments" if (cell.get("n_experiments") or 0) > 1 else "")
         if evidence == "inconclusive":
             lines.append(f"inconclusive: mean {cell['mean']:+.3g} mM"
                          + ("" if cell["sd"] is None else f" \u00b1 {cell['sd']:.2g}")
-                         + f", {cell['n']} replicate(s){experiments}; the spread reaches across {limit:g} mM")
+                         + f", {cell['n']} replicate(s){experiments}; they do not agree on a change beyond "
+                         f"{limit:g} mM, or on none")
         elif evidence == "measured":
             if result["settings"].get("booleans"):
                 amount = "yes"
@@ -174,7 +178,8 @@ def matrices_svg(result: dict) -> str:
     # the gray scale is set by the value medium's measurements only; a value from another medium is not
     # comparable with them and is drawn on its own background
     values = [v for d in ("consumed", "produced") for row, ev in zip(pair[d], pair[f"evidence_{d}"], strict=True)
-              for v, e in zip(row, ev, strict=True) if e == "measured" and isinstance(v, (int, float))]
+              for v, e in zip(row, ev, strict=True)
+              if e in ("measured", "single_replicate") and isinstance(v, (int, float))]
     vmax = max(values, default=0) or 1.0
     names = pair["taxa"]
     label_w = max((_text_width(n, 12) for n in names), default=60) + 12
@@ -233,6 +238,11 @@ def matrices_svg(result: dict) -> str:
                 text = tooltip(result, t, m, ph, direction, evidence, v)
                 tips.append((x, y, text))
                 out.append(f'<g id="fn-c{len(tips)}" class="fn-cell"><title>{html.escape(text)}</title>')
+                lone = evidence == "single_replicate"
+                if lone:
+                    # one replicate: drawn as what it says, with a dot in its corner
+                    evidence = "measured" if v else "below_limit"
+                    out.append(f'<circle cx="{x + CELL_W - 4:.1f}" cy="{y + 4:.1f}" r="1.8" fill="{brand.MUTED}"/>')
                 if evidence == "measured":
                     share = 1.0 if booleans else math.sqrt(min(1.0, v / vmax))
                     fill = _gray(0.75 if booleans else share)
@@ -287,8 +297,10 @@ def matrices_svg(result: dict) -> str:
     if any(isinstance(v, float) and e == "presence_only" for d in ("consumed", "produced")
            for row, ev in zip(pair[d], pair[f"evidence_{d}"], strict=True) for v, e in zip(row, ev, strict=True)):
         items[-1] = (OTHER_MEDIUM, "", "value from another medium, not comparable with the gray scale")
+    if "single_replicate" in shown:
+        items.append(("#ffffff", "dot", "one replicate"))
     if "inconclusive" in shown:
-        items.append((INCONCLUSIVE, "?", "inconclusive: the spread reaches across the limit"))
+        items.append((INCONCLUSIVE, "?", "inconclusive: replicates or experiments disagree"))
     if "no_phase" in shown:
         items.append((NO_PHASE, "\u2013", "assayed, no phase in its cultures"))
     x = label_w
@@ -300,6 +312,8 @@ def matrices_svg(result: dict) -> str:
         if mark == "circle":
             out.append(f'<circle cx="{x + 8:.0f}" cy="{ky - 4}" r="3.6" fill="none" stroke="{brand.MUTED}" '
                        'stroke-width="1.2"/>')
+        elif mark == "dot":
+            out.append(f'<circle cx="{x + 13:.0f}" cy="{ky - 7}" r="1.8" fill="{brand.MUTED}"/>')
         elif mark:
             out.append(f'<text x="{x + 8:.0f}" y="{ky}" font-size="10" text-anchor="middle" '
                        f'fill="{brand.MUTED}">{mark}</text>')

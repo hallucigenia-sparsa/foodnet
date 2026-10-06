@@ -28,9 +28,10 @@ DEFAULTS = {
     # an end of None meaning until the last sample (Karoline, 2026-10-05, for trehalose)
     "second_window_metabolites": "", "second_window_start": 0.0, "second_window_end": None,
     "detection_limit": d.DETECTION_LIMIT,
-    # a change must clear the limit across the replicates' spread, not only in its mean; a spread across the
-    # limit is inconclusive (Karoline, 2026-10-06). Off: the mean alone decides, as in 0.1.0
-    "judge_spread": True,
+    # the replicates of an experiment, and the experiments of a value, must agree on what happened: every
+    # replicate beyond the limit on one side, or every one inside it; else inconclusive (Karoline,
+    # 2026-10-06). Off: the mean alone decides, as in 0.1.0
+    "require_agreement": True,
     # detection limits of their own, for compounds measured at another scale: "thiamine=0.01, riboflavin=0.005"
     "compound_limits": "",
     "ignore_media": False, "booleans": False,
@@ -221,6 +222,10 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         cultures = [c for c in cultures if named(c)]
         read["growth_only"] = [c for c in read["growth_only"] if named(c)]
     lost = getattr(index, "failed", [])
+    if lost:
+        for entry in resolved["unresolved"]:
+            resolved["reasons"][entry] = (resolved["reasons"].get(entry, "") + " (the species list could not be read "
+                                          "whole, so it may be held in a study that was not read)").strip()
     if lost and not all_studies:
         errors.append(f"{len(lost)} record(s) of the species list could not be read from mGrowthDB (for example "
                       f"{lost[0][0]}: {lost[0][1]}), so taxa held only there are missing from this search; the result "
@@ -257,7 +262,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     chosen = set(rule["chosen"])
     value_rows = [r for r in rows if r["culture"] in chosen]
     other_rows = [r for r in rows if r["culture"] not in chosen]
-    limit, spread = s["detection_limit"], s["judge_spread"]
+    limit, spread = s["detection_limit"], s["require_agreement"]
     by_name = compound_limits_of(s)
     limits = {mid: by_name[n] for c in cultures for mid, met in c.metabolites.items()
               for n in by_name if d.second_window_matches(met, [n])}
@@ -376,6 +381,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     # line also exits with an error, unless told to accept it)
     net.meta["incomplete"] = bool(errors)
     net.meta["errors"] = list(errors)
+    net.meta["warnings"] = list(warnings)       # what the page shows above the result, kept with the files
     say(len(studies), len(studies), "Preparing the result")
     return {"entries": names, "settings": dict(s), "resolved": resolved["resolved"],
             "reasons": resolved["reasons"], "suggestions": resolved["suggestions"], "genera": resolved["genera"],
@@ -462,8 +468,9 @@ def _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown
     unsure = sum(1 for c in value_cells.values()
                  if c.get("state") == "inconclusive" and "conflict" not in c["cautions"])
     if unsure:
-        out.append(f"{unsure} value(s) are inconclusive: the replicates' spread reaches across the detection "
-                   "limit, so they are neither an arc nor a measured zero (NA, evidence inconclusive).")
+        out.append(f"{unsure} value(s) are inconclusive: their replicates do not agree on a change beyond the "
+                   "detection limit, or on none, so they are neither an arc nor a measured zero (NA, evidence "
+                   "inconclusive).")
     coarse = sum(1 for c in value_cells.values() if "coarse_sampling" in c["cautions"])
     if coarse:
         out.append(f"{coarse} value(s) rest on a phase boundary placed on fewer than three growth samples (caution "

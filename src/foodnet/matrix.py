@@ -15,13 +15,13 @@ The cell vocabulary, the same in every matrix:
   * 0: measured there, and no change beyond the limit in this direction (in the pair, a compound that moved
     the other way is 0 here and a number in the other matrix);
   * NA: no value. The compound was never assayed for this taxon in the value medium; or its change was
-    seen only in another medium (presence only); or it was assayed but is inconclusive (the replicates'
-    spread, or the experiments, reach across the detection limit); or it was assayed but the culture gave
+    seen only in another medium (presence only); or it was assayed but is inconclusive (its replicates, or
+    its experiments, do not agree on what happened); or it was assayed but the culture gave
     no phase (no end of exponential growth, or no stationary phase reached).
 
 The evidence matrices of the pair say which, cell by cell (`EVIDENCE_WORDS`): measured, below_limit,
-seen_elsewhere (0 in the value medium, but another medium showed this direction), inconclusive, no_phase,
-presence_only, not_assayed.
+single_replicate (a number or 0 that rests on one replicate), seen_elsewhere (0 in the value medium, but another
+medium showed this direction), inconclusive, no_phase, presence_only, not_assayed.
 
 With "Report everything as booleans" a number becomes 1 (or -1 in the signed matrix) and a presence-only
 cell counts as 1 too, since a boolean asks only whether it happened.
@@ -39,8 +39,8 @@ import zipfile
 from .model import FoodNetwork
 
 NA = "NA"
-EVIDENCE_WORDS = ("measured", "below_limit", "seen_elsewhere", "inconclusive", "no_phase", "presence_only",
-                  "not_assayed")
+EVIDENCE_WORDS = ("measured", "below_limit", "single_replicate", "seen_elsewhere", "inconclusive", "no_phase",
+                  "presence_only", "not_assayed")
 # v1 (0.2.0): adds each taxon's biomass change over the phase, which miaSim's yields need, and the caveats
 # that make a CRM refuse to build without being told (mixed media, the stationary phase)
 CRM_FORMAT = "foodnet.crm/v1"
@@ -139,15 +139,16 @@ def entry(result: dict, taxon: str, met: str, ph: str, direction: str) -> tuple:
     seen = (result["presence"].get((taxon, met, ph)) or {}).get(direction)
     booleans = _booleans(result)
     if cell is not None and cell["n"]:
+        single = cell["n"] == 1        # decided on one replicate (Karoline, 2026-10-06): its own evidence
         if cell["direction"] == direction:
-            return (1 if booleans else abs(cell["mean"])), "measured"
+            return (1 if booleans else abs(cell["mean"])), ("single_replicate" if single else "measured")
         if cell.get("state") == "inconclusive":
             return None, "inconclusive"
         if seen and booleans:
             return 1, "presence_only"
         # measured in the value medium without a change this way: 0 there, whatever another medium showed,
         # and the evidence says when one did
-        return 0, ("seen_elsewhere" if seen else "below_limit")
+        return 0, ("seen_elsewhere" if seen else "single_replicate" if single else "below_limit")
     if seen:
         if booleans:
             return 1, "presence_only"
@@ -259,8 +260,8 @@ def corner(result: dict) -> str:
     media = " / ".join(rule.get("media") or []) or "no medium"
     which = "every medium" if rule.get("rule") == "all" else media
     meta = result["network"].meta
-    return (f"taxon [values from {which}; foodnet {meta.get('tool_version', '')} on "
-            f"{str(meta.get('derived_at', ''))[:10]}]")
+    return (f"taxon [{'INCOMPLETE; ' if result.get('errors') else ''}values from {which}; "
+            f"foodnet {meta.get('tool_version', '')} on {str(meta.get('derived_at', ''))[:10]}]")
 
 
 def _matrix_csv(taxa, header, rows, fmt=_number, first: str = "taxon") -> str:
@@ -327,6 +328,20 @@ def initial_csv(result: dict) -> str:
     return _csv(["metabolite", "chebi_id", "mean_mM", "min_mM", "max_mM", "replicates"], rows)
 
 
+def cautions_csv(result: dict, phases=None) -> str:
+    """One row per value with a caution or a note: what the evidence matrices cannot hold (one replicate,
+    boundaries far apart, coarse sampling, amounts that differ, a conflict and the experiments behind it)."""
+    names = result.get("names") or {}
+    rows = []
+    for (taxon, met, ph), cell in sorted(result["cells"].items()):
+        if phases and ph not in phases:
+            continue
+        if cell["cautions"] or cell["notes"]:
+            rows.append([names.get(taxon, taxon), names.get(met, met), ph, cell.get("state") or "",
+                         " ".join(cell["cautions"]), "; ".join(cell["notes"])])
+    return _csv(["taxon", "metabolite", "phase", "state", "cautions", "notes"], rows)
+
+
 def biomass_csv(result: dict) -> str:
     net = result["network"]
     rows = []
@@ -356,6 +371,12 @@ def readme(result: dict, which: str = "matrices") -> str:
     lines = [f"{'Consumer-resource model parameters' if which == 'crm' else 'Consumption and production matrices'}"
              f" from foodnet {net.meta.get('tool_version', '')}",
              f"Derived {net.meta.get('derived_at', '')} from {net.meta.get('source_db', 'mGrowthDB')}.", ""]
+    if result.get("errors"):
+        lines += ["INCOMPLETE: records could not be read from mGrowthDB, so these numbers may lack data. Run the "
+                  "search again.", *(f"  * {e}" for e in result["errors"]), ""]
+    if result.get("warnings"):
+        lines += ["Read first (the page showed these above the result):",
+                  *(f"  * {w}" for w in result["warnings"]), ""]
     if which == "crm":
         lines += [f"Phase: {crm_phase(result)}" + (" (the search asked for both phases; a consumer-resource model "
                                                     "describes growth, so the exponential phase is used)"
@@ -364,8 +385,9 @@ def readme(result: dict, which: str = "matrices") -> str:
         lines += [f"Window: {window[0]:g} h to {window[1]:g} h (set in Advanced settings; it replaces the phases).", ""]
     else:
         lines += [f"Phase: {phase}. Exponential growth ends at the first sample where the culture has risen "
-                  f"{s['fraction']:.0%} of the way from its start to its maximum (on the growth curve smoothed by a "
-                  "running median of three); the stationary phase runs from there to the last metabolite sample.", ""]
+                  f"{s['fraction']:.0%} of the way from its start to its maximum, or earlier, where its growth rate "
+                  "has fallen below a tenth of its maximum over two consecutive intervals; the stationary phase runs "
+                  "from there to the last metabolite sample.", ""]
     second = result.get("second_window") or {}
     if second.get("metabolites"):
         named = ", ".join(n.name for n in result.get("metabolite_nodes", []) if n.id in second["metabolites"])
@@ -374,8 +396,8 @@ def readme(result: dict, which: str = "matrices") -> str:
     values = "booleans (1 = it happened, 0 = measured and it did not, NA = no evidence either way)" \
         if s["booleans"] else ("mM, the mean net change over the phase: the mean of the experiments' means when "
                                "several experiments give a value, else the mean of the replicates")
-    spread = (" and the replicates' spread (mean plus and minus one standard deviation) must clear it too; a "
-              "spread across the limit is inconclusive" if s.get("judge_spread", True) else "")
+    spread = ("; a change needs every replicate beyond it on the same side, and every experiment to say the "
+              "same, or it is inconclusive" if s.get("require_agreement", True) else "")
     own = ("; " + ", ".join(f"{k} {v:g} mM" for k, v in sorted(_own_limits(s).items())) + " have limits of their own"
            if _own_limits(s) else "")
     lines += [f"Values: {values}.",
@@ -385,8 +407,8 @@ def readme(result: dict, which: str = "matrices") -> str:
               "The first header cell names the medium the values come from.",
               "",
               "NA is never zero. A cell is NA when the compound was not assayed for that taxon in the value "
-              "medium; when it was assayed but is inconclusive (the replicates' spread, or the experiments, reach "
-              "across the detection limit); when it was assayed but its cultures gave no phase (no end of "
+              "medium; when it was assayed but is inconclusive (its replicates, or its experiments, do not agree "
+              "on what happened); when it was assayed but its cultures gave no phase (no end of "
               "exponential growth, or no stationary phase)"
               + {"na": "; or when its change was seen only in another medium (presence only)",
                  "true": "; a change seen only in another medium is written TRUE (Advanced settings), "
@@ -460,6 +482,7 @@ def pair_package(result: dict) -> bytes:
                        _matrix_csv(pair["taxa"], pair["columns"], pair[f"evidence_{direction}"], str,
                                    first=corner(result)))
         z.writestr("signed.csv", signed_csv(net, result))
+        z.writestr("cautions.csv", cautions_csv(result))
         from .figure import matrices_svg
         z.writestr("matrices.svg", matrices_svg(result))
         z.writestr("README.txt", readme(result))
@@ -520,6 +543,8 @@ def crm_payload(result: dict) -> dict:
                     # CRM from either unless told to
                     "mixed_media": result["value_rule"]["rule"] == "all",
                     "stationary_phase": ph == "stationary",
+                    "incomplete": bool(result.get("errors")), "errors": list(result.get("errors") or []),
+                    "warnings": list(result.get("warnings") or []),
                     "inconclusive": [{"taxon": pair["taxa"][i], "resource": m.name, "direction": d}
                                      for i, _ in enumerate(taxa) for j, m in enumerate(mets)
                                      for d in ("consumed", "produced")
@@ -544,6 +569,7 @@ def crm_package(result: dict) -> bytes:
         z.writestr("growth_rates.csv", rates_csv(result))
         z.writestr("initial_concentrations.csv", initial_csv(result))
         z.writestr("biomass.csv", biomass_csv(result))
+        z.writestr("cautions.csv", cautions_csv(result, [crm_phase(result)]))
         z.writestr("crm.json", json.dumps(crm_payload(result), indent=1))
         z.writestr("README.txt", readme(result, "crm"))
     return buffer.getvalue()
