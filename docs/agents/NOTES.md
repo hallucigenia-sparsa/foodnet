@@ -70,6 +70,14 @@ gate applies.
   until a pattern is added; check new studies' descriptions when they appear. `derive.value_set` gives each
   medium entry of the second box its best-matching medium and names the rest (`also_matched`).
 
+- 2026-10-06, pre-release audit (Karoline asked for one before any release): 600 random combinations of the
+  main settings through every output on the synthetic data (found and fixed: a taxon with a growth rate and
+  no arc broke the report); HTML through every route of the page (escaped everywhere); a clean wheel install
+  and the page smoke test; All live (25 studies, 93 cultures, about 37 s, valid); mGrowthDB unreachable (a
+  clear error); R CMD check OK; CI green on every job. Not rechecked live: Send to Cytoscape after the arcs
+  gained `exponential_h` (the payload is tested; the transport is grownet's). Left for the release pull
+  request: the changelog date and CITATION.cff's date-released; then PyPI trusted publishing (RELEASING.md).
+
 ## Things learned about mGrowthDB while building
 
 - **Search misses culture-level monocultures.** `search.json?strainNcbiIds=` matches per-strain measurement
