@@ -103,8 +103,9 @@ with metabolite data."
 19. **Settled 2026-10-06 (Karoline), formerly open:** the end of exponential growth at 90% of the maximal
     abundance on the linear scale ("OK"); CRM parameters with Both use the exponential phase ("OK, but
     document": the help, the CRM README and the README say so); single-replicate values are shown with a
-    caution ("OK"); the growth-rate fallback takes another monoculture of the taxon in the same medium ("keep
-    as is, but with the stringent medium matching"), which decision 18 now makes strict.
+    caution ("OK"; since decision 20 a single replicate decides nothing by default, and is shown so only when
+    judging by the mean alone); the growth-rate fallback takes another monoculture of the taxon in the same
+    medium ("keep as is, but with the stringent medium matching"), which decision 18 now makes strict.
 
 20. **The experiment is the unit, and a change must be pinned down.** Karoline, 2026-10-06, after a review
     of 0.1.0 showed a study with ten replicates outvoting one with two, and +0.84 +/- 1.04 mM on a 27 mM

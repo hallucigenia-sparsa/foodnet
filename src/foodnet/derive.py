@@ -445,7 +445,11 @@ def classify(values, limit: float, agree: bool = True):
         the same side for a change, both inside it for none ("Pairs agree"). The interval on one degree of
         freedom is so wide that clear pairs (-3.2 and -1.5 mM) came out inconclusive;
       * one: inconclusive ("1 is inconclusive"), so the least data never makes the boldest call. Identical
-        non-zero replicates count as one: they are one series deposited twice, not certainty.
+        replicates near the limit count as one: they are one series deposited twice, not certainty (a
+        substrate exhausted from one shared start, identical far beyond the limit, stays a change).
+
+    At three or more, replicates that all lie beyond the limit on one side (or all inside it) decide even
+    when the interval does not, so a confirming third replicate never undoes what a pair would decide.
 
     Without `agree` the mean alone decides, as in 0.1.0. Two rules came first and were dropped on review:
     the mean plus and minus one standard deviation (a spread, not an inference), and every replicate beyond
@@ -456,13 +460,14 @@ def classify(values, limit: float, agree: bool = True):
     mean = statistics.mean(values)
     if not agree:
         return _class(mean, limit)
-    if len(values) > 1 and mean != 0 and statistics.stdev(values) == 0:
-        values = values[:1]
+    if len(values) > 1 and 0 < abs(mean) < 2 * limit and statistics.stdev(values) == 0:
+        values = values[:1]        # near the limit, identical replicates would pass as certainty
     if len(values) == 1:
         return INCONCLUSIVE
+    classes = {_class(v, limit) for v in values}
+    agreed = classes.pop() if len(classes) == 1 else INCONCLUSIVE
     if len(values) == 2:
-        classes = {_class(v, limit) for v in values}
-        return classes.pop() if len(classes) == 1 else INCONCLUSIVE
+        return agreed
     half = t_quantile(CONFIDENCE, len(values) - 1) * statistics.stdev(values) / math.sqrt(len(values))
     low, high = mean - half, mean + half
     if low >= limit:
@@ -471,7 +476,8 @@ def classify(values, limit: float, agree: bool = True):
         return -1
     if -limit < low and high < limit:
         return 0
-    return INCONCLUSIVE
+    # replicates that all agree, as a pair must, are never inconclusive for there being three of them
+    return agreed
 
 
 WORD = {1: "produced", -1: "consumed", 0: "below the limit", None: "inconclusive"}
@@ -605,6 +611,9 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
         test = paired(units, [0.0] * len(units))
         if len(values) == 1:
             cautions.add("single_replicate")
+        if k in (1, -1) and agree and any(len(per_exp[e]) == 2 for e in used if classes.get(e) == k):
+            # decided on a pair, which errs more readily than three or more replicates (a fifth review round)
+            cautions.add("pair_decided")
         if test and test.get("no_variance"):
             cautions.add("no_variance")
         cells[key] = {"mean": mean, "sd": sd, "n": len(values), "n_experiments": len(used), "values": values,

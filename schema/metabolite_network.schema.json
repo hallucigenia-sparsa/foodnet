@@ -195,7 +195,8 @@
                 "amounts_differ",
                 "experiment_left_out",
                 "still_changing",
-                "growth_rate_boundary"
+                "growth_rate_boundary",
+                "pair_decided"
               ]
             }
           },

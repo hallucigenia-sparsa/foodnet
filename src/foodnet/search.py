@@ -475,6 +475,13 @@ def _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown
     if coarse:
         out.append(f"{coarse} value(s) rest on a phase boundary placed on fewer than three growth samples (caution "
                    "coarse_sampling): the phase may end anywhere between two samples.")
+    n = sum(1 for k, c in value_cells.items() if k[2] == "exponential" and "still_changing" in c["cautions"])
+    if n:
+        out.append(f"{n} exponential-phase value(s) miss uptake or production that went on after growth slowed "
+                   "(caution still_changing; the growth rate ended exponential growth well before the culture "
+                   "stopped): their compounds' use is split between the phases, so a model built on the "
+                   "exponential phase alone, as the CRM parameters are, underrates it. A time window over both "
+                   "gives the whole change.")
     apart = sum(1 for c in value_cells.values() if "boundaries_differ" in c["cautions"])
     if apart:
         out.append(f"{apart} value(s) average replicates whose phase boundaries lie further apart than a sampling "

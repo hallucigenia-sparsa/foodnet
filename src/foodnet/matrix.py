@@ -20,8 +20,9 @@ The cell vocabulary, the same in every matrix:
     no phase (no end of exponential growth, or no stationary phase reached).
 
 The evidence matrices of the pair say which, cell by cell (`EVIDENCE_WORDS`): measured, below_limit,
-single_replicate (a number or 0 that rests on one replicate), seen_elsewhere (0 in the value medium, but another
-medium showed this direction), inconclusive, no_phase, presence_only, not_assayed.
+single_replicate (a number or 0 that rests on one replicate; only when judging by the mean alone),
+seen_elsewhere (0 in the value medium, but another medium showed this direction), inconclusive, no_phase,
+presence_only, not_assayed.
 
 With "Report everything as booleans" a number becomes 1 (or -1 in the signed matrix) and a presence-only
 cell counts as 1 too, since a boolean asks only whether it happened.
@@ -548,6 +549,12 @@ def crm_payload(result: dict) -> dict:
                     "stationary_phase": ph == "stationary",
                     "incomplete": bool(result.get("errors")), "errors": list(result.get("errors") or []),
                     "warnings": list(result.get("warnings") or []),
+                    # per value: what the evidence matrices cannot hold (cautions.csv in the zip)
+                    "cautions": [{"taxon": (result.get("names") or {}).get(t, t),
+                                  "resource": (result.get("names") or {}).get(m, m), "cautions": list(c["cautions"]),
+                                  "notes": list(c["notes"])}
+                                 for (t, m, p), c in sorted(result["cells"].items())
+                                 if p == ph and (c["cautions"] or c["notes"])],
                     "inconclusive": [{"taxon": pair["taxa"][i], "resource": m.name, "direction": d}
                                      for i, _ in enumerate(taxa) for j, m in enumerate(mets)
                                      for d in ("consumed", "produced")

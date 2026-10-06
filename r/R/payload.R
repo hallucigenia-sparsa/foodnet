@@ -107,7 +107,8 @@ as_foodnet_crm <- function(payload) {
                             inconclusive = inconclusive,
                             incomplete = isTRUE(caveats$incomplete),
                             errors = chr_vector(caveats$errors),
-                            warnings = chr_vector(caveats$warnings)),
+                            warnings = chr_vector(caveats$warnings),
+                            cautions = cautions_rows(caveats$cautions)),
              readme = chr(payload$readme),
              tool = chr(payload$tool, "foodnet"),
              tool_version = chr(payload$tool_version),
@@ -128,6 +129,20 @@ caveats_rows <- function(rows) {
     data.frame(taxon = vapply(rows, function(p) chr(p$taxon), character(1)),
                resource = vapply(rows, function(p) chr(p$resource), character(1)),
                direction = vapply(rows, function(p) chr(p$direction), character(1)),
+               stringsAsFactors = FALSE)
+}
+
+# The per-value cautions, as a data frame (taxon, resource, cautions, notes).
+#' @noRd
+cautions_rows <- function(rows) {
+    if (!length(rows)) {
+        return(data.frame(taxon = character(0), resource = character(0), cautions = character(0),
+                          notes = character(0), stringsAsFactors = FALSE))
+    }
+    data.frame(taxon = vapply(rows, function(p) chr(p$taxon), character(1)),
+               resource = vapply(rows, function(p) chr(p$resource), character(1)),
+               cautions = vapply(rows, function(p) paste(chr_vector(p$cautions), collapse = " "), character(1)),
+               notes = vapply(rows, function(p) paste(chr_vector(p$notes), collapse = "; "), character(1)),
                stringsAsFactors = FALSE)
 }
 
@@ -162,6 +177,15 @@ print.foodnet_crm <- function(x, ...) {
     cat("  Read before you simulate:\n")
     if (length(x$caveats$warnings)) {
         cat(paste0("   * ", x$caveats$warnings, "\n"), sep = "")
+    }
+    flagged <- x$caveats$cautions
+    if (nrow(flagged)) {
+        moving <- flagged[grepl("still_changing", flagged$cautions), , drop = FALSE]
+        if (nrow(moving)) {
+            cat(sprintf("   * %d value(s) miss use that went on after growth slowed (still_changing): %s\n",
+                        nrow(moving), paste(utils::head(paste(moving$taxon, moving$resource), 6), collapse = ", ")))
+        }
+        cat(sprintf("   * %d value(s) carry cautions: x$caveats$cautions lists them.\n", nrow(flagged)))
     }
     single <- count_evidence(x, "single_replicate")
     if (single) {

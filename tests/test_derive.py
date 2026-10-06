@@ -18,7 +18,8 @@ def test_exponential_phase_values_are_the_mean_net_change(client):
     assert r["cells"][(A, GLC, "exponential")]["direction"] == "consumed"
     assert r["cells"][(A, AC, "exponential")]["mean"] == pytest.approx(4.0)       # acetic acid, joined
     assert r["cells"][(B, BUT, "exponential")]["mean"] == pytest.approx(3.0)
-    assert r["cells"][(B, BUT, "exponential")]["cautions"] == [] and r["cells"][(B, BUT, "exponential")]["n"] == 2
+    assert r["cells"][(B, BUT, "exponential")]["cautions"] == ["pair_decided"]          # two replicates
+    assert r["cells"][(B, BUT, "exponential")]["n"] == 2
 
 
 def test_the_stationary_phase_starts_at_the_boundary(client):

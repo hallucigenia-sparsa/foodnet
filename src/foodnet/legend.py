@@ -15,7 +15,7 @@ WIDTH = 900
 ROW = 34
 
 CAUTION_TEXT = {
-    "single_replicate": "one replicate, so no spread (dotted)",
+    "single_replicate": "one replicate (by default inconclusive; decided only when judging by the mean alone)",
     "short_record": "metabolites recorded for less than 24 h",
     "window_beyond_data": "the phase or window starts before the first or ends after the last sample; it stands in",
     "stationary_not_reached": "the culture was still growing at its last sample: no stationary phase",
@@ -29,6 +29,7 @@ CAUTION_TEXT = {
     "experiment_left_out": "an inconclusive experiment that does not contradict the others is left out",
     "still_changing": "the compound kept changing right after growth slowed (a slow-down, or a second substrate)",
     "growth_rate_boundary": "growth ended where its rate fell, more than a sample before 90% of its maximum",
+    "pair_decided": "decided on two replicates, both beyond the limit; a pair errs more readily than three",
 }
 
 
@@ -68,7 +69,7 @@ def legend_svg() -> str:
     rows.append(_text(190, y, "presence_only: seen in another medium, so its direction counts and not its size"))
     y += ROW
     rows.append(_arrow(y, brand.MUTED, "2 5"))
-    rows.append(_text(190, y, "measured in one replicate (single_replicate)"))
+    rows.append(_text(190, y, "measured in one replicate (single_replicate; only when judging by the mean alone)"))
     y += ROW
     rows.append(_arrow(y, brand.MUTED))
     rows.append(_text(190, y, "measured: a mean change beyond the detection limit, in the medium values come from"))

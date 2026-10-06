@@ -173,6 +173,7 @@ def test_a_change_is_decided_on_a_confidence_interval_that_more_replicates_narro
     assert derive.classify([0.25, 0.3], 0.2) == 1                     # a pair: both beyond the limit
     assert derive.classify([-3.2, -1.52], 0.2) == -1                  # a clear pair is not inconclusive
     assert derive.classify([0.25, 0.3, 0.1], 0.2) is None              # three: the interval reaches inside
+    assert derive.classify([-3.2, -1.52, -0.3], 0.2) == -1            # a confirming third never undoes a pair
     assert derive.classify([0.25, 0.3, 0.28, 0.27, 0.29], 0.2) == 1    # five pin it down beyond it
     assert derive.classify([0.05, -0.1, 0.12, 0.0], 0.2) == 0
     assert derive.classify([-0.4, 0.7], 0.2) is None
@@ -210,6 +211,7 @@ def test_an_inconclusive_experiment_does_not_veto_the_others_but_is_named():
 def test_identical_replicates_count_as_one_measurement():
     assert derive.classify([0.21, 0.21], 0.2) is None        # one series twice: one value, inconclusive
     assert derive.classify([0.0, 0.0], 0.2) == 0              # but an exhausted compound is exactly 0 twice
+    assert derive.classify([-8.23, -8.23, -8.23], 0.2) == -1   # and a substrate exhausted from one start
     cultures = [_culture("E1", [0, 1, 2, 3]), _culture("E1", [0, 1, 2, 3])]
     cell = derive.pool(_rows([(0, 0.21), (1, 0.21)]), cultures, 0.2)[("t1", "x", "exponential")]
     assert "no_variance" in cell["cautions"]
