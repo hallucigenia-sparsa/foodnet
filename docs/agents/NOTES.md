@@ -46,6 +46,13 @@ gate applies.
   only the phases it has, labeled by `matrix.interval` when intervals differ. Reproduces every trehalose
   value of the reference (studies 2, 4, 7, 9; 0 to 48 h; trehalose to the last sample).
 
+- 2026-10-06 (Karoline: "the hover didn't land"): an SVG `<title>` alone is not enough, since an embedded
+  browser (the app's pane) does not show it. `figure._hover_tips` draws each cell's text as a box, after all
+  cells, hidden with the attribute `visibility="hidden"` and shown by a `#fn-cK:hover ~ #fn-tK` rule in the
+  image's own `<style>`: no JavaScript, works in the page and the downloaded SVG, stays hidden in editors.
+  Cells and boxes must stay direct children of the `<svg>` for the `~` rule. Testing hover in the pane:
+  screenshot coordinates are twice the page's CSS pixels there.
+
 ## Things learned about mGrowthDB while building
 
 - **Search misses culture-level monocultures.** `search.json?strainNcbiIds=` matches per-strain measurement

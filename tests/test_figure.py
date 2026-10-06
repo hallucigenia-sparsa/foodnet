@@ -99,3 +99,15 @@ def test_a_value_from_another_medium_has_its_own_background(client):
     assert fills.count(figure.OTHER_MEDIUM) == 3       # B's formate, C's glucose, and the key
     texts = _texts(figure.matrices_svg(run(client, presence_entries="value")))
     assert "5.0" in texts and "value from another medium, not comparable with the gray scale" in texts
+
+
+def test_the_mouseover_text_is_drawn_in_the_image_not_left_to_the_browser(client):
+    # Karoline, 2026-10-06: "the hover didn't land": a browser need not show an SVG title, so each cell also
+    # has a box with the same text, hidden until the cell is hovered, by the image's own style sheet
+    svg = figure.matrices_svg(run(client))
+    root = ET.fromstring(svg)
+    tips = [g for g in root.iter(f"{SVG}g") if g.get("class") == "fn-tip"]
+    assert len(tips) == 24 and all(g.get("visibility") == "hidden" for g in tips)
+    assert "#fn-c1:hover ~ #fn-t1" in svg and "visibility: visible" in svg
+    first = " ".join("".join(t.itertext()) for t in tips[0].iter(f"{SVG}text"))
+    assert first.startswith("Alpha alpha A1, acetate, consumed")

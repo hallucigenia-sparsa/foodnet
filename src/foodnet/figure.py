@@ -63,6 +63,40 @@ def _wrap(text: str, width: float, size: float) -> list:
     return lines + ([line] if line else [])
 
 
+TIP_FONT, TIP_LINE, TIP_PAD, TIP_MAX_W = 11, 15, 7, 460
+BOLD = ' font-weight="600"'
+
+
+def _hover_tips(tips, width: float, height: float) -> list:
+    """A box per cell with its tooltip text, hidden until the mouse is over the cell.
+
+    A native SVG title is shown only by a browser that chooses to (an embedded browser often does not; Karoline,
+    2026-10-06: "the hover didn't land"), so the text is drawn as well: each box follows all the cells, so it
+    lies above them, and a rule in the image's own style sheet shows it while its cell is hovered. No
+    JavaScript, on the page and in the downloaded file alike. The boxes carry visibility="hidden" as an
+    attribute, so a program that ignores the style sheet (a vector editor, a printer) leaves them hidden."""
+    rules, boxes = [], []
+    for k, (x, y, text) in enumerate(tips, start=1):
+        lines = [w for line in text.split("\n") for w in _wrap(line, TIP_MAX_W - 2 * TIP_PAD, TIP_FONT)]
+        w = min(TIP_MAX_W, max(_text_width(line, TIP_FONT) for line in lines) + 2 * TIP_PAD)
+        h = len(lines) * TIP_LINE + 2 * TIP_PAD - 4
+        bx = min(max(4.0, x + CELL_W / 2 - w / 2), max(4.0, width - w - 4))
+        below = y + CELL_H + 4
+        by = below if below + h <= height - 4 else max(4.0, y - h - 4)
+        rows = "".join(f'<text x="{bx + TIP_PAD:.1f}" y="{by + TIP_PAD + 9 + i * TIP_LINE:.1f}" font-size="{TIP_FONT}" '
+                       f'fill="{brand.INK}"{BOLD if i == 0 else ""}>{html.escape(line)}</text>'
+                       for i, line in enumerate(lines))
+        boxes.append(f'<g id="fn-t{k}" class="fn-tip" visibility="hidden" pointer-events="none">'
+                     f'<rect x="{bx:.1f}" y="{by:.1f}" width="{w:.1f}" height="{h:.1f}" rx="4" fill="#ffffff" '
+                     f'stroke="{brand.MUTED}" stroke-width="0.8"/>{rows}</g>')
+        rules.append(f"#fn-c{k}:hover ~ #fn-t{k}")
+    if not boxes:
+        return []
+    style = (f"<style>{', '.join(rules)} {{ visibility: visible; }} "
+             ".fn-cell:hover > rect { stroke: #1F1D1A; stroke-width: 1.2; }</style>")
+    return [style, *boxes]
+
+
 def _gray(share: float) -> str:
     level = round(255 - share * (255 - 45))
     return f"#{level:02x}{level:02x}{level:02x}"
@@ -156,6 +190,7 @@ def matrices_svg(result: dict) -> str:
         width = label_w + 2 * panel_w + GAP + right
         origins = [(label_w, 0), (label_w + panel_w + GAP, 0)]
     out = []
+    tips = []          # (x, y, text) per cell, drawn last so a tip lies above every cell
     unit = "" if booleans else " (mM)"
     for p, direction in enumerate(("consumed", "produced")):
         x0, y0 = origins[p]
@@ -177,8 +212,9 @@ def matrices_svg(result: dict) -> str:
                 v, evidence = pair[direction][i][j], pair[f"evidence_{direction}"][i][j]
                 # each cell is a group with a title, which a browser shows on mouseover: what the cell is and
                 # the studies behind it (Karoline, 2026-10-06: "a mouseover will show the source studies")
-                tip = html.escape(tooltip(result, t, m, ph, direction, evidence, v))
-                out.append(f'<g><title>{tip}</title>')
+                text = tooltip(result, t, m, ph, direction, evidence, v)
+                tips.append((x, y, text))
+                out.append(f'<g id="fn-c{len(tips)}" class="fn-cell"><title>{html.escape(text)}</title>')
                 if evidence == "measured":
                     share = 1.0 if booleans else math.sqrt(min(1.0, v / vmax))
                     fill = _gray(0.75 if booleans else share)
@@ -250,6 +286,7 @@ def matrices_svg(result: dict) -> str:
         ky += 18
         out.append(f'<text x="{label_w:.0f}" y="{ky}" font-size="11" fill="{brand.MUTED}">{html.escape(line)}</text>')
     height = ky + 20
+    out += _hover_tips(tips, width, height)
     head = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" '
             f'width="{width:.0f}" height="{height:.0f}" font-family="{FONT}" role="img" '
             f'aria-label="Consumed and produced matrices">',
