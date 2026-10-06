@@ -39,6 +39,7 @@ _KEYS = [
     ("e_change", "edge", "change", "double"),
     ("e_sd", "edge", "sd", "double"),
     ("e_n", "edge", "n", "int"),
+    ("e_n_experiments", "edge", "n_experiments", "int"),
     ("e_p_value", "edge", "p_value", "double"),
     ("e_q_value", "edge", "q_value", "double"),
     ("e_window_start", "edge", "window_start", "double"),
@@ -95,6 +96,7 @@ def to_graphml(net: FoodNetwork, pretty: bool = True) -> str:
         ed.set("target", e.target)
         for key, value in (("direction", e.direction), ("phase", e.phase), ("evidence", e.evidence),
                            ("amount", e.amount), ("change", e.change), ("sd", e.sd), ("n", e.n),
+                           ("n_experiments", e.n_experiments),
                            ("p_value", e.p_value), ("q_value", e.q_value), ("window_start", e.window_start),
                            ("window_end", e.window_end), ("exponential_h", e.exponential_h), ("medium", e.medium),
                            ("study_ids", " ".join(e.study_ids)), ("experiments", " ".join(e.experiments)),

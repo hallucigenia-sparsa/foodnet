@@ -17,11 +17,14 @@ ROW = 34
 CAUTION_TEXT = {
     "single_replicate": "one replicate, so no spread (dotted)",
     "short_record": "metabolites recorded for less than 24 h",
-    "window_beyond_data": "the phase or window ends after the last metabolite sample; that sample stands in",
+    "window_beyond_data": "the phase or window starts before the first or ends after the last sample; it stands in",
     "stationary_not_reached": "the culture was still growing at its last sample: no stationary phase",
-    "conflict": "experiments pooled into this value disagree; the report names them",
+    "conflict": "experiments (or taxa, merged to genus) disagree: inconclusive, no arc",
     "not_detected_in_value_medium": "seen in another medium, and measured without a change in the value medium",
     "phase_from_other_replicates": "no growth curve in this replicate; its experiment's median boundary is used",
+    "coarse_sampling": "the phase boundary rests on fewer than three growth samples",
+    "boundaries_differ": "the replicates end exponential growth further apart than a sampling interval",
+    "no_variance": "identical replicates (rounding, or one series twice): no test",
 }
 
 

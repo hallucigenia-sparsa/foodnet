@@ -14,8 +14,14 @@ The cell vocabulary, the same in every matrix:
   * a number: a change beyond the detection limit, measured in the medium the values come from;
   * 0: measured there, and no change beyond the limit in this direction (in the pair, a compound that moved
     the other way is 0 here and a number in the other matrix);
-  * NA: no value. Either the compound was never assayed for this taxon in the value medium, or its change
-    was seen only in another medium (presence only). The evidence matrices of the pair say which.
+  * NA: no value. The compound was never assayed for this taxon in the value medium; or its change was
+    seen only in another medium (presence only); or it was assayed but is inconclusive (the replicates'
+    spread, or the experiments, reach across the detection limit); or it was assayed but the culture gave
+    no phase (no end of exponential growth, or no stationary phase reached).
+
+The evidence matrices of the pair say which, cell by cell (`EVIDENCE_WORDS`): measured, below_limit,
+seen_elsewhere (0 in the value medium, but another medium showed this direction), inconclusive, no_phase,
+presence_only, not_assayed.
 
 With "Report everything as booleans" a number becomes 1 (or -1 in the signed matrix) and a presence-only
 cell counts as 1 too, since a boolean asks only whether it happened.
@@ -33,7 +39,8 @@ import zipfile
 from .model import FoodNetwork
 
 NA = "NA"
-EVIDENCE_WORDS = ("measured", "below_limit", "presence_only", "not_assayed")
+EVIDENCE_WORDS = ("measured", "below_limit", "seen_elsewhere", "inconclusive", "no_phase", "presence_only",
+                  "not_assayed")
 CRM_FORMAT = "foodnet.crm/v0"
 
 
@@ -104,6 +111,14 @@ PRESENCE_ENTRIES = ("na", "true", "value")
 TRUE = "TRUE"
 
 
+def _own_limits(s: dict) -> dict:
+    from .search import compound_limits_of
+    try:
+        return compound_limits_of(s)
+    except ValueError:
+        return {}
+
+
 def presence_entries(result: dict) -> str:
     """How a cell seen only in another medium is written (Karoline, 2026-10-06): "na" (the cautious default),
     "true", or "value", the change measured there."""
@@ -112,10 +127,8 @@ def presence_entries(result: dict) -> str:
 
 
 def presence_value(entries) -> float:
-    """The change seen in other media, in mM: the mean over all their replicates (each medium's mean weighted
-    by its replicates)."""
-    n = sum(e["n"] for e in entries)
-    return sum(e["mean"] * e["n"] for e in entries) / n
+    """The change seen in other media, in mM: the mean of the media's own values, each medium counted once."""
+    return sum(e["mean"] for e in entries) / len(entries)
 
 
 def entry(result: dict, taxon: str, met: str, ph: str, direction: str) -> tuple:
@@ -126,9 +139,13 @@ def entry(result: dict, taxon: str, met: str, ph: str, direction: str) -> tuple:
     if cell is not None and cell["n"]:
         if cell["direction"] == direction:
             return (1 if booleans else abs(cell["mean"])), "measured"
+        if cell.get("state") == "inconclusive":
+            return None, "inconclusive"
         if seen and booleans:
             return 1, "presence_only"
-        return 0, "below_limit"
+        # measured in the value medium without a change this way: 0 there, whatever another medium showed,
+        # and the evidence says when one did
+        return 0, ("seen_elsewhere" if seen else "below_limit")
     if seen:
         if booleans:
             return 1, "presence_only"
@@ -138,6 +155,8 @@ def entry(result: dict, taxon: str, met: str, ph: str, direction: str) -> tuple:
         if choice == "value":
             return abs(presence_value(seen)), "presence_only"
         return None, "presence_only"
+    if cell is not None:
+        return None, "no_phase"            # assayed, but no phase (or no stationary phase) in its cultures
     return None, "not_assayed"
 
 
@@ -146,6 +165,8 @@ def signed_entry(result: dict, taxon: str, met: str, ph: str):
     cell = result["cells"].get((taxon, met, ph))
     booleans = _booleans(result)
     if cell is not None and cell["n"]:
+        if cell.get("state") == "inconclusive":
+            return None
         if cell["direction"] is None:
             seen = result["presence"].get((taxon, met, ph)) or {}
             if booleans and len(seen) == 1:
@@ -211,7 +232,7 @@ def signed_rows(net: FoodNetwork, result: dict, phases=None) -> tuple:
 def signed_csv(net: FoodNetwork, result: dict) -> str:
     """The taxa by metabolites matrix as CSV: produced positive, consumed negative, NA for no value."""
     names, header, rows = signed_rows(net, result)
-    return _csv(["taxon", *header], [[n, *map(_number, r)] for n, r in zip(names, rows, strict=True)])
+    return _csv([corner(result), *header], [[n, *map(_number, r)] for n, r in zip(names, rows, strict=True)])
 
 
 def pair_rows(net: FoodNetwork, result: dict, phases=None) -> dict:
@@ -229,8 +250,19 @@ def pair_rows(net: FoodNetwork, result: dict, phases=None) -> dict:
     return out
 
 
-def _matrix_csv(taxa, header, rows, fmt=_number) -> str:
-    return _csv(["taxon", *header], [[n, *map(fmt, r)] for n, r in zip(taxa, rows, strict=True)])
+def corner(result: dict) -> str:
+    """The first header cell of every matrix: "taxon", with where the values come from and when, so a CSV
+    passed on alone still says it (a reader that takes the first column as row names drops the cell)."""
+    rule = result.get("value_rule") or {}
+    media = " / ".join(rule.get("media") or []) or "no medium"
+    which = "every medium" if rule.get("rule") == "all" else media
+    meta = result["network"].meta
+    return (f"taxon [values from {which}; foodnet {meta.get('tool_version', '')} on "
+            f"{str(meta.get('derived_at', ''))[:10]}]")
+
+
+def _matrix_csv(taxa, header, rows, fmt=_number, first: str = "taxon") -> str:
+    return _csv([first, *header], [[n, *map(fmt, r)] for n, r in zip(taxa, rows, strict=True)])
 
 
 def counts(result: dict) -> dict:
@@ -319,32 +351,41 @@ def readme(result: dict, which: str = "matrices") -> str:
     elif window:
         lines += [f"Window: {window[0]:g} h to {window[1]:g} h (set in Advanced settings; it replaces the phases).", ""]
     else:
-        lines += [f"Phase: {phase}. Exponential growth ends at the first sample where the culture reaches "
-                  f"{s['fraction']:.0%} of its maximal abundance; the stationary phase runs from there to the last "
-                  "metabolite sample.", ""]
+        lines += [f"Phase: {phase}. Exponential growth ends at the first sample where the culture has risen "
+                  f"{s['fraction']:.0%} of the way from its start to its maximum (on the growth curve smoothed by a "
+                  "running median of three); the stationary phase runs from there to the last metabolite sample.", ""]
     second = result.get("second_window") or {}
     if second.get("metabolites"):
         named = ", ".join(n.name for n in result.get("metabolite_nodes", []) if n.id in second["metabolites"])
         lines += [f"Second time window: {named} measured from {second['label']}, not over the phase or main "
                   "window; their columns say so.", ""]
     values = "booleans (1 = it happened, 0 = measured and it did not, NA = no evidence either way)" \
-        if s["booleans"] else "mM, the mean net change over the phase across replicates"
+        if s["booleans"] else ("mM, the mean net change over the phase: the mean of the experiments' means when "
+                               "several experiments give a value, else the mean of the replicates")
+    spread = (" and the replicates' spread (mean plus and minus one standard deviation) must clear it too; a "
+              "spread across the limit is inconclusive" if s.get("judge_spread", True) else "")
+    own = ("; " + ", ".join(f"{k} {v:g} mM" for k, v in sorted(_own_limits(s).items())) + " have limits of their own"
+           if _own_limits(s) else "")
     lines += [f"Values: {values}.",
-              f"Detection limit: a mean change below {s['detection_limit']:g} mM counts as no change.",
+              f"Detection limit: a mean change below {s['detection_limit']:g} mM counts as no change{spread}{own}.",
               "Rows are taxa, columns metabolites. In consumed.csv and produced.csv every number is a magnitude, "
-              "never negative; in the signed matrix a produced compound is positive and a consumed one negative.",
+              "never negative; in the signed matrix a produced compound is positive and a consumed one negative. "
+              "The first header cell names the medium the values come from.",
               "",
               "NA is never zero. A cell is NA when the compound was not assayed for that taxon in the value "
-              "medium" + {"na": ", or when its change was seen only in another medium (presence only)",
-                          "true": "; a change seen only in another medium is written TRUE (Advanced settings), "
-                                  "and its direction is the matrix it stands in",
-                          "value": "; a change seen only in another medium is written as the amount measured "
-                                   "there (Advanced settings), not comparable with the value medium's amounts"
-                          }[presence_entries(result)]
-              + ". The evidence_*.csv files say which, cell by cell: measured, below_limit, presence_only, "
-              "not_assayed.",
-              f"Cells: {tally['measured']} measured, {tally['below_limit']} measured below the limit or the other "
-              f"way, {tally['presence_only']} presence only, {tally['not_assayed']} not assayed.", ""]
+              "medium; when it was assayed but is inconclusive (the replicates' spread, or the experiments, reach "
+              "across the detection limit); when it was assayed but its cultures gave no phase (no end of "
+              "exponential growth, or no stationary phase)"
+              + {"na": "; or when its change was seen only in another medium (presence only)",
+                 "true": "; a change seen only in another medium is written TRUE (Advanced settings), "
+                         "and its direction is the matrix it stands in",
+                 "value": "; a change seen only in another medium is written as the amount measured "
+                          "there (Advanced settings), not comparable with the value medium's amounts"
+                 }[presence_entries(result)]
+              + ". A 0 is a measurement in the value medium; when another medium showed a change that way, its "
+              "evidence is seen_elsewhere. The evidence_*.csv files say which, cell by cell: "
+              + ", ".join(EVIDENCE_WORDS) + ".",
+              "Cells: " + ", ".join(f"{tally[w]} {w.replace('_', ' ')}" for w in EVIDENCE_WORDS) + ".", ""]
     if rule["rule"] == "all":
         lines.append("Media: every medium gives values (Ignore media differences was set): " + ", ".join(rule["media"]))
     elif rule["rule"] == "selected":
@@ -358,10 +399,10 @@ def readme(result: dict, which: str = "matrices") -> str:
         lines.append("Media: values come from the medium that holds data for the most taxa, "
                      + " / ".join(rule["media"]) + ". Every other medium gives presence only.")
     lines.append("")
-    for title, items in (("Values that pool experiments that disagree (they are pooled anyway; read them first):",
-                          conflicts(result)),
+    for title, items in (("Values whose experiments disagree (inconclusive: NA, and no arc):", conflicts(result)),
                          ("Duplicate deposits counted once:", result["duplicates"]),
-                         ("Seen only in another medium (NA in the value matrices):", presence_lines(result))):
+                         ("Seen in another medium and not in the value medium (presence_only where the value medium "
+                          "has no value, seen_elsewhere where it measured no change):", presence_lines(result))):
         if items:
             lines += [title, *(f"  * {x}" for x in items), ""]
     if which == "crm":
@@ -388,9 +429,11 @@ def pair_package(result: dict) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
         for direction in ("consumed", "produced"):
-            z.writestr(f"{direction}.csv", _matrix_csv(pair["taxa"], pair["columns"], pair[direction]))
+            z.writestr(f"{direction}.csv", _matrix_csv(pair["taxa"], pair["columns"], pair[direction],
+                                                       first=corner(result)))
             z.writestr(f"evidence_{direction}.csv",
-                       _matrix_csv(pair["taxa"], pair["columns"], pair[f"evidence_{direction}"], str))
+                       _matrix_csv(pair["taxa"], pair["columns"], pair[f"evidence_{direction}"], str,
+                                   first=corner(result)))
         z.writestr("signed.csv", signed_csv(net, result))
         from .figure import matrices_svg
         z.writestr("matrices.svg", matrices_svg(result))
@@ -453,9 +496,11 @@ def crm_package(result: dict) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
         for direction in ("consumed", "produced"):
-            z.writestr(f"{direction}.csv", _matrix_csv(pair["taxa"], pair["columns"], pair[direction]))
+            z.writestr(f"{direction}.csv", _matrix_csv(pair["taxa"], pair["columns"], pair[direction],
+                                                       first=corner(result)))
             z.writestr(f"evidence_{direction}.csv",
-                       _matrix_csv(pair["taxa"], pair["columns"], pair[f"evidence_{direction}"], str))
+                       _matrix_csv(pair["taxa"], pair["columns"], pair[f"evidence_{direction}"], str,
+                                   first=corner(result)))
         z.writestr("growth_rates.csv", rates_csv(result))
         z.writestr("initial_concentrations.csv", initial_csv(result))
         z.writestr("crm.json", json.dumps(crm_payload(result), indent=1))

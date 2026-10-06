@@ -8,7 +8,7 @@ def test_the_boundary_is_the_first_sample_at_ninety_percent_of_the_maximum():
     # the docstring's example: start 1, maximum 1000, threshold 1 + 0.9 * 999 = 900.1; 900 at 16 h is just
     # below it, so the first sample at or above is 24 h, which is also the last point
     b = phase.exponential_end([0, 4, 8, 12, 16, 24], [1, 10, 100, 500, 900, 1000])
-    assert b == {"end": 24.0, "index": 5, "last": True}
+    assert b == {"end": 24.0, "index": 5, "last": True, "coarse": False}
 
 
 def test_the_boundary_ignores_the_decline_after_the_maximum():

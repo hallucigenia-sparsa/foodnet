@@ -28,10 +28,16 @@ SETTINGS = {
                                  "slowly consumed sugar.",
     "second_window_start": "The second window's start, in hours since inoculation.",
     "second_window_end": "The second window's end, in hours; empty means until each culture's last sample.",
-    "fraction": "Exponential growth ends at the first sample where the culture reaches this share of its maximal "
-                "abundance (counted from its start): 90% by default.",
+    "fraction": "Exponential growth ends at the first sample where the culture has risen this share of the way "
+                "from its start to its maximum, on the growth curve smoothed by a running median of three (so one "
+                "stray point does not move it): 90% by default.",
     "no_growth_factor": "A culture that rose less than this many times did not grow and has no phases (1.5).",
     "detection_limit": "A mean change smaller than this, in either direction, counts as no change (0.2 mM).",
+    "judge_spread": "A change must clear the detection limit across the replicates' spread (mean plus and minus "
+                    "one standard deviation), not only in its mean; a spread reaching across the limit is "
+                    "inconclusive, neither an arc nor a measured zero. On by default; off, the mean alone decides.",
+    "compound_limits": "Detection limits of their own for compounds measured at another scale, as name=mM, comma "
+                       "separated: thiamine=0.01. Empty by default: every compound takes the detection limit.",
     "ignore_media": "Values from every medium, pooled, instead of only from the value medium.",
     "presence_entries": "How a matrix cell seen only in another medium is written: NA (the cautious default), "
                         "TRUE, or the amount measured there (shown on its own background in the image; not "
@@ -44,7 +50,8 @@ SETTINGS = {
     "rate_window": "With easylinear, the number of points in each fitted window (5).",
     "merge_arcs": "One arc per taxon, metabolite, phase and direction across studies, instead of one per study.",
     "min_studies": "Keep only arcs resting on at least this many studies (needs merged arcs above 1).",
-    "merge_genera": "One node per genus; a value is the median of its taxa's values.",
+    "merge_genera": "One node per genus; a value is the median of its taxa's values, judged against the detection "
+                    "limit. Taxa that disagree make it inconclusive.",
     "conditions": "The second box. Study or experiment ids limit the data to them; a medium name chooses the "
                   "value medium (and, alone, limits the data to it). With ids and no medium, the ids' majority "
                   "medium gives the values and their other media presence. Empty: all data, values from the "
@@ -83,14 +90,20 @@ EDGE_FIELDS = {
     "target": "Where it ends.",
     "direction": "produced or consumed.",
     "phase": "exponential, stationary, or window.",
-    "evidence": "measured (a value from the value medium) or presence_only (seen only in another medium).",
+    "evidence": "measured (a value from the value medium) or presence_only (seen in another medium, and not in "
+                "the value medium).",
     "amount": "mM, the size of the mean net change in this direction. Missing for presence_only arcs and with "
               "booleans; never 0.",
     "change": "mM, the signed mean net change (positive = produced).",
-    "sd": "mM, the standard deviation over replicates.",
+    "sd": "mM, the standard deviation over the experiments' means when several experiments give the value, else "
+          "over its replicates.",
     "n": "The replicates behind the value.",
-    "p_value": "A one-sample t-test of the replicate changes against zero; reported, not used to decide.",
-    "q_value": "The p-value corrected for multiple testing over the search.",
+    "n_experiments": "The experiments behind the value: each counts once in the mean, however many replicates it "
+                     "has.",
+    "p_value": "A one-sample t-test against zero, of the experiments' means (of the replicates when one "
+               "experiment gives the value); none when they do not vary. Reported, not used to decide.",
+    "q_value": "The p-value corrected for multiple testing over the tests that make the arcs (every study's "
+               "values, or the pooled values when arcs are merged).",
     "window_start": "Hours: the mean start of the phase over the replicates.",
     "window_end": "Hours: the mean end of the phase.",
     "exponential_h": "Hours the cultures behind the arc grew exponentially, from their first growth sample to "
@@ -99,7 +112,8 @@ EDGE_FIELDS = {
     "study_ids": "The studies the arc rests on.",
     "experiments": "The mGrowthDB experiments behind it.",
     "cautions": "single_replicate, short_record, window_beyond_data, stationary_not_reached, conflict, "
-                "not_detected_in_value_medium, phase_from_other_replicates (see the legend).",
+                "not_detected_in_value_medium, phase_from_other_replicates, coarse_sampling, boundaries_differ, "
+                "no_variance (see the legend).",
     "notes": "Remarks in words: what disagreed, what another medium showed.",
     "merged_arcs": "With merged arcs, how many studies the arc joins.",
     "merged_taxa": "With merging to genus, the taxa behind the arc.",
@@ -158,12 +172,19 @@ model built from these parameters is a hypothesis about the community: check it 
 community itself before relying on what it predicts.</p>
 <h2 id="phases">Growth phases</h2>
 <p>What a culture makes or takes up while it grows can differ from what it does once growth has stopped, so every
-value belongs to a phase. Exponential growth ends at the first sample at which the culture reaches 90% of its
-maximal abundance (an advanced setting); the stationary phase runs from there to the last metabolite sample. A
-value is the metabolite's concentration at the end of the phase minus its concentration at the start,
-interpolated between samples, averaged over replicates. Diauxic shifts are not detected: a second growth phase
-counts as stationary. A time window in Advanced settings replaces the phases. The growth curve is a per-strain
-count when the replicate has one, else the culture's own (cell counts before optical density).</p>
+value belongs to a phase. Exponential growth ends at the first sample at which the culture has risen 90% of the
+way from its start to its maximum (an advanced setting), read on the growth curve smoothed by a running median of
+three so a single stray point does not move it; the stationary phase runs from there to the last metabolite
+sample. A value is the metabolite's concentration at the end of the phase minus its concentration at the start,
+interpolated between samples, averaged over replicates, and then over experiments, each experiment counting once.
+Diauxic shifts are not detected: a second growth phase counts as stationary. Neither is a slow late rise: a
+culture whose plateau keeps creeping up can end its phase late, and when the replicates of one experiment end it
+further apart than a sampling interval the value carries the caution boundaries_differ (a time window is then the
+safer choice). A boundary placed on fewer than three growth samples carries coarse_sampling. A culture that did
+not grow by the no-growth factor has no phases: its cells are no_phase, and a time window gives them values. A
+time window in Advanced settings replaces the phases. The growth curve is a per-strain count when the replicate
+has one, else the culture's own (cell counts before optical density); a curve that gives no boundary gives way
+to the replicate's next one.</p>
 <p>A metabolite series shorter than 24 h is still used, and its values carry the caution short_record; the page
 warns about it above the result.</p>
 <h2 id="values">Values, media and presence</h2>
@@ -181,17 +202,24 @@ medium. A medium name typed in the second box therefore gives the values from th
 most taxa; the others it matches (Wilkins-Chalgren with mucin, for "Wilkins-Chalgren") give presence only, and
 the page names them. Tell media apart by their descriptions and atmosphere switches this off; Exclude these
 experiments leaves out an experiment by id. The report lists every medium found.
-Studies in the value medium are pooled; when their experiments disagree on what happened, the value carries the
-caution conflict and the report names the experiments. The same experiment deposited under two studies is counted
-once.</p>
+Studies in the value medium are pooled, each experiment counting once; when their experiments disagree on what
+happened, the value is inconclusive (NA, no arc), carries the caution conflict, and the report names the
+experiments. A change must also clear the detection limit across the replicates' spread: a mean of +0.8 mM with a
+standard deviation of 1.0 mM is inconclusive, not production. The same experiment deposited under two studies is
+counted once.</p>
+<p>Because the value medium is chosen for the whole search, a taxon's values can change with the other taxa
+searched with it: when a taxon has more data in another medium, the page says so. Name a medium in the second box
+to fix the choice.</p>
 <p>Acid and base forms of one compound are one metabolite (acetic acid and acetate), since an HPLC measures the
 pool whatever a record calls it. A compound that was not assayed for a taxon is never written as zero.</p>
 <h2 id="matrices">The two matrix formats</h2>
 <p><strong>Taxa x metabolites (CSV)</strong>: one matrix, rows taxa, columns metabolites, each cell the mean change in
 mM, positive when produced and negative when consumed. <strong>Consumed and produced matrices (zip)</strong>: two
-matrices of non-negative amounts, with an evidence matrix for each (measured, below_limit, presence_only,
-not_assayed) and a README. In both: a number is a change beyond the detection limit, 0 is measured without one, NA is
-no value. With the phase choice Both, each metabolite has a column per phase.</p>
+matrices of non-negative amounts, with an evidence matrix for each and a README. In both: a number is a change
+beyond the detection limit, 0 is measured without one, NA is no value. The evidence matrices say which:
+measured, below_limit, seen_elsewhere (0 in the value medium, a change this way in another), inconclusive,
+no_phase, presence_only, not_assayed. The first header cell names the medium the values come from. With the
+phase choice Both, each metabolite has a column per phase.</p>
 <h2 id="crm">Consumer-resource models and R</h2>
 <p>CRM mode collects growth rates: from the replicates whose metabolites gave the values, else from another
 monoculture in the same medium. Get CRM parameters then downloads the matrices, the rates and the initial medium

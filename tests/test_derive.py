@@ -22,8 +22,9 @@ def test_exponential_phase_values_are_the_mean_net_change(client):
 
 
 def test_the_stationary_phase_starts_at_the_boundary(client):
-    r = run(client, phase="stationary")
-    # A's glucose from 12 h to 24 h: 0 and -1, mean -0.5, beyond the 0.2 mM limit
+    r = run(client, phase="stationary", judge_spread=False)
+    # A's glucose from 12 h to 24 h: 0 and -1, mean -0.5, beyond the 0.2 mM limit (judged by the mean alone;
+    # by default its spread reaches across the limit, test_matrix.py)
     assert r["cells"][(A, GLC, "stationary")]["mean"] == pytest.approx(-0.5)
     assert r["cells"][(A, GLC, "stationary")]["direction"] == "consumed"
     # A's acetate: +1 and -1, mean 0: measured, and no change
@@ -194,11 +195,15 @@ def test_initial_concentrations_are_the_value_medium_first_samples(client):
     assert r["initial"][GLC]["mean"] == pytest.approx(10.0) and r["initial"][GLC]["n"] == 3
 
 
-def test_a_per_study_arc_that_is_the_whole_value_carries_its_q_value(client):
+def test_every_tested_arc_carries_its_q_value_and_identical_replicates_none(client):
+    net = run(client, phase="stationary", judge_spread=False)["network"]
+    arc = next(e for e in net.edges if e.taxon == A and e.metabolite == GLC)
+    # A's stationary glucose (0 and -1) is tested, and corrected within the family of the per-study arcs
+    assert arc.q_value is not None and arc.p_value is not None
     net = run(client)["network"]
     arc = next(e for e in net.edges if e.taxon == A and e.metabolite == GLC)
-    # A's glucose rests on one study, so its arc is the pooled cell and has the cell's q-value
-    assert arc.q_value is not None and arc.p_value is not None
+    # its exponential glucose is -8 and -8: identical replicates are no certainty, so no test
+    assert arc.p_value is None and "no_variance" in arc.cautions
 
 
 def test_the_length_of_the_exponential_phase_reaches_the_arcs(client):
@@ -319,9 +324,12 @@ def test_a_medium_altered_in_its_description_gives_presence_not_values():
         assert r["cells"][(A, GLC, "exponential")]["mean"] == pytest.approx(-8.0)
         assert r["value_rule"]["also_matched"] == ["Wilkins-Chalgren Anaerobe Broth (+mucin)"]
         assert any("also matched" in w for w in r["warnings"])
-        # switched off, the mucin variant pools into the values: -8, -8 and -10, mean -8.67
+        # switched off, the mucin variant pools into the values: experiments at -8 (two replicates) and -10
+        # (one), each counted once, mean -9
         r = run(client, conditions="Wilkins", strict_media=False)
-        assert r["cells"][(A, GLC, "exponential")]["mean"] == pytest.approx(-26 / 3)
+        assert r["cells"][(A, GLC, "exponential")]["mean"] == pytest.approx(-9.0)
+        assert r["cells"][(A, GLC, "exponential")]["n"] == 3
+        assert r["cells"][(A, GLC, "exponential")]["n_experiments"] == 2
     finally:
         _drop_mucin_variant()
 

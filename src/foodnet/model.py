@@ -35,11 +35,14 @@ IDENTITIES = ("ncbi", "name", "genus", "chebi", "metabolite_name")
 CAUTIONS = (
     "single_replicate",        # one replicate: no spread
     "short_record",            # the metabolite series covers less than 24 h
-    "window_beyond_data",      # the phase or window ends after the last metabolite sample
+    "window_beyond_data",      # the phase or window starts before the first or ends after the last sample
     "stationary_not_reached",  # the growth curve was still rising at its last point: no stationary phase
-    "conflict",                # experiments pooled into this value disagree on the direction
+    "conflict",                # experiments (or, merged to genus, taxa) disagree: no value, no arc
     "not_detected_in_value_medium",  # seen in another medium, assayed and not seen in the value medium
     "phase_from_other_replicates",   # this replicate had no growth curve; the boundary of its siblings is used
+    "coarse_sampling",         # the phase boundary rests on fewer than three growth samples
+    "boundaries_differ",       # the replicates' phase boundaries lie further apart than a sampling interval
+    "no_variance",             # the replicates are identical (rounding, or one series deposited twice): no test
 )
 
 # words before a genus that are not a genus (the same rule as grownet)
@@ -99,10 +102,11 @@ class Edge:
     evidence: str                 # one of EVIDENCE
     amount: float | None = None   # mM, the size of the net change in this direction; None for presence_only
     change: float | None = None   # mM, the signed mean net change (positive = produced)
-    sd: float | None = None       # mM, standard deviation over replicates
+    sd: float | None = None       # mM, standard deviation over the experiments' means (over replicates in one)
     n: int | None = None          # replicates behind the mean
-    p_value: float | None = None  # one-sample t-test of the replicate changes against zero (reported only)
-    q_value: float | None = None  # p_value corrected for multiple testing over the search
+    n_experiments: int | None = None  # experiments behind the mean: the unit the mean and the test count
+    p_value: float | None = None  # one-sample t-test of the experiment means (one: replicates) against zero
+    q_value: float | None = None  # p_value corrected for multiple testing over the arcs' family of tests
     window_start: float | None = None  # h, mean start of the phase over the replicates
     window_end: float | None = None    # h, mean end of the phase over the replicates
     exponential_h: float | None = None  # h, how long the cultures grew exponentially (mean over replicates)

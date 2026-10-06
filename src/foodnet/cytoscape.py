@@ -88,7 +88,8 @@ def network_json(net: FoodNetwork, name: str = "foodnet") -> dict:
                 # direction, the phase and the evidence: none of those may collapse into one another
                 "interaction": f"{e.direction} {e.phase} {e.evidence}",
                 "direction": e.direction, "phase": e.phase, "evidence": e.evidence, "amount": e.amount,
-                "change": e.change, "sd": e.sd, "n": e.n, "p_value": e.p_value, "q_value": e.q_value,
+                "change": e.change, "sd": e.sd, "n": e.n, "n_experiments": e.n_experiments, "p_value": e.p_value,
+                "q_value": e.q_value,
                 "window_start": e.window_start, "window_end": e.window_end, "exponential_h": e.exponential_h,
                 "medium": e.medium,
                 "study_ids": " ".join(e.study_ids), "experiments": " ".join(e.experiments),
@@ -228,6 +229,7 @@ def _post(url: str, payload, timeout: float = 30.0):
 # instead, so every arc carries all of them, with the cells of the arcs that have no value genuinely empty
 # (grownet's finding, Karoline, 2026-10-03; checked against Cytoscape 3.10.3).
 OPTIONAL_EDGE_COLUMNS = (("amount", "Double"), ("change", "Double"), ("sd", "Double"), ("n", "Integer"),
+                         ("n_experiments", "Integer"),
                          ("p_value", "Double"), ("q_value", "Double"), ("window_start", "Double"),
                          ("window_end", "Double"), ("exponential_h", "Double"), ("merged_arcs", "Integer"))
 

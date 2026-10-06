@@ -30,7 +30,7 @@ from .figure import matrices_svg
 from .legend import legend_svg
 from .mgrowthdb import MGrowthDBError
 from .report import report_text
-from .search import DEFAULTS, EXAMPLE, PHASE_LABELS, run_query
+from .search import DEFAULTS, EXAMPLE, PHASE_LABELS, compound_limits_of, run_query
 from .taxonomy import species_index
 
 TITLE = brand.NAME
@@ -115,11 +115,19 @@ def _settings_block(settings: dict) -> str:
 <div class="row"><label>Exponential growth ends at
   <input name="fraction" type="text" size="5" value="{_esc(round(s['fraction'] * 100, 6))}"> % of the maximal
   abundance</label>
-  <span class="muted">the first sample at which the culture reaches this share of its maximum, counted from its
-  start, ends the exponential phase and starts the stationary one; 90 by default</span></div>
+  <span class="muted">the first sample at which the culture has risen this share of the way from its start to its
+  maximum (on the curve smoothed by a running median of three) ends the exponential phase and starts the stationary
+  one; 90 by default</span></div>
 <div class="row"><label>Detection limit
   <input name="detection_limit" type="text" size="5" value="{_esc(s['detection_limit'])}"> mM</label>
   <span class="muted">a mean change smaller than this, either way, counts as no change; 0.2 by default</span></div>
+<div class="row"><label><input type="checkbox" name="judge_spread" value="1"{_checked(s['judge_spread'])}>
+  Judge changes against the replicates' spread</label>
+  <span class="muted">a change must clear the limit across the mean plus and minus one standard deviation; a spread
+  reaching across it is inconclusive (NA, no arc). On by default</span></div>
+<div class="row"><label>Detection limits of their own
+  <input name="compound_limits" type="text" size="30" value="{_esc(s['compound_limits'])}"></label>
+  <span class="muted">for compounds measured at another scale, as name=mM, comma separated: thiamine=0.01</span></div>
 <div class="row"><label><input type="checkbox" name="ignore_media" value="1"{_checked(s['ignore_media'])}>
   Ignore media differences</label>
   <span class="muted">values from every medium, pooled. Off by default: values come from the medium that holds data
@@ -537,6 +545,10 @@ def window_problem(form: dict) -> str:
             return f"{name} needs a start as well as an end, in hours."
         if end <= start:
             return f"{name} ends at {end:g} h, which is not after its start at {start:g} h."
+    try:
+        compound_limits_of({"compound_limits": form.get("compound_limits", [""])[0]})
+    except ValueError as e:
+        return str(e)[0].upper() + str(e)[1:] + "."
     return ""
 
 
@@ -571,9 +583,9 @@ def parse_settings(form: dict) -> dict:
     if form.get("correction", [""])[0] in ("bh", "by"):
         s["correction"] = form["correction"][0]
     for key in ("ignore_media", "booleans", "report_rates", "merge_arcs", "merge_genera", "outside_evidence",
-                "strict_media"):
+                "strict_media", "judge_spread"):
         s[key] = bool(form.get(key))
-    for key in ("conditions", "exclude_studies", "exclude_experiments", "exclude_metabolites"):
+    for key in ("conditions", "exclude_studies", "exclude_experiments", "exclude_metabolites", "compound_limits"):
         s[key] = form.get(key, [""])[0].strip()
     return s
 

@@ -34,7 +34,7 @@ def test_every_format_and_the_side_files(tmp_path):
     assert "crm.json" in zipfile.ZipFile(io.BytesIO((tmp_path / "crm.zip").read_bytes())).namelist()
     assert (tmp_path / "r.csv").read_text().startswith("taxon,growth_rate")
     assert main(["derive", *TAXA, "--format", "matrix", "--out", str(tmp_path / "m.csv")]) == 0
-    assert (tmp_path / "m.csv").read_text().startswith("taxon,acetate")
+    assert (tmp_path / "m.csv").read_text().startswith('taxon [values from Wilkins')
     assert main(["derive", *TAXA, "--format", "graphml", "--out", str(tmp_path / "n.graphml")]) == 0
 
 

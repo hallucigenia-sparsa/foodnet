@@ -5,16 +5,26 @@ stationary phase. So let's do this differently: estimate when the exponential ph
 the threshold", with a choice of "Exponential phase" (the default), "Stationary phase" or "Both", and "This
 will not treat diauxic shifts well, but we are also not able to identify them always clearly, so OK for now."
 
-**The boundary.** The end of exponential growth is the first sampled time at which the culture reaches
-`fraction` (0.9 by default, an advanced setting) of its maximal abundance, on the linear scale and counted
-from its starting abundance. Only measured time points are used; nothing is interpolated on the growth
-curve, so the boundary is always a time at which the culture was sampled. The linear scale is the choice
-for a reason found on real data (study SMGDB00000007, R. intestinalis): on a log scale the last doubling
-before the plateau is a tenth of the rise, so a 90% rule on log abundance ended the phase at 12 h, while
-glucose was still being taken up until 16 h, when the cells reached their maximum.
+**The boundary.** The end of exponential growth is the first sampled time at which the culture has risen
+`fraction` (0.9 by default, an advanced setting) of the way from its starting abundance to its maximum, on
+the linear scale. Only measured time points are used; nothing is interpolated on the growth curve, so the
+boundary is always a time at which the culture was sampled. The linear scale is the choice for a reason
+found on real data (study SMGDB00000007, R. intestinalis): on a log scale the last doubling before the
+plateau is a tenth of the rise, so a 90% rule on log abundance ended the phase at 12 h, while glucose was
+still being taken up until 16 h, when the cells reached their maximum.
+
+**The curve is smoothed first** (`smooth`, a running median of three with Tukey's end-point rule), and the
+maximum and the crossing are read from the smoothed curve (Karoline, 2026-10-06, after a review found the
+raw maximum on a noisy plateau: E. coli LF82 in study SMGDB00000009 stops growing by about 10 h, but counting
+noise of 10% on its plateau put the boundary of single replicates at 84 to 108 h; and a late rise of one
+point, B. hydrogenotrophica at 48 h in study SMGDB00000004, made the whole run "exponential"). A median of
+three removes one stray point and leaves a real rise, which lasts more than one sample. The boundary also
+says when it rests on fewer than three samples (`coarse`: a culture sampled every 24 h cannot place it more
+finely), which the arcs carry as the caution `coarse_sampling`.
 
 **A culture that did not grow** has no exponential phase. A rise below `NO_GROWTH_FACTOR` (1.5, grownet's
-default for the same question) gives no boundary, and its metabolites are reported, not split.
+default for the same question) gives no boundary, and its metabolites give no value in the phases: the
+matrices mark them `no_phase`, and a time window (which needs no boundary) gives them values.
 
 **The change in a phase** is the metabolite concentration at the end of the phase minus the concentration
 at its start, from the metabolite's own series. The phases are:
@@ -28,6 +38,8 @@ interpolated linearly between the two samples around it. A boundary outside the 
 never extrapolated: the nearest sample is used and the arc is marked `window_beyond_data`.
 """
 from __future__ import annotations
+
+import statistics
 
 FRACTION = 0.9               # the share of the maximal abundance that ends exponential growth
 NO_GROWTH_FACTOR = 1.5       # below this rise (maximum over start) the culture did not grow
@@ -49,17 +61,34 @@ def hours(unit: str) -> float | None:
     return TIME_UNITS.get((unit or "").strip().lower())
 
 
+def smooth(values) -> list:
+    """A running median of three, with Tukey's end-point rule at the end: the last point becomes the median of
+    itself, its smoothed neighbor and the value that neighbor's trend extrapolates to, so a curve still rising
+    at its end still ends at its maximum and a lone jump at the end is taken down to its neighbors. The first
+    point is the culture's start and stays as measured (the end-point rule there would lift a culture that
+    had already grown by its second sample to its plateau). Curves of fewer than four points are returned as
+    they are."""
+    v = [float(x) for x in values]
+    if len(v) < 4:
+        return v
+    out = [statistics.median(v[i - 1:i + 2]) for i in range(1, len(v) - 1)]
+    last = statistics.median([v[-1], out[-1], 3 * out[-1] - 2 * out[-2]])
+    return [v[0], *out, last]
+
+
 def exponential_end(times, values, fraction: float = FRACTION, factor: float = NO_GROWTH_FACTOR) -> dict:
-    """{"end": time, "index": i, "last": bool}: where exponential growth ends on one growth curve.
+    """{"end": time, "index": i, "last": bool, "coarse": bool}: where exponential growth ends on one curve.
 
     `last` is True when the boundary is the curve's last point: the culture had not stopped growing when
-    sampling ended, so there is no stationary phase in the data. Raises NoBoundary when the curve is too
-    short, holds no positive value, or did not grow by `factor`.
+    sampling ended, so there is no stationary phase in the data. `coarse` is True when fewer than three
+    samples lead up to the boundary. Raises NoBoundary when the curve is too short, holds no positive value,
+    or did not grow by `factor`.
 
     Worked example (the docstring of the test repeats it): times 0, 4, 8, 12, 16, 24 and abundances
-    1, 10, 100, 500, 900, 1000. The start is 1 and the maximum 1000, so the threshold is
-    1 + 0.9 * (1000 - 1) = 900.1. The first sample at or above it is 24 h (900 at 16 h is just below), so the
-    boundary is 24 h, and it is the last point.
+    1, 10, 100, 500, 900, 1000. Smoothed, they are 1, 10, 100, 500, 900, 1000 (a rising curve keeps its
+    shape). The start is 1 and the maximum 1000, so the threshold is 1 + 0.9 * (1000 - 1) = 900.1. The first
+    sample at or above it is 24 h (900 at 16 h is just below), so the boundary is 24 h, and it is the last
+    point.
     """
     pairs = [(float(t), float(v)) for t, v in zip(times, values, strict=True)]
     if len(pairs) < 3:
@@ -67,13 +96,14 @@ def exponential_end(times, values, fraction: float = FRACTION, factor: float = N
     start = next((v for _, v in pairs if v > 0), None)
     if start is None:
         raise NoBoundary("no positive abundance in the growth curve")
-    top = max(v for _, v in pairs)
+    smoothed = smooth([v for _, v in pairs])
+    top = max(smoothed)
     if top < factor * start:
         raise NoBoundary(f"did not grow: the maximum is {top / start:.2g} times the start, below {factor:g}")
     threshold = start + fraction * (top - start)
-    for i, (t, v) in enumerate(pairs):
+    for i, ((t, _), v) in enumerate(zip(pairs, smoothed, strict=True)):
         if v >= threshold:
-            return {"end": t, "index": i, "last": i == len(pairs) - 1}
+            return {"end": t, "index": i, "last": i == len(pairs) - 1, "coarse": i < 2}
     raise NoBoundary("no point reaches the threshold")       # not reached: the maximum always does
 
 

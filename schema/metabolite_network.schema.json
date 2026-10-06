@@ -126,6 +126,12 @@
               "null"
             ]
           },
+          "n_experiments": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "p_value": {
             "type": [
               "number",
@@ -182,7 +188,10 @@
                 "stationary_not_reached",
                 "conflict",
                 "not_detected_in_value_medium",
-                "phase_from_other_replicates"
+                "phase_from_other_replicates",
+                "coarse_sampling",
+                "boundaries_differ",
+                "no_variance"
               ]
             }
           },

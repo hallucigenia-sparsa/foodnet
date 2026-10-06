@@ -3,6 +3,7 @@
 Karoline, 2026-10-04: "one matrix with taxa as rows and metabolites as columns and another with 2 matrices:
 1 for consumption and the other for production."
 """
+import csv
 import io
 import json
 import zipfile
@@ -11,9 +12,16 @@ from conftest import run
 
 from foodnet import matrix
 
+A = "ncbi:1"
+GLC, AC = "chebi:17234", "chebi:30089"
+
 
 def _rows(text):
-    return [line.split(",") for line in text.strip().splitlines()]
+    """The CSV's rows, with the first header cell (which names the value medium and the version) as "taxon"."""
+    rows = list(csv.reader(io.StringIO(text)))
+    assert rows[0][0].startswith("taxon [values from ")
+    rows[0][0] = "taxon"
+    return rows
 
 
 def test_the_signed_matrix_has_production_positive_consumption_negative_and_na_for_no_value(client):
@@ -28,10 +36,21 @@ def test_the_signed_matrix_has_production_positive_consumption_negative_and_na_f
 
 
 def test_a_measured_change_below_the_limit_is_zero_not_na(client):
+    r = run(client, phase="stationary", judge_spread=False)
+    rows = _rows(matrix.signed_csv(r["network"], r))
+    # judged by the mean alone, A's stationary acetate (+1 and -1) is measured and no change, so 0; glucose -0.5
+    assert rows[1] == ["Alpha alpha A1", "0", "NA", "NA", "-0.5"]
+
+
+def test_a_spread_across_the_limit_is_inconclusive_never_zero(client):
     r = run(client, phase="stationary")
     rows = _rows(matrix.signed_csv(r["network"], r))
-    # A's stationary acetate: +1 and -1, measured and no change, so 0; glucose -0.5
-    assert rows[1] == ["Alpha alpha A1", "0", "NA", "NA", "-0.5"]
+    # the default judges the spread too: acetate +1 and -1 (sd 1.41) and glucose 0 and -1 (sd 0.71) both reach
+    # across the 0.2 mM limit, so they are NA, and their evidence says why
+    assert rows[1] == ["Alpha alpha A1", "NA", "NA", "NA", "NA"]
+    assert matrix.entry(r, A, AC, "stationary", "produced") == (None, "inconclusive")
+    assert r["cells"][(A, GLC, "stationary")]["state"] == "inconclusive"
+    assert not [e for e in r["network"].edges if e.taxon == A and e.phase == "stationary"]
 
 
 def test_the_pair_holds_magnitudes_and_says_why_a_cell_is_na(client):

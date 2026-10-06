@@ -78,8 +78,8 @@ def paired(x, y) -> dict | None:
     """The paired two-sided t-test of x against y, or None with fewer than two pairs.
 
     Tests whether the mean of the differences x[i] - y[i] is zero, with n - 1 degrees of freedom. Returns
-    {"t", "df", "p"}. When the differences do not vary, the p-value is 0 if their mean is not zero and 1
-    if it is, as in `welch`.
+    {"t", "df", "p"}. When the differences do not vary there is no test: identical values come from rounding
+    or from one series deposited twice, not from certainty, so p is None and "no_variance" is True.
     """
     if len(x) != len(y):
         raise ValueError(f"paired test needs pairs: {len(x)} values against {len(y)}")
@@ -89,7 +89,7 @@ def paired(x, y) -> dict | None:
     n, mean = len(d), statistics.mean(d)
     sd = statistics.stdev(d)
     if sd == 0:
-        return {"t": math.inf if mean else 0.0, "df": n - 1, "p": 0.0 if mean else 1.0}
+        return {"t": None, "df": n - 1, "p": None, "no_variance": True}
     t = mean / (sd / math.sqrt(n))
     return {"t": t, "df": n - 1, "p": min(1.0, 2.0 * (1.0 - t_cdf(abs(t), n - 1)))}
 

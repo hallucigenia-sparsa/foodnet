@@ -13,7 +13,9 @@ Rules worth stating, because each is a choice:
     measures that one strain; within each, cell counts before optical density (flow cytometry, qPCR,
     plate counts, 16S, then OD), since OD saturates first and so ends exponential growth early. When one
     replicate holds several curves of the same kind (study SMGDB00000007 records three culture-level flow
-    cytometry traces), the per-strain one decides.
+    cytometry traces), the per-strain one decides. Every usable curve is kept in that order, and the first
+    that gives an end of exponential growth is the one used (a short or spiked curve gives way to the next).
+    A 16S curve in relative units is no growth curve: in a monoculture it is about 100% throughout.
   * Times are converted to hours, concentrations to mM (`foodnet.compounds`). A series in a unit that is
     not a concentration is left out and reported.
   * Experiments that are not batch (chemostat, serial dilution) are left out and reported: production and
@@ -54,6 +56,9 @@ class Culture:
     replicate: str
     growth: dict | None = None     # {"times", "values", "technique", "level", "unit"}, times in hours
     metabolites: dict = field(default_factory=dict)   # node id -> {"name", "chebi_id", "series", "recorded_as"}
+    # every usable growth curve, most preferred first; `growth` is the first, until the phase boundary
+    # (foodnet.derive.boundaries) finds that a later one is the first to give an end of exponential growth
+    curves: list = field(default_factory=list)
 
     @property
     def label(self) -> str:
@@ -132,9 +137,15 @@ def _growth_rank(context: dict) -> tuple | None:
     technique = (context.get("techniqueType") or "").lower()
     if subject.get("type") not in ("strain", "bioreplicate") or technique in NOT_GROWTH:
         return None
+    if technique == "16s" and _relative((context.get("techniqueUnits") or "").casefold()):
+        return None        # a share of the reads: about 100% throughout in a monoculture, so no growth curve
     level = 0 if subject.get("type") == "strain" else 1
     kind = GROWTH_TECHNIQUES.index(technique) if technique in GROWTH_TECHNIQUES else len(GROWTH_TECHNIQUES)
     return (level, kind)
+
+
+def _relative(unit: str) -> bool:
+    return any(word in unit for word in ("%", "percent", "relative", "fraction", "proportion", "ratio"))
 
 
 def _series(client, context_id, factor: float, scale: float = 1.0) -> list:
@@ -188,11 +199,11 @@ def cultures_of_experiment(client, exp: dict, identities: dict, excluded_metabol
                 skipped.append((f"{label}: {rep}", f"{UNREAD} its growth curve: {e}"))
                 continue
             if len(points) >= MIN_POINTS:
-                culture.growth = {"times": [t for t, _ in points], "values": [v for _, v in points],
-                                  "technique": context.get("techniqueType") or "",
-                                  "level": (context.get("subject") or {}).get("type", ""),
-                                  "unit": context.get("techniqueUnits") or context.get("techniqueType") or ""}
-                break
+                culture.curves.append({"times": [t for t, _ in points], "values": [v for _, v in points],
+                                       "technique": context.get("techniqueType") or "",
+                                       "level": (context.get("subject") or {}).get("type", ""),
+                                       "unit": context.get("techniqueUnits") or context.get("techniqueType") or ""})
+        culture.growth = culture.curves[0] if culture.curves else None
         if with_metabolites:
             for context in bio.get("measurementContexts", []):
                 subject = context.get("subject") or {}

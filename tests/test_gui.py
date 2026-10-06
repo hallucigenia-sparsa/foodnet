@@ -87,7 +87,7 @@ def test_a_search_shows_its_arcs_and_every_download_works(server):
     body, _ = _get(f"{server}/download?{q}&format=graphml")
     assert body.startswith(b"<?xml")
     body, _ = _get(f"{server}/download?{q}&format=matrix")
-    assert body.decode().startswith("taxon,acetate")
+    assert body.decode().startswith('taxon [values from Wilkins')
     body, _ = _get(f"{server}/download?{q}&format=matrices")
     assert "consumed.csv" in zipfile.ZipFile(io.BytesIO(body)).namelist()
     body, _ = _get(f"{server}/report.txt?{q}")

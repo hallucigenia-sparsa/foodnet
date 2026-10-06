@@ -12,7 +12,12 @@ The cell states are the figure's, and there are exactly these:
   * **white**: measured in the value medium, and no change beyond the limit in this direction;
   * **pale orange**: never assayed for this taxon in the value medium, a color outside the gray scale, so the
     absence of a measurement never reads as a measured zero;
-  * **an open circle**: the change was seen in another medium (presence only), drawn on white or orange.
+  * **a question mark on pale yellow**: assayed, but inconclusive: the replicates' spread, or the
+    experiments, reach across the detection limit (Karoline, 2026-10-06);
+  * **a dash on pale green**: assayed, but its cultures gave no phase (no end of exponential growth, or no
+    stationary phase reached), so there is no value in the phase asked for;
+  * **an open circle**: the change was seen in another medium, drawn on white (the value medium measured no
+    change: seen_elsewhere) or on orange (presence only).
 
 With booleans, a measured 1 is dark gray with no number. With the phase choice Both, each metabolite has a
 column per phase.
@@ -30,6 +35,9 @@ NOT_ASSAYED = "#F6D9B8"
 # a value taken from another medium (Advanced settings: entries seen only in another medium, "value"): a
 # background of its own, outside the gray scale and apart from the not-assayed orange
 OTHER_MEDIUM = "#E4DCF1"
+INCONCLUSIVE = "#FBEFC5"
+NO_PHASE = "#DCEDE3"
+MARKS = {"inconclusive": (INCONCLUSIVE, "?"), "no_phase": (NO_PHASE, "\u2013")}
 GAP = 36              # between the two panels
 MAX_SIDE_BY_SIDE = 1000   # px; wider, the panels stack
 FONT = "system-ui, -apple-system, 'Segoe UI', sans-serif"
@@ -120,14 +128,19 @@ def tooltip(result: dict, taxon, met, phase: str, direction: str, evidence: str,
     cell = result["cells"].get((taxon.id, met.id, phase))
     lines = [head]
     if cell is not None and cell["n"]:
-        limit = result["settings"].get("detection_limit", 0.2)
-        if evidence == "measured":
+        limit = cell.get("limit") or result["settings"].get("detection_limit", 0.2)
+        experiments = (f", {cell['n_experiments']} experiments" if (cell.get("n_experiments") or 0) > 1 else "")
+        if evidence == "inconclusive":
+            lines.append(f"inconclusive: mean {cell['mean']:+.3g} mM"
+                         + ("" if cell["sd"] is None else f" \u00b1 {cell['sd']:.2g}")
+                         + f", {cell['n']} replicate(s){experiments}; the spread reaches across {limit:g} mM")
+        elif evidence == "measured":
             if result["settings"].get("booleans"):
                 amount = "yes"
             else:
                 spread = "" if cell["sd"] is None else f" \u00b1 {cell['sd']:.2g}"
                 amount = f"{value:.3g}{spread} mM"
-            lines.append(f"{amount}, {cell['n']} replicate(s)")
+            lines.append(f"{amount}, {cell['n']} replicate(s){experiments}")
         else:
             lines.append(f"measured, no change beyond {limit:g} mM in this direction "
                          f"(mean {cell['mean']:+.3g} mM, {cell['n']} replicate(s))")
@@ -137,6 +150,11 @@ def tooltip(result: dict, taxon, met, phase: str, direction: str, evidence: str,
         if cell["cautions"]:
             lines.append("Cautions: " + ", ".join(cell["cautions"]))
         lines += cell["notes"]
+    elif cell is not None:
+        lines.append("assayed, but its cultures gave no phase (no end of exponential growth, or no stationary "
+                     "phase reached), so no value in this phase; a time window gives one")
+        lines.append("Studies: " + _studies(result, cell["studies"]))
+        lines.append("Experiments: " + ", ".join(cell["experiments"]))
     else:
         lines.append("not assayed in the medium the values come from")
     for entry in (result["presence"].get((taxon.id, met.id, phase)) or {}).get(direction, []):
@@ -231,6 +249,13 @@ def matrices_svg(result: dict) -> str:
                                f'text-anchor="middle" fill="{brand.INK}">{_number(v)}</text>')
                     out.append("</g>")
                     continue
+                if evidence in MARKS:
+                    fill, mark = MARKS[evidence]
+                    out.append(f'<rect x="{x}" y="{y}" width="{CELL_W}" height="{CELL_H}" fill="{fill}"/>')
+                    out.append(f'<text x="{x + CELL_W / 2:.1f}" y="{y + CELL_H / 2 + 4:.1f}" font-size="11" '
+                               f'text-anchor="middle" fill="{brand.MUTED}">{mark}</text>')
+                    out.append("</g>")
+                    continue
                 cell = result["cells"].get((t.id, m.id, ph))
                 assayed = cell is not None and cell["n"]
                 fill = "#ffffff" if assayed else NOT_ASSAYED
@@ -258,18 +283,26 @@ def matrices_svg(result: dict) -> str:
              ("#ffffff", "", f"measured, no change beyond {limit:g} mM"),
              (NOT_ASSAYED, "", "not assayed"),
              ("#ffffff", "circle", "seen only in another medium")]
+    shown = {e for d in ("consumed", "produced") for row in pair[f"evidence_{d}"] for e in row}
     if any(isinstance(v, float) and e == "presence_only" for d in ("consumed", "produced")
            for row, ev in zip(pair[d], pair[f"evidence_{d}"], strict=True) for v, e in zip(row, ev, strict=True)):
         items[-1] = (OTHER_MEDIUM, "", "value from another medium, not comparable with the gray scale")
+    if "inconclusive" in shown:
+        items.append((INCONCLUSIVE, "?", "inconclusive: the spread reaches across the limit"))
+    if "no_phase" in shown:
+        items.append((NO_PHASE, "\u2013", "assayed, no phase in its cultures"))
     x = label_w
     for fill, mark, text in items:
         item_w = 22 + _text_width(text, 11) + 22
         if x > label_w and x + item_w > width:
             x, ky = label_w, ky + 20
         out.append(f'<rect x="{x:.0f}" y="{ky - 10}" width="16" height="12" fill="{fill}" stroke="{brand.LINE}"/>')
-        if mark:
+        if mark == "circle":
             out.append(f'<circle cx="{x + 8:.0f}" cy="{ky - 4}" r="3.6" fill="none" stroke="{brand.MUTED}" '
                        'stroke-width="1.2"/>')
+        elif mark:
+            out.append(f'<text x="{x + 8:.0f}" y="{ky}" font-size="10" text-anchor="middle" '
+                       f'fill="{brand.MUTED}">{mark}</text>')
         out.append(f'<text x="{x + 22:.0f}" y="{ky}" font-size="11" fill="{brand.MUTED}">{html.escape(text)}</text>')
         x += item_w
     phase = net.meta.get("phase")
@@ -280,7 +313,8 @@ def matrices_svg(result: dict) -> str:
     second_info = result.get("second_window") or {}
     if second_info.get("metabolites"):
         what += f" (* {second_info['label']})"
-    caption = (f"Net change over the {what}, mean over replicates. foodnet {net.meta.get('tool_version', '')}, "
+    caption = (f"Net change over the {what}, mean over experiments (over replicates within one). "
+               f"foodnet {net.meta.get('tool_version', '')}, "
                f"{net.meta.get('derived_on', '')}; mGrowthDB studies {', '.join(sorted(net.studies))}.")
     for line in _wrap(caption, width - label_w - 10, 11):
         ky += 18

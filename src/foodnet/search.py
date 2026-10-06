@@ -28,6 +28,11 @@ DEFAULTS = {
     # an end of None meaning until the last sample (Karoline, 2026-10-05, for trehalose)
     "second_window_metabolites": "", "second_window_start": 0.0, "second_window_end": None,
     "detection_limit": d.DETECTION_LIMIT,
+    # a change must clear the limit across the replicates' spread, not only in its mean; a spread across the
+    # limit is inconclusive (Karoline, 2026-10-06). Off: the mean alone decides, as in 0.1.0
+    "judge_spread": True,
+    # detection limits of their own, for compounds measured at another scale: "thiamine=0.01, riboflavin=0.005"
+    "compound_limits": "",
     "ignore_media": False, "booleans": False,
     # off by default: a rate costs a fit per growth curve; CRM mode turns it on
     "report_rates": False, "rate_method": rates.DEFAULT_METHOD, "rate_window": rates.DEFAULT_WINDOW,
@@ -65,6 +70,25 @@ def second_window_label(second: dict | None) -> str:
     return f"{second['start']:g} h to {end}"
 
 
+def compound_limits_of(s: dict) -> dict:
+    """{name, lowercased: limit in mM} from the setting "thiamine=0.01, riboflavin: 0.005"; a malformed entry
+    raises ValueError with what is wrong, so the page and the command line can say so."""
+    out = {}
+    for part in (s.get("compound_limits") or "").replace("\n", ",").replace(";", ",").split(","):
+        if not part.strip():
+            continue
+        name, sep, value = part.replace(":", "=").partition("=")
+        try:
+            limit = float(value)
+        except ValueError:
+            limit = None
+        if not sep or not name.strip() or limit is None or limit < 0:
+            raise ValueError(f"a compound's detection limit is written name=mM, as thiamine=0.01; {part.strip()!r} "
+                             "is not")
+        out[" ".join(name.casefold().split())] = limit
+    return out
+
+
 def window_of(s: dict) -> tuple | None:
     if s.get("window_start") is None or s.get("window_end") is None:
         return None
@@ -87,7 +111,8 @@ def _arc_edge(arc: dict) -> Edge:
                 target=arc["metabolite"] if produced else arc["taxon"],
                 direction=arc["direction"], phase=arc["phase"], evidence=arc["evidence"],
                 amount=d.finite(arc["amount"]), change=d.finite(arc["change"]), sd=d.finite(arc["sd"]),
-                n=arc["n"], p_value=arc.get("p_value"), q_value=arc.get("q_value"),
+                n=arc["n"], n_experiments=arc.get("n_experiments"), p_value=arc.get("p_value"),
+                q_value=arc.get("q_value"),
                 window_start=arc.get("window_start"), window_end=arc.get("window_end"),
                 exponential_h=d.finite(arc.get("exponential_h")), medium=arc["medium"],
                 study_ids=tuple(arc["study_ids"]), experiments=tuple(arc["experiments"]),
@@ -219,34 +244,38 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     skipped += skips
     dropped, duplicate_lines = d.duplicates(cultures)
     rows = [r for r in rows if (cultures[r["culture"]].experiment, r["metabolite"]) not in dropped]
+    valued = {r["culture"] for r in rows if r["change"] is not None}
     # the value medium is chosen among the cultures inside the scope; with outside evidence on, the cultures
     # outside it stay in the list and give presence only
     inside = [i for i, c in enumerate(cultures) if selecting.empty(selection) or selecting.matches(record(c), scope)]
     rule = d.value_set([cultures[i] for i in inside], read["experiments"],
-                       media if selection["media"] else None, s["ignore_media"])
+                       media if selection["media"] else None, s["ignore_media"],
+                       valued=[j for j, i in enumerate(inside) if i in valued])
     rule["chosen"] = [inside[i] for i in rule["chosen"]]
     if not selecting.empty(selection) and not selection["media"] and rule["rule"] == "majority":
         rule["rule"] = "majority_in_scope"
     chosen = set(rule["chosen"])
     value_rows = [r for r in rows if r["culture"] in chosen]
     other_rows = [r for r in rows if r["culture"] not in chosen]
-    limit = s["detection_limit"]
-    value_cells = d.pool(value_rows, cultures, limit)
+    limit, spread = s["detection_limit"], s["judge_spread"]
+    by_name = compound_limits_of(s)
+    limits = {mid: by_name[n] for c in cultures for mid, met in c.metabolites.items()
+              for n in by_name if d.second_window_matches(met, [n])}
+    unknown_limits = [n for n in by_name
+                      if not any(d.second_window_matches(met, [n]) for c in cultures for met in c.metabolites.values())]
+    value_cells = d.pool(value_rows, cultures, limit, spread, limits)
     d.adjust(value_cells, s["correction"])
-    presence_cells = {} if s["ignore_media"] else d.presence(other_rows, cultures, limit)
+    presence_cells = {} if s["ignore_media"] else d.presence(other_rows, cultures, limit, spread, limits)
     per_study = None
     if not s["merge_arcs"]:
         by_study = defaultdict(list)
         for r in value_rows:
             by_study[cultures[r["culture"]].study].append(r)
-        per_study = {sid: d.pool(group, cultures, limit) for sid, group in by_study.items()}
-        # one correction runs over one family of tests, the pooled cells; a per-study arc takes its cell's
-        # q-value when that study is the only one behind the cell (the two values are then the same), and
-        # has none when the cell pools several studies
-        for sid, cells in per_study.items():
-            for key, cell in cells.items():
-                pooled = value_cells.get(key) or {}
-                cell["q_value"] = pooled.get("q_value") if pooled.get("studies") == [sid] else None
+        per_study = {sid: d.pool(group, cultures, limit, spread, limits) for sid, group in by_study.items()}
+        # the arcs are per study, so their tests are the family corrected together: every study's cells
+        # (the pooled cells, corrected above, are the matrices' values)
+        family = {(sid, *key): cell for sid, cells in per_study.items() for key, cell in cells.items()}
+        d.adjust(family, s["correction"])
 
     # a strain is shown by its current name, the one its most recent study uses (grownet #24): study
     # SMGDB00000004 still calls taxon 411483 Faecalibacterium prausnitzii A2-165
@@ -263,10 +292,10 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     matrix_cells, matrix_presence = value_cells, presence_cells
     node_taxa = {tid: _node_for_taxon(t) for tid, t in taxa.items()}
     if s["merge_genera"]:
-        matrix_cells = d.merge_genus_cells(value_cells, taxa)
+        matrix_cells = d.merge_genus_cells(value_cells, taxa, limit, limits)
         matrix_presence = d.merge_genus_presence(presence_cells, taxa)
         if per_study is not None:
-            per_study = {sid: d.merge_genus_cells(cells, taxa) for sid, cells in per_study.items()}
+            per_study = {sid: d.merge_genus_cells(cells, taxa, limit, limits) for sid, cells in per_study.items()}
         node_taxa = {}
         for tid, t in taxa.items():
             gid = d.genus_of(taxa, tid)
@@ -328,6 +357,10 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         "end": second["end"]}
     warnings = _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown_in,
                          not selecting.empty(selection))
+    warnings += _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window)
+    if unknown_limits:
+        warnings.append("Detection limits of their own name " + ", ".join(unknown_limits) + ", which no culture of "
+                        "these taxa measured; check the spelling (the report lists every metabolite read).")
     if unmatched:
         warnings.append("The second time window names " + ", ".join(unmatched) + ", which no culture of these taxa "
                         "measured; check the spelling (the report lists every metabolite read).")
@@ -350,6 +383,39 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
             "rates": organism_rates, "without_a_rate": without_rate, "initial": initial,
             "cultures": len(cultures), "value_cultures": len(chosen), "warnings": warnings,
             "skipped": skipped, "errors": errors}
+
+
+def _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window) -> list:
+    """What a reader must know about where the values come from (Karoline, 2026-10-06, after a review showed
+    a taxon's values changing with the other taxa searched): the taxa whose own best medium is another one,
+    a close choice, and the taxa whose cultures in the value medium give no phase."""
+    out = []
+    if rule["rule"] in ("majority", "majority_in_scope") and rule["keys"]:
+        value_key = rule["keys"][0]
+        elsewhere = sorted((taxa[t]["name"], label) for t, label in d.elsewhere(cultures, valued, value_key).items()
+                           if t in taxa)
+        if elsewhere:
+            out.append("Values come from " + " / ".join(rule["media"]) + ", the medium with values for the most "
+                       "taxa. " + "; ".join(f"{name} has more data in {label}" for name, label in elsewhere)
+                       + ": its values here are from the value medium or missing, and would change if it were "
+                       "searched with other taxa. Name a medium in the second box to fix the choice.")
+        runner = rule.get("runner_up")
+        if runner and not rule["tie"] and runner[1] >= rule["taxa_per_medium"].get(value_key, 0) - 1:
+            out.append(f"The value medium won narrowly: {rule['taxa_per_medium'].get(value_key, 0)} taxa against "
+                       f"{runner[1]} for {rule.get('labels', {}).get(runner[0], runner[0])}.")
+    if window is None:
+        lost = defaultdict(set)
+        for r in rows:
+            if r["culture"] in chosen and "no_phase" in r["cautions"]:
+                lost[cultures[r["culture"]].taxon["id"]].add(r["culture"])
+        whole = sorted(taxa[t]["name"] for t, idx in lost.items()
+                       if t in taxa and not any(i in valued for i in chosen if cultures[i].taxon["id"] == t))
+        if whole:
+            out.append(", ".join(whole) + ": no end of exponential growth was found on their growth curves (they "
+                       "did not grow by the no-growth factor, or the curve is too short), so their metabolites give "
+                       "no value in the phases (no_phase in the matrices). A time window in Advanced settings needs "
+                       "no phase and gives them values.")
+    return out
 
 
 def _genus_rates(found, missing, taxa):
@@ -381,18 +447,34 @@ def _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown
                    "are used, and the arcs carry the caution short_record.")
     beyond = sum(1 for c in value_cells.values() if "window_beyond_data" in c["cautions"])
     if beyond:
-        out.append(f"{beyond} value(s) end after the last metabolite sample, so the last sample stands in for "
-                   "the end of the phase or window (caution window_beyond_data).")
+        out.append(f"{beyond} value(s) start before the first or end after the last metabolite sample, so the "
+                   "nearest sample stands in for that end of the phase or window (caution window_beyond_data).")
     conflicts = sum(1 for c in value_cells.values() if "conflict" in c["cautions"])
     if conflicts:
         out.append(f"{conflicts} value(s) pool experiments that disagree on the direction or on whether the "
-                   "compound changed beyond the detection limit (caution conflict); the report names them.")
+                   "compound changed beyond the detection limit (caution conflict): they are inconclusive, NA in "
+                   "the matrices and no arc; the report names the experiments.")
+    unsure = sum(1 for c in value_cells.values()
+                 if c.get("state") == "inconclusive" and "conflict" not in c["cautions"])
+    if unsure:
+        out.append(f"{unsure} value(s) are inconclusive: the replicates' spread reaches across the detection "
+                   "limit, so they are neither an arc nor a measured zero (NA, evidence inconclusive).")
+    coarse = sum(1 for c in value_cells.values() if "coarse_sampling" in c["cautions"])
+    if coarse:
+        out.append(f"{coarse} value(s) rest on a phase boundary placed on fewer than three growth samples (caution "
+                   "coarse_sampling): the phase may end anywhere between two samples.")
+    apart = sum(1 for c in value_cells.values() if "boundaries_differ" in c["cautions"])
+    if apart:
+        out.append(f"{apart} value(s) average replicates whose phase boundaries lie further apart than a sampling "
+                   "interval (caution boundaries_differ); consider a time window.")
     if rule.get("also_matched"):
         out.append("The second box also matched " + "; ".join(rule["also_matched"]) + ", which "
                    + ("differ from the medium giving the values by what their descriptions say was added or taken "
                       "away, or by their atmosphere; they give presence only. Name them in the second box to use "
                       "them for values, or exclude them in Advanced settings."))
     if rule["tie"]:
-        out.append("Media tied for the most taxa: " + ", ".join(rule["tie"]) + f". Values come from "
-                   f"{rule['keys'][0]}; name a medium in the second box to choose.")
+        labels = rule.get("labels", {})
+        out.append("Media tied for the most taxa: " + "; ".join(labels.get(k, k) for k in rule["tie"])
+                   + f". Values come from {labels.get(rule['keys'][0], rule['keys'][0])} (more replicates with "
+                   "values, then the name that sorts first); name a medium in the second box to choose.")
     return out
