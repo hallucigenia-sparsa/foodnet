@@ -7,9 +7,9 @@ gate applies.
 
 ## Current state
 
-- 2026-10-06, after 0.1.0: **a nine-round adversarial review** (physiology, statistics, consumer-resource
+- 2026-10-06, after 0.1.0: **a seventeen-round adversarial review** (physiology, statistics, consumer-resource
   modeling, software security, and a critic; each round re-attacked the version fixed after the last) led to
-  0.2.0.dev0 on main, in commits 6a83eb4 to 972e015 (nine rounds; the last came back with nothing new from all five), **not pushed and not released**. Karoline's decisions are
+  0.2.0.dev0 on main, in commits 6a83eb4 to 950bb61 (seventeen rounds; the last came back with nothing new from all five), **not pushed and not released**. After round 9, Karoline's question on unblanked OD led to whole-run values for cultures without a phase boundary, growth judged by fold, OD rise or coherent metabolic activity beyond evaporation, and a scatter test on every value (METHOD_NOTES 28). Karoline's decisions are
   METHOD_NOTES 20 to 27; the accepted trade-offs are under Known limits. The biggest changes: values judged on
   a confidence interval (pairs by agreement, one replicate inconclusive) with each experiment counted once;
   growth ending at the 90% rule or earlier where the growth rate drops (E. coli LF82 at 8 h); new evidence
