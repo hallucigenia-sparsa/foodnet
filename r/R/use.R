@@ -299,10 +299,7 @@ crm_unscale <- function(x, abundance, growth = c("measured", "phase_floor"), arg
     }
     if (is.matrix(abundance) && !is.null(rownames(abundance))) {
         # rows by name where they have names, so reordered rows keep their own unit (a review)
-        if (!setequal(rownames(abundance), x$taxa)) {
-            stop_foodnet("the rows of abundance name other taxa than these parameters: ",
-                         paste(utils::head(setdiff(rownames(abundance), x$taxa), 3), collapse = ", "))
-        }
+        if (!setequal(rownames(abundance), x$taxa)) stop_foodnet("the rows of abundance ", taxa_mismatch(rownames(abundance), x$taxa))
         return(abundance * scale[rownames(abundance)])
     }
     if (is.matrix(abundance)) {
@@ -312,8 +309,25 @@ crm_unscale <- function(x, abundance, growth = c("measured", "phase_floor"), arg
         }
         return(abundance * scale)
     }
+    if (!is.null(names(abundance))) {
+        # a named vector by name too, as one time point of the assay is (a review)
+        if (!setequal(names(abundance), x$taxa)) stop_foodnet("the names of abundance ", taxa_mismatch(names(abundance), x$taxa))
+        return(abundance * scale[names(abundance)])
+    }
     if (length(abundance) != length(scale)) stop_foodnet("abundance needs one value per taxon (", length(scale), ")")
     abundance * scale
+}
+
+# What a set of names lacks or adds against the parameters' taxa, in words.
+#' @noRd
+taxa_mismatch <- function(given, taxa) {
+    extra <- setdiff(given, taxa)
+    lacking <- setdiff(taxa, given)
+    paste0(if (length(extra)) paste0("name taxa these parameters lack (", paste(utils::head(extra, 3), collapse = ", "),
+                                     ")") else "",
+           if (length(extra) && length(lacking)) " and " else "",
+           if (length(lacking)) paste0("leave out ", paste(utils::head(lacking, 3), collapse = ", ")) else "",
+           "; give one value per taxon of crm$taxa")
 }
 
 # The growth rates a simulation uses, and a warning for any below its phase's own mean rate.

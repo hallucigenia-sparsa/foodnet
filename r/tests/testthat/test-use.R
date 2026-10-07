@@ -219,4 +219,7 @@ test_that("unscaling takes the unit the simulation used", {
     # rows by name: reordered rows keep their own unit (a review)
     m <- matrix(args$x0, nrow = 2, dimnames = list(crm$taxa, NULL))
     expect_equal(crm_unscale(crm, m[2:1, , drop = FALSE], args = args)[crm$taxa, 1], crm$biomass_start)
+    v <- stats::setNames(args$x0, crm$taxa)
+    expect_equal(crm_unscale(crm, v[2:1], args = args)[crm$taxa], crm$biomass_start)
+    expect_error(crm_unscale(crm, v[1], args = args), "leave out B")
 })
