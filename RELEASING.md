@@ -52,6 +52,8 @@ workflow's short-lived GitHub identity instead ("trusted publishing").
    `python packaging/check_release.py vX.Y.Z` must say the tag is ready (it checks every item above), and `make check` must pass:
    among other things it refuses texts that describe work in progress rather than the released state (an
    install line pointing at one of our branches, for example).
+   Test the R package of the release commit before tagging with `remotes::install_local("<clone>/r")`: its
+   pinned install line names a tag that exists only once step 2 is done.
 2. **Merge it, then tag `main`:**
 
    ```bash

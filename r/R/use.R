@@ -11,14 +11,14 @@
 #' @return A numeric matrix with taxa and resources as its row and column names.
 #' @export
 crm_consumed <- function(x) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     x$consumed
 }
 
 #' @rdname crm_consumed
 #' @export
 crm_produced <- function(x) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     x$produced
 }
 
@@ -34,7 +34,7 @@ crm_produced <- function(x) {
 #' @return A named numeric vector in the row order of the matrices.
 #' @export
 crm_rates <- function(x, missing = NULL) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     rates <- x$growth_rates
     if (!is.null(missing)) {
         if (!is.numeric(missing) || length(missing) != 1) stop_foodnet("missing must be one number")
@@ -53,7 +53,7 @@ crm_rates <- function(x, missing = NULL) {
 #' @return A named numeric vector in the column order of the matrices.
 #' @export
 crm_resources <- function(x, missing = NULL) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     initial <- x$initial
     if (!is.null(missing)) initial[is.na(initial)] <- missing
     initial
@@ -111,7 +111,7 @@ crm_resources <- function(x, missing = NULL) {
 #' @export
 crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero"),
                            growth = c("measured", "phase_floor"), allow = character()) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     scale <- match.arg(scale)
     # miaSim's E reads every uptake as growth in one medium; "shares" and "none" are plain arithmetic on the
     # amounts for other models, as in 0.1.0
@@ -135,6 +135,19 @@ crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("sto
     crm_scale(x, growth)        # stops, naming them, when a taxon lacks what the scale needs
     squares <- rowSums(consumed^2)
     consumed / ifelse(total > 0, total, 1) - produced * ifelse(squares > 0, total / squares, 0)
+}
+
+# A clear stop when x is not the parameters themselves, e.g. crm_efficiency()'s matrix passed on (Karoline's
+# test, 2026-10-07: crm_backcheck(crm_efficiency(crm, na = "zero"), ...)).
+#' @noRd
+need_crm <- function(x) {
+    if (!inherits(x, "foodnet_crm")) {
+        stop_foodnet("this takes the CRM parameters themselves (crm, from foodnet_listen() or foodnet_crm()), ",
+                     "not ", if (is.matrix(x)) "a matrix such as crm_efficiency()'s E" else class(x)[1],
+                     ": it builds what it needs from them, e.g. crm_backcheck(crm, monod_constant = 1, ",
+                     "na = \"zero\")")
+    }
+    invisible(TRUE)
 }
 
 # A stop for parameters a CRM cannot be built from as they are, unless `allow` names the caveat.
@@ -216,7 +229,7 @@ amounts <- function(x, na = "stop", booleans_ok = FALSE) {
 #' @return A named numeric vector, one per taxon.
 #' @export
 crm_scale <- function(x, growth = c("measured", "phase_floor")) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     growth <- match.arg(growth)
     consumed <- x$consumed
     consumed[is.na(consumed)] <- 0
@@ -226,10 +239,19 @@ crm_scale <- function(x, growth = c("measured", "phase_floor")) {
     dx <- x$biomass_change
     lacking <- names(rates)[is.na(rates) | is.na(dx) | dx <= 0 | total <= 0]
     if (length(lacking)) {
-        stop_foodnet("a miaSim simulation needs a growth rate, a positive biomass change and a measured uptake ",
-                     "for every taxon; ", paste(lacking, collapse = ", "), " lack one (see print(x)). Leave them ",
-                     "out with crm_subset(x, taxa = ), or use crm_efficiency(x, scale = \"shares\") for a model ",
-                     "that reads E as shares.")
+        # name what each lacks, and give the line that leaves them out (Karoline's test, 2026-10-07: "see print(x)"
+        # sent her looking)
+        what <- vapply(lacking, function(t) {
+            missing <- c(if (is.na(rates[[t]])) "growth rate",
+                         if (is.na(dx[[t]])) "biomass change" else if (dx[[t]] <= 0) "biomass gain",
+                         if (total[[t]] <= 0) "measured uptake")
+            paste0(t, " (no ", paste(missing, collapse = ", no "), ")")
+        }, character(1))
+        stop_foodnet("a miaSim simulation needs a growth rate, a biomass gain and a measured uptake for every ",
+                     "taxon, and ", paste(what, collapse = "; "), if (length(lacking) == 1) " lacks" else " lack",
+                     " them. Leave ", if (length(lacking) == 1) "it" else "them", " out: x <- crm_subset(x, taxa = ",
+                     "setdiff(x$taxa, c(", paste0("\"", lacking, "\"", collapse = ", "), "))); or use ",
+                     "crm_efficiency(x, scale = \"shares\") for a model that reads E as shares.")
     }
     out <- dx * total / (rates * squares)
     names(out) <- x$taxa
@@ -285,7 +307,7 @@ crm_growth <- function(x, growth = "measured") {
 #' @return CRM parameters of class `foodnet_crm`.
 #' @export
 crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     keep_t <- if (is.character(taxa)) match(taxa, x$taxa) else taxa
     keep_r <- if (is.character(resources)) match(resources, x$resources) else resources
     if (anyNA(keep_t) || anyNA(keep_r)) stop_foodnet("unknown taxon or resource")
@@ -375,7 +397,7 @@ PHASE_CAVEATS <- c("cautions", "inconclusive", "presence_only", "whole_run", "bi
 #'   `x$other_phases`, so switching back gives the original.
 #' @export
 crm_phase <- function(x, phase) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     if (identical(phase, x$phase)) return(x)
     b <- x$other_phases[[phase]]
     if (is.null(b)) {
@@ -407,7 +429,7 @@ crm_phase <- function(x, phase) {
 #' @return The text, invisibly when printed.
 #' @export
 crm_readme <- function(x, print = TRUE) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     if (print) {
         cat(x$readme)
         return(invisible(x$readme))
@@ -431,7 +453,7 @@ crm_readme <- function(x, print = TRUE) {
 #' @return The paths written, invisibly.
 #' @export
 crm_write <- function(x, dir) {
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
     # the download names the CRM's own phase plainly and another phase by suffix: switched, x keeps the
     # exponential phase among the others
@@ -536,7 +558,7 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
                       allow = character(), na = c("stop", "zero"), growth = c("measured", "phase_floor")) {
     na <- match.arg(na)
     growth <- match.arg(growth)
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     refuse_caveats(x, allow)
     if (missing(x0) || is.null(x0)) {
         stop_foodnet("give x0, a starting abundance per taxon in the unit of its growth curve (x$biomass_unit); ",
@@ -610,7 +632,7 @@ crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop"
                           growth = c("measured", "phase_floor"), allow = character()) {
     na <- match.arg(na)
     growth <- match.arg(growth)
-    stopifnot(inherits(x, "foodnet_crm"))
+    need_crm(x)
     if (!requireNamespace("miaSim", quietly = TRUE)) {
         stop_foodnet("crm_backcheck() runs miaSim: install it with BiocManager::install(\"miaSim\")")
     }

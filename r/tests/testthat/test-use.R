@@ -28,7 +28,7 @@ test_that("a taxon can be left out, and unscaling checks the shape", {
 
 test_that("miaSim's units need a rate and a biomass change for every taxon", {
     crm <- foodnet:::as_foodnet_crm(example_payload())
-    expect_error(suppressWarnings(crm_efficiency(crm, na = "zero")), "B lack one")
+    expect_error(suppressWarnings(crm_efficiency(crm, na = "zero")), "B \\(no growth rate\\) lacks them")
 })
 
 test_that("the shares scale is 0.1.0's matrix, and none is consumed minus produced", {
@@ -160,4 +160,17 @@ test_that("subsetting keeps the warnings about kept taxa only, once marked, and 
     payload$caveats$warnings <- list("no rate for [Clostridium] scindens", "Clostridium has more data elsewhere")
     kept <- crm_subset(foodnet:::as_foodnet_crm(payload), taxa = "[Clostridium] scindens")
     expect_equal(kept$caveats$warnings, "(for the whole search) no rate for [Clostridium] scindens")
+})
+
+test_that("a taxon a simulation cannot use is named with what it lacks, and how to leave it out", {
+    crm <- foodnet:::as_foodnet_crm(example_payload())                 # B has no growth rate
+    expect_error(crm_scale(crm), "and B \\(no growth rate\\) lacks them")
+    expect_error(crm_scale(crm), "crm_subset\\(x, taxa = setdiff\\(x\\$taxa, c\\(\"B\"\\)\\)\\)")
+})
+
+test_that("passing E where the parameters belong says so", {
+    crm <- foodnet:::as_foodnet_crm(example_payload())
+    E <- suppressWarnings(crm_efficiency(crm, scale = "shares", na = "zero"))
+    expect_error(crm_backcheck(E, monod_constant = 1), "takes the CRM parameters themselves")
+    expect_error(crm_efficiency(E), "not a matrix such as crm_efficiency\\(\\)'s E")
 })
