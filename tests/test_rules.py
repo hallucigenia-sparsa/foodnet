@@ -406,4 +406,6 @@ def test_a_genus_misses_what_its_median_misses():
              ("c", "x", "exponential"): {**cell, "mean": -1.0, "cautions": [], "missed": None}}
     merged = derive.merge_genus_cells(cells, taxa, 0.2)
     (genus_cell,) = merged.values()
-    assert genus_cell["mean"] == -2.0 and genus_cell["missed"] == 0.0
+    # within the limit: the genus is not still changing (a review: "+0.00 mM more")
+    assert genus_cell["mean"] == -2.0 and genus_cell["missed"] is None
+    assert "still_changing" not in genus_cell["cautions"] and "not in the genus median" in genus_cell["notes"][-1]

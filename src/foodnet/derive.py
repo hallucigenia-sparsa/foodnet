@@ -950,6 +950,18 @@ def merge_genus_cells(cells: dict, taxa: dict, limit: float = DETECTION_LIMIT, l
         mean = statistics.median(means) if means else None
         cautions = set().union(*(c["cautions"] for _, c in members)) - {"conflict", "inconclusive"}
         notes = [f"median over {len(means)} taxon(s): " + ", ".join(sorted(taxa[t]["name"] for t, _ in voting))]
+        # what the genus value misses, built as the value is: the median over the voting taxa, 0 for a taxon that
+        # misses nothing (a review: a mean over the still-changing ones alone overstated it); within the limit, the
+        # genus is not still changing, whatever one of its taxa did (a review: "+0.00 mM more")
+        missed = (statistics.median(c.get("missed") or 0.0 for _, c in voting)
+                  if any(c.get("missed") is not None for _, c in voting) else None)
+        if missed is not None and not _class(missed, lim):
+            missed = None
+            if key[2] == "exponential" and "still_changing" in cautions:
+                cautions.discard("still_changing")
+                notes.append("still changing in " + ", ".join(sorted(taxa[t]["name"] for t, c in voting
+                                                                     if c.get("missed") is not None))
+                             + " only, not in the genus median")
         states = {c["state"] for _, c in voting}
         k = _class(mean, lim) if means else INCONCLUSIVE
         if len(states) > 1:
@@ -974,10 +986,7 @@ def merge_genus_cells(cells: dict, taxa: dict, limit: float = DETECTION_LIMIT, l
                   "p_value": None, "initial": _mean_of(c["initial"] for _, c in members),
                   "exponential_h": _mean_of(c.get("exponential_h") for _, c in members),
                   "merged_taxa": sorted(t for t, _ in members), "limit": lim,
-                  # what the genus value misses, built as the value is: the median over the voting taxa, 0 for a
-                  # taxon that misses nothing (a review: a mean over the still-changing ones alone overstated it)
-                  "missed": (statistics.median(c.get("missed") or 0.0 for _, c in voting)
-                             if any(c.get("missed") is not None for _, c in voting) else None)}
+                  "missed": missed}
         if not any(c["n"] for _, c in members):
             merged["state"] = None
         out[key] = merged

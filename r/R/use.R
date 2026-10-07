@@ -292,6 +292,11 @@ crm_unscale <- function(x, abundance, growth = c("measured", "phase_floor"), arg
         growth <- used
     }
     scale <- crm_scale(x, match.arg(growth, c("measured", "phase_floor")))
+    made <- if (is.null(args)) NULL else attr(args, "foodnet_scale")
+    if (!is.null(made) && (!identical(names(made), x$taxa) || !isTRUE(all.equal(unname(scale), unname(made))))) {
+        stop_foodnet("args were made from other CRM parameters than these (their units differ): pass the crm ",
+                     "you gave to as_miasim()")
+    }
     if (is.matrix(abundance)) {
         if (nrow(abundance) != length(scale)) {
             stop_foodnet("abundance needs one row per taxon (", length(scale), "), as assay() of miaSim's result; ",
@@ -637,6 +642,8 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     # taxon came back off by the ratio of its two rates (a review); NA with your own E (no unit of ours).
     # c(args, list(...)) drops it, so do.call() never passes it to miaSim.
     attr(args, "foodnet_growth") <- if (own_E) NA_character_ else growth
+    # and the unit itself, so the args of other parameters cannot unscale this run unnoticed (a review)
+    if (!own_E) attr(args, "foodnet_scale") <- suppressWarnings(crm_scale(x, growth))
     args
 }
 

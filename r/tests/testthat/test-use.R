@@ -211,4 +211,9 @@ test_that("unscaling takes the unit the simulation used", {
     expect_false(isTRUE(all.equal(unname(suppressWarnings(crm_unscale(crm, args$x0))), unname(crm$biomass_start))))
     expect_error(crm_unscale(crm, args$x0, growth = "measured", args = args), "the simulation used")
     expect_null(attr(c(args, list(t_end = 1)), "foodnet_growth"))   # never reaches miaSim
+    # args from other parameters are refused (a review: a window crm unscaled an exponential run silently)
+    other <- crm
+    other$biomass_change <- other$biomass_change * 2
+    expect_error(crm_unscale(other, args$x0, args = args), "other CRM parameters")
+    expect_error(crm_unscale(crm_subset(crm, taxa = c("B", "A")), args$x0, args = args), "other CRM parameters")
 })
