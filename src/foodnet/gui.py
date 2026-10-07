@@ -30,7 +30,7 @@ from .figure import matrices_svg
 from .legend import legend_svg
 from .mgrowthdb import MGrowthDBError
 from .report import report_text
-from .search import DEFAULTS, EXAMPLE, PHASE_LABELS, compound_limits_of, run_query
+from .search import CRM_EXAMPLE, DEFAULTS, EXAMPLE, PHASE_LABELS, compound_limits_of, run_query
 from .taxonomy import species_index
 
 TITLE = brand.NAME
@@ -229,6 +229,10 @@ def crm_mode(settings: dict, on: bool = True) -> dict:
 CRM_MODE_MESSAGE = ("CRM mode on: growth rates on (Advanced settings). Run the search, then press Get CRM "
                     "parameters at the top of the result; press CRM mode again to switch it off.")
 CRM_MODE_OFF_MESSAGE = "CRM mode off: growth rates off, which is the default."
+CRM_EXAMPLE_MESSAGE = ("CRM example: five gut species in Wilkins-Chalgren (studies 2, 4, 7 and 9), 0 to 48 h, "
+                       "trehalose over the whole run (Advanced settings), CRM mode on. Press Get taxon-metabolite "
+                       "network, then Get CRM parameters; the help's Simulate with miaSim section has the steps "
+                       "in R.")
 
 
 def render_form(token: str, entries: str = "", settings: dict | None = None, message: str = "",
@@ -259,6 +263,7 @@ can add evidence from outside the box.</p>
 {_phase_choice(settings)}
 <div class="bar"><button class="primary" type="submit">Get taxon-metabolite network</button>
 <button type="submit" name="example" value="1">Example</button>
+<button type="submit" name="crm_example" value="1">CRM example</button>
 <button type="submit" name="all" value="1">All</button>
 <button type="submit" name="crm_mode" value="1" class="switch{' on' if on else ''}" aria-pressed="{str(on).lower()}"
 ><span class="track"><span class="knob"></span></span>CRM mode</button>
@@ -865,6 +870,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
         if form.get("example"):
             self._send(render_form(self.token, "\n".join(EXAMPLE), settings, conditions=settings.get("conditions", "")))
+            return
+        if form.get("crm_example"):
+            settings = {**settings, **CRM_EXAMPLE["settings"], "conditions": "\n".join(CRM_EXAMPLE["conditions"])}
+            self._send(render_form(self.token, "\n".join(CRM_EXAMPLE["taxa"]), settings, message=CRM_EXAMPLE_MESSAGE,
+                                   conditions=settings["conditions"]))
             return
         if form.get("all"):
             job = self._start([], settings, all_studies=True)

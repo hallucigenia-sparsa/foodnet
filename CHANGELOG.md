@@ -37,6 +37,8 @@ semantic versioning.
 - R: `crm_scale()`, `crm_unscale()`, `crm_subset()`, `crm_backcheck()`, `crm_phase()`, and
   `growth = "phase_floor"`; `crm_write()` writes the download's files.
 - Cautions within_scatter, within_evaporation (with the Evaporation setting), pair_decided and start_differs.
+- A CRM example button (five gut species in Wilkins-Chalgren, CRM mode on) and a help section that walks through
+  a miaSim simulation step by step, which the example runs as it is.
 - Cautions are ranked: tier 1 changes what a value means, tier 2 makes it less certain, tier 3 says how the
   phase was found. The page, the README and R's print name the tier 1 values first.
 - The result opens with its buttons (downloads, Cytoscape, report, CRM parameters), then an index of its

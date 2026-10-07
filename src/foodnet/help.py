@@ -131,7 +131,8 @@ EDGE_FIELDS = {
 SECTIONS = (("what", "What foodnet does"), ("alone", "Alone is not in a community"),
             ("phases", "Growth phases"), ("values", "Values, media and presence"),
             ("matrices", "The two matrix formats"), ("crm", "Consumer-resource models and R"),
-            ("cytoscape", "Cytoscape and the downloads"), ("empty", "When a search gives nothing"),
+            ("miasim", "Simulate with miaSim, step by step"), ("cytoscape", "Cytoscape and the downloads"),
+            ("empty", "When a search gives nothing"),
             ("settings", "Every setting"), ("fields", "Every field"), ("cli", "The command line"))
 
 
@@ -256,13 +257,41 @@ or die (its biomass change says which); in R,
 <code>crm_phase(crm, "stationary")</code> switches to it.</p>
 <p>The R companion package receives them. Install it once with <code>{_e(rbridge.INSTALL_R)}</code>
 ({_e(rbridge.INSTALL_TROUBLE)}), then <code>library(foodnet); crm &lt;- foodnet_listen()</code> and press Send to R.
-<code>crm_efficiency(crm)</code> builds <a href="{MIASIM}">miaSim</a>'s efficiency matrix from its equations, in a
+The steps of a simulation are <a href="#miasim">below</a>. <code>crm_efficiency(crm)</code> builds
+<a href="{MIASIM}">miaSim</a>'s efficiency matrix from its equations, in a
 unit of abundance chosen per taxon (<code>crm_scale</code>) so that, alone, it grows at its measured rate, gains its
 measured biomass and makes its measured by-products. Uptake of each resource follows the Monod
 constants, which foodnet does not measure: <code>crm_backcheck(crm, monod_constant = 1)</code> simulates each taxon
 alone against its monoculture. <code>as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1)</code> gives the
 arguments of <code>simulateConsumerResource</code>, and never lets it draw starting abundances or Monod constants at
 random.</p>
+<h2 id="miasim">Simulate with miaSim, step by step</h2>
+<p>Press <strong>CRM example</strong> to follow these steps with five gut species in Wilkins-Chalgren (studies 2, 4,
+7 and 9, 0 to 48 h, trehalose over the whole run); with your own taxa, switch CRM mode on instead.</p>
+<ol>
+<li>Install the R package and <a href="{MIASIM}">miaSim</a> once: <code>install.packages(c("remotes",
+"BiocManager"))</code>, <code>{_e(rbridge.INSTALL_R)}</code>, <code>BiocManager::install("miaSim")</code>.</li>
+<li>In R: <code>library(foodnet); crm &lt;- foodnet_listen()</code>. On this page press Get taxon-metabolite network,
+then Get CRM parameters with Send to R. (Without a listener: <code>crm &lt;- foodnet_crm(url)</code>, with the
+address shown under the button.)</li>
+<li><code>print(crm)</code>, and read what it says first: the values whose cautions change what they mean, and any
+taxon without a growth rate, a biomass gain or an uptake. A simulation cannot use such a taxon; leave it out with
+<code>crm &lt;- crm_subset(crm, taxa = setdiff(crm$taxa, c("its name")))</code> (the error names it, if you go
+on).</li>
+<li>Choose Monod constants, which foodnet does not measure, and check them: <code>crm_backcheck(crm, monod_constant
+= 1, na = "zero")</code> simulates each taxon alone and compares it with its monoculture (a biomass ratio near 1
+means it gains what it gained). It takes <code>crm</code> itself and builds the efficiency matrix; <code>na =
+"zero"</code> counts NA cells as 0 and says how many of each kind.</li>
+<li>Simulate the community: <code>args &lt;- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1,
+missing_resource = 0, na = "zero")</code>, then <code>tse &lt;- do.call(miaSim::simulateConsumerResource, c(args,
+list(t_end = 48, t_store = 480)))</code>.</li>
+<li>Back in each growth curve's unit: <code>abundance &lt;- crm_unscale(crm, SummarizedExperiment::assay(tse))</code>,
+for example <code>matplot(t(log10(abundance)), type = "l")</code>.</li>
+</ol>
+<p>The run is deterministic as <code>as_miasim()</code> shapes it: miaSim adds random immigrants at
+<code>migration_p</code> even without <code>stochastic</code>, so it passes <code>migration_p = 0</code>. To explore
+noise, change <code>args</code> before the call (<code>args$migration_p &lt;- 0.01; args$stochastic &lt;-
+TRUE</code>); to turn it off again, <code>migration_p = 0, stochastic = FALSE, error_variance = 0</code>.</p>
 <h2 id="cytoscape">Cytoscape and the downloads</h2>
 <p>Send to Cytoscape puts the network into a running Cytoscape in the style of the legend. A downloaded GraphML can take
 the same style: <a href="{style_link}">foodnet_style.xml</a> (File, Import, Styles from File). JSON is the canonical

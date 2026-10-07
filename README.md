@@ -155,7 +155,8 @@ remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r", ref = "v0.2
 BiocManager::install("miaSim")
 ```
 
-then:
+then (the page's **CRM example** button sets up five gut species for which these steps run as they are, and
+the help's "Simulate with miaSim" section walks through them):
 
 ```r
 library(foodnet)

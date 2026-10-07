@@ -156,3 +156,28 @@ def test_an_evaporation_share_outside_its_range_is_refused():
     assert "percentage" in gui.window_problem({"evaporation": ["-5"]})
     assert "percentage" in gui.window_problem({"evaporation": ["abc"]})
     assert gui.window_problem({"evaporation": ["15"]}) == ""
+
+
+def test_the_crm_example_sets_up_a_community_a_simulation_can_use():
+    # Karoline, 2026-10-07: "a 2nd example in the GUI [...] (without FD), switch on CRM mode and show in the help
+    # steps needed to run a simulation with miaSim"
+    from foodnet import gui
+    from foodnet.search import CRM_EXAMPLE
+    page = gui.render_form("T")
+    assert 'name="crm_example"' in page and "CRM example" in page
+    settings = {**gui.parse_settings({}), **CRM_EXAMPLE["settings"],
+                "conditions": "\n".join(CRM_EXAMPLE["conditions"])}
+    page = gui.render_form("T", "\n".join(CRM_EXAMPLE["taxa"]), settings, message=gui.CRM_EXAMPLE_MESSAGE,
+                           conditions=settings["conditions"])
+    assert "Escherichia coli LF82" in page and "SMGDB00000009" in page and "Faecalibacterium" not in page
+    assert gui.crm_mode_on(settings) and 'value="48.0"' in page and "trehalose" in page
+
+
+def test_the_help_walks_through_a_miasim_simulation():
+    from foodnet import help as help_page
+    text = help_page.render_help("T", {}, ("A",))
+    i = text.index('id="miasim"')
+    steps = text[i:text.index("<h2", i + 1)]
+    for step in ("CRM example", "foodnet_listen()", "crm_subset(", "crm_backcheck(crm", "as_miasim(crm",
+                 "simulateConsumerResource", "crm_unscale(crm", "migration_p = 0, stochastic = FALSE"):
+        assert step in steps, step

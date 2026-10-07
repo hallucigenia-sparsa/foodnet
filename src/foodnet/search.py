@@ -57,6 +57,19 @@ DEFAULTS = {
     "include_non_batch": False, "spike_factor": phases.SPIKE_FACTOR, "correction": "bh",
 }
 EXAMPLE = ("Escherichia coli LF82", "Bacteroides fragilis", "Roseburia intestinalis")
+# A second example, for consumer-resource models (Karoline, 2026-10-07: "a 2nd example in the GUI [...], switch
+# on CRM mode and show in the help steps needed to run a simulation with miaSim"): five gut species in
+# Wilkins-Chalgren, studies 2, 4, 7 and 9, 0 to 48 h, trehalose over the whole run (its uptake is slow). Every
+# one of them has a growth rate, a biomass change and an uptake there, so a miaSim simulation runs as it is
+# (the hand-checked reference behind it has a sixth species, Faecalibacterium duncaniae, without any of these
+# in these studies).
+CRM_EXAMPLE = {
+    "taxa": ("Bacteroides thetaiotaomicron", "Blautia hydrogenotrophica", "Roseburia intestinalis",
+             "Escherichia coli LF82", "Bacteroides fragilis"),
+    "conditions": ("SMGDB00000002", "SMGDB00000004", "SMGDB00000007", "SMGDB00000009"),
+    "settings": {"window_start": 0.0, "window_end": 48.0, "second_window_metabolites": "trehalose",
+                 "report_rates": True},
+}
 
 
 def second_window_of(s: dict) -> dict | None:
