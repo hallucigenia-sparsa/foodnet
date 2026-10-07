@@ -8,7 +8,7 @@ the collaboration. We will acknowledge the report, work with you on a fix, and c
 
 ## Scope
 
-The supported version is the current `main`. foodnet pulls only from the public mGrowthDB API and
+Security fixes go into `main` and the next release, and only the latest release on PyPI is supported: upgrade to it (and install the R package of the same version). foodnet pulls only from the public mGrowthDB API and
 commits no pulled or collaborator data; see [docs/DATA_GOVERNANCE.md](docs/DATA_GOVERNANCE.md).
 
 `foodnet gui` runs a local page for one person: it binds to 127.0.0.1 only, requires a token that is

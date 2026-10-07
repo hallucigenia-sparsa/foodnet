@@ -26,7 +26,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEXT_EXT = (".py", ".md", ".toml", ".yml", ".yaml", ".json", ".cfg", ".ini", ".txt")
+TEXT_EXT = (".py", ".md", ".toml", ".yml", ".yaml", ".json", ".cfg", ".ini", ".txt", ".R", ".Rd")
 
 SECRET = re.compile(
     r"(?i)(?:api[_-]?key|secret|token|password|authorization|bearer)\s*[:=]\s*"
@@ -166,9 +166,16 @@ def check_house_style(rels):
         if rel.endswith(TEXT_EXT):
             for m in CAVEATS.finditer(text):
                 bad.append(f"{r}: hedging caveat {m.group(0)!r} (say it plainly)")
-        # dashes and US spelling: prose only (docs), outside code spans
+        # dashes and US spelling: prose only (docs, the R help pages and the roxygen comments they come
+        # from), outside code spans
+        prose = None
         if r.endswith(".md"):
             prose = _strip_code(text)
+        elif r.endswith(".Rd"):
+            prose = re.sub(r"\\(?:code|link|eqn)\{[^}]*\}", "", text)
+        elif r.endswith(".R"):
+            prose = _strip_code("\n".join(line for line in text.splitlines() if line.lstrip().startswith("#'")))
+        if prose is not None:
             if DASH.search(prose):
                 bad.append(f"{r}: dash punctuation (use grammar: comma, colon, parentheses, or 'to')")
             for m in BRITISH.finditer(prose):

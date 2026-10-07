@@ -21,7 +21,7 @@ def test_derive_writes_a_valid_network(tmp_path, capsys):
     out = tmp_path / "net.json"
     assert main(["derive", *TAXA, "--out", str(out)]) == 0
     doc = json.loads(out.read_text(encoding="utf-8"))
-    assert doc["schema"] == "foodnet.metabolite_network/v0" and doc["edges"]
+    assert doc["schema"] == "foodnet.metabolite_network/v1" and doc["edges"]
     assert main(["validate", str(out)]) == 0
     assert "valid" in capsys.readouterr().out
 
@@ -58,7 +58,7 @@ def test_a_path_that_cannot_be_written_is_one_line(tmp_path, capsys):
 
 def test_validate_reports_problems(tmp_path, capsys):
     bad = tmp_path / "bad.json"
-    bad.write_text(json.dumps({"schema": "foodnet.metabolite_network/v0", "nodes": [], "studies": [],
+    bad.write_text(json.dumps({"schema": "foodnet.metabolite_network/v1", "nodes": [], "studies": [],
                                "edges": [{"source": "a", "target": "b", "direction": "produced",
                                           "phase": "exponential", "evidence": "measured"}]}))
     assert main(["validate", str(bad)]) == 1

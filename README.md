@@ -6,10 +6,7 @@
 
 food**net** builds bipartite taxon and metabolite networks from the batch monocultures in
 [mGrowthDB](https://mgrowthdb.gbiomed.kuleuven.be/): which taxon produces which compound, and which consumes
-it, with the amount moved in each growth phase. Uptake of each resource is weighted by its share of the measured uptake, so a trace substrate weighs
-little, but a taxon grows at its full rate only while its resources are saturating: with real Monod
-constants it grows slower than measured, and `crm_backcheck()` shows by how much. `crm_subset()` leaves out a
-taxon a simulation cannot use. It hands the result to Cytoscape, to graph formats, to two
+it, with the amount moved in each growth phase. It hands the result to Cytoscape, to graph formats, to two
 matrix formats, and to R as the parameters of a consumer-resource model (CRM), with
 [miaSim](https://bioconductor.org/packages/release/bioc/html/miaSim.html) as the example simulator.
 
@@ -48,8 +45,9 @@ foodnet gui
 ```
 
 opens the page in your browser. Type taxa in the first box (a species, a strain, a genus or an NCBI taxon
-id, one per line), or press Example, and press Get taxon-metabolite network. The consumed and produced
-matrices appear first under the settings, then the taxa and the arcs with the downloads.
+id, one per line), or press Example, and press Get taxon-metabolite network. The result opens with its
+buttons (downloads, Send to Cytoscape, the report, the CRM parameters) and an index of its sections; then
+come the consumed and produced matrices as an image, the taxa, the arcs and the sources.
 
 ![the legend](docs/legend.svg)
 
@@ -67,18 +65,14 @@ matrices appear first under the settings, then the taxa and the arcs with the do
    choose Exponential phase (the default), Stationary phase or Both. A time window in Advanced settings
    replaces the phases, and a second window can be given to metabolites named there (trehalose over the whole
    run, for example), so no compound needs a window of its own. Diauxic shifts are not detected.
-3. **A change per phase. Uptake of each resource is weighted by its share of the measured uptake, so a trace substrate weighs
-little, but a taxon grows at its full rate only while its resources are saturating: with real Monod
-constants it grows slower than measured, and `crm_backcheck()` shows by how much. `crm_subset()` leaves out a
-taxon a simulation cannot use.** For each replicate and metabolite, the concentration at the end of the phase
+3. **A change per phase.** For each replicate and metabolite, the concentration at the end of the phase
    minus the concentration at its start (interpolated between samples), averaged over replicates and then
    over experiments, each experiment counting once. A mean change below the detection limit (0.2 mM, a
    setting; compounds can have their own) is no change, judged on how well the replicates pin the mean
    down: with three or more, a one-sided 90% confidence interval on the mean must lie beyond the limit
    (inside it for no change); with two, both replicates must; one replicate decides nothing. Experiments
    must not contradict each other. Otherwise the value is inconclusive, neither an arc nor a measured
-   zero. A
-   metabolite series shorter than 24 h is used, and flagged.
+   zero. A metabolite series shorter than 24 h is used, and flagged.
 4. **Values from one medium, presence from the others.** With the second box empty, all data are
    considered: the values come from the medium that holds data for the most taxa, and every other medium
    only says whether a compound was produced or consumed (`presence_only` arcs, NA matrix cells). A filled
@@ -115,18 +109,23 @@ Every decision and its reason is in [docs/METHOD_NOTES.md](docs/METHOD_NOTES.md)
 
 ## The outputs
 
-- **The matrices as an image**, shown first under the settings: consumed and produced side by side (or one
+- **The matrices as an image**, the first section of the result after its buttons and index: consumed and produced side by side (or one
   above the other when they are wide): a number on a gray for a change, white for measured without one,
   pale orange for not assayed, a question mark for inconclusive, a dash for a culture without the phase, an
-  open circle for a change seen in another medium.
+  open circle for a change seen in another medium, a dot in the corner for a value from one replicate, and a
+  dashed frame for a change over the whole run.
   Downloadable as SVG, and in the matrices zip. Hovering over a cell shows its value, its replicates and the
   studies, experiments and medium behind it (also in the downloaded SVG, opened in a browser).
 - **Network**: JSON (the canonical format, [schema](schema/metabolite_network.schema.json)) or GraphML.
 - **Taxa x metabolites matrix** (CSV): one cell per taxon and metabolite, the mean change in mM, positive
-  when produced and negative when consumed.
+  when produced and negative when consumed. miaSim's efficiency matrix has the opposite signs (positive for
+  a resource taken up), so this matrix is not an `E`: the R package builds `E` from the consumed and produced
+  matrices, with miaSim's signs.
 - **Consumed and produced matrices** (zip): two matrices of non-negative amounts, an evidence matrix for
-  each (`measured`, `below_limit`, `seen_elsewhere`, `inconclusive`, `no_phase`, `presence_only`,
-  `not_assayed`), and a README. The first header cell of every matrix names the medium the values come
+  each (`measured`, `below_limit`, `whole_run`, `single_replicate`, `seen_elsewhere`, `inconclusive`,
+  `no_phase`, `not_grown`, `presence_only`, `not_assayed`; the legend and the help say what each means),
+  and a README. In the CRM parameters' stationary phase a second-window compound is `second_window`: its
+  change over that window is given once, in the exponential phase. The first header cell of every matrix names the medium the values come
   from.
 - **Send to Cytoscape**: the network in a running Cytoscape, in the style of the legend. A downloaded
   GraphML takes the same style from `foodnet style`.
@@ -138,20 +137,22 @@ table and in every file.
 In every matrix a number is a change beyond the detection limit, 0 is measured without one, and NA is no
 value. A change seen only in another medium is NA by default; Advanced settings can write it as TRUE or as
 the amount measured there (drawn on a background of its own in the image), and the evidence matrices mark
-it `presence_only` either way. With Both, each metabolite has a column per phase. Uptake of each resource is weighted by its share of the measured uptake, so a trace substrate weighs
-little, but a taxon grows at its full rate only while its resources are saturating: with real Monod
-constants it grows slower than measured, and `crm_backcheck()` shows by how much. `crm_subset()` leaves out a
-taxon a simulation cannot use.
+it `presence_only` either way. With Both, each metabolite has a column per phase.
 
 ## Consumer-resource models in R
 
 CRM mode collects growth rates: from the replicates whose metabolites gave the values, else from another
 monoculture in the same medium. Get CRM parameters then downloads the matrices, the growth rates, the
-initial medium concentrations and each taxon's biomass change over the phase, or sends them to R. Install
-the companion package once:
+initial medium concentrations, each taxon's biomass change over the phase, the hours each value was measured
+over (`intervals.csv`) and each amount's lowest and highest replicate (`bounds.csv`), or sends them to R.
+With the phase choice Both, the stationary phase (what changed after the end of exponential growth) comes
+too, beside the exponential one. Install the companion package once, at the version of your foodnet (the
+page and the help print the line for yours, which names the release), and miaSim for the simulations:
 
 ```r
+install.packages(c("remotes", "BiocManager"))
 remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r")
+BiocManager::install("miaSim")
 ```
 
 then:
@@ -168,6 +169,14 @@ tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_stor
 abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse))   # back in each growth curve's unit
 ```
 
+A run is deterministic as `as_miasim()` shapes it. In miaSim 1.18, `simulateConsumerResource` adds a random
+immigrant at rate `migration_p` (default 0.01) even with `stochastic = FALSE`, so `as_miasim()` passes
+`migration_p = 0`; drift, epochs and external events are off unless `stochastic = TRUE`, and measurement
+noise unless `error_variance > 0`. To explore noise, change them in the list before the call, since it already
+holds `migration_p` (`args$migration_p <- 0.01; args$stochastic <- TRUE`); to turn it all off again, set
+`migration_p = 0, stochastic = FALSE, error_variance = 0`. Leave `norm = FALSE`: relative abundances cannot
+be turned back by `crm_unscale()`.
+
 The matrices are measured amounts. miaSim has no uptake rate: a taxon takes up each resource at up to 1 mM
 per unit of abundance per hour, so the unit of abundance decides how fast it eats. `crm_efficiency()` and
 `as_miasim()` therefore give each taxon a unit of its own (`crm_scale()`), chosen from its biomass change,
@@ -180,8 +189,9 @@ little, but a taxon grows at its full rate only while its resources are saturati
 constants it grows slower than measured, and `crm_backcheck()` shows by how much. `crm_subset()` leaves out a
 taxon a simulation cannot use. `as_miasim()` never
 lets miaSim draw starting abundances or Monod constants at random, and refuses pooled media and the
-stationary phase unless allowed. With the phase choice Both, the CRM parameters use the exponential phase,
-since a consumer-resource model describes growth. See [r/README.md](r/README.md).
+stationary phase unless allowed. With the phase choice Both, the CRM is built from the exponential phase,
+since a consumer-resource model describes growth; `crm_phase(crm, "stationary")` switches to the other.
+See [r/README.md](r/README.md).
 
 ## The command line
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "foodnet.metabolite_network/v0",
+  "$id": "foodnet.metabolite_network/v1",
   "title": "foodnet metabolite network",
   "description": "A bipartite network of taxa and metabolites: produced arcs run from a taxon to a metabolite, consumed arcs from a metabolite to a taxon, each in one growth phase, with the studies behind it.",
   "type": "object",
@@ -13,7 +13,7 @@
   "properties": {
     "schema": {
       "enum": [
-        "foodnet.metabolite_network/v0"
+        "foodnet.metabolite_network/v1"
       ]
     },
     "meta": {

@@ -200,7 +200,8 @@ def _settings_block(settings: dict) -> str:
   default</span></div>
 <div class="row"><label>Multiple testing correction
   <select name="correction">{corrections}</select></label>
-  <span class="muted">for the q-values reported beside each value (a one-sample t-test of the replicate changes);
+  <span class="muted">for the q-values reported beside each value (a one-sample t-test of the experiments' means,
+  or of the replicates when one experiment gives the value);
   they are reported, never used to decide</span></div>
 </details>"""
 
@@ -225,8 +226,8 @@ def crm_mode(settings: dict, on: bool = True) -> dict:
     return {**settings, "report_rates": True if on else DEFAULTS["report_rates"]}
 
 
-CRM_MODE_MESSAGE = ("CRM mode on: growth rates on (Advanced settings). Run the search, then get the CRM "
-                    "parameters under the result; press CRM mode again to switch it off.")
+CRM_MODE_MESSAGE = ("CRM mode on: growth rates on (Advanced settings). Run the search, then press Get CRM "
+                    "parameters at the top of the result; press CRM mode again to switch it off.")
 CRM_MODE_OFF_MESSAGE = "CRM mode off: growth rates off, which is the default."
 
 
@@ -359,7 +360,7 @@ def _sources(net) -> str:
         f"{len(by_study.get(sid, []))} arc(s)"
         + (f" &middot; <a href=\"{_esc(study.url)}\">study</a>" if _web(study.url) else "") + "</li>"
         for sid, study in sorted(net.studies.items()))
-    return ("<h2>Sources</h2><p class=\"muted\">Cited at the level of each arc; per-study licenses are "
+    return ("<h2 id=\"sources\">Sources</h2><p class=\"muted\">Cited at the level of each arc; per-study licenses are "
             f"respected.</p><ul class=\"sources\">{items}</ul>")
 
 
@@ -418,7 +419,7 @@ def _empty_reason(result: dict) -> str:
     if result.get("errors"):
         return "mGrowthDB could not be read completely (see the messages above); try again when it is reachable."
     if not result["resolved"] and not result.get("all"):
-        return "None of the entries could be used; each one says why above."
+        return "None of the entries could be used; each one says why, under Taxa below."
     if not result["studies"]:
         return "mGrowthDB holds these strains, but no study grows them."
     if result["settings"].get("conditions") and not result["value_cultures"]:
@@ -460,12 +461,12 @@ def _figure(token: str, result: dict) -> str:
         return ""
     job = result.get("job", "")
     href = f"/matrices.svg?token={_esc(token)}" + (f"&amp;job={_esc(job)}" if job else "")
-    return (f"<h2>Consumed and produced</h2>"
+    return (f"<h2 id=\"matrices\">Consumed and produced</h2>"
             "<p class=\"muted\">Hover over a cell to see its value, its replicates and the studies, experiments and "
             "medium behind it.</p>"
             f"<div class=\"scroll figure\">{matrices_svg(result)}</div>"
             f"<p class=\"bar\"><a class=\"btn\" href=\"{href}\">Download the image (.svg)</a>"
-            "<span class=\"muted\">the same matrices are in the downloads below, as numbers</span></p>")
+            "<span class=\"muted\">the same matrices are in the downloads above, as numbers</span></p>")
 
 
 def _result_section(token: str, result: dict, message: str = "") -> str:
@@ -495,23 +496,37 @@ def _result_section(token: str, result: dict, message: str = "") -> str:
                                              net.nodes[e.metabolite].name))
     if edges:
         measured = sum(1 for e in edges if e.evidence == "measured")
-        table = (f"<h2>{len(edges)} arc(s): {measured} measured, {len(edges) - measured} presence only</h2>"
-                 f"{outputs}<p class=\"muted\">{_value_note(result)}</p>{warnings}{duplicates}"
-                 f"<div class=\"scroll\"><table>{HEADER}{_arc_rows(net, edges)}</table></div>")
+        table = (f"<h2 id=\"arcs\">{len(edges)} arc(s): {measured} measured, {len(edges) - measured} presence "
+                 f"only</h2><div class=\"scroll\"><table>{HEADER}{_arc_rows(net, edges)}</table></div>")
+        empty = ""
     else:
-        table = (f"<h2>No arcs</h2><p class=\"note\">{_empty_reason(result)} <a href=\"/help?token={_esc(token)}"
-                 f"{_esc(_job_suffix(result.get('job', '')))}#empty\">What to try</a>.</p>{warnings}{outputs}")
+        table = ""
+        empty = (f"<h2 id=\"arcs\">No arcs</h2><p class=\"note\">{_empty_reason(result)} <a href=\"/help?token="
+                 f"{_esc(token)}{_esc(_job_suffix(result.get('job', '')))}#empty\">What to try</a>.</p>")
     studies = ", ".join(result["studies"]) or "none"
     skips = result["skipped"]
     skipped = ""
     if skips:
         shown = "".join(f"<li>{_esc(label)}: {_esc(reason)}</li>" for label, reason in skips[:60]
                         if not reason.startswith("average of the replicates"))
-        skipped = (f"<details><summary>{len(skips)} record(s) left out or noted</summary><ul>{shown}</ul>"
+        skipped = (f"<details id=\"skipped\"><summary>{len(skips)} record(s) left out or noted</summary>"
+                   f"<ul>{shown}</ul>"
                    "<p class=\"muted\">The report lists all of them.</p></details>")
-    return (f"<section class=\"result\" id=\"result\">{note}{_figure(token, result)}"
-            f"<h2>Taxa</h2><ul>{''.join(items)}</ul>{unresolved}"
-            f"<p class=\"muted\">Studies read: {_esc(studies)}</p>{errors}{table}{_sources(net)}{skipped}</section>")
+    figure = _figure(token, result)
+    # what to do with the result comes first, then an index of the sections below (Karoline, 2026-10-07:
+    # "buttons related to results should appear above the matrix images and there should be an index below
+    # the buttons to allow users to jump to different result sections")
+    index = [("matrices", "Consumed and produced")] if figure else []
+    index += [("taxa", "Taxa"), ("arcs", "Arcs" if edges else "No arcs"), ("sources", "Sources")]
+    if skipped:
+        index.append(("skipped", "Records left out or noted"))
+    nav = ("<nav class=\"index\" aria-label=\"Result sections\">"
+           + "".join(f"<a href=\"#{anchor}\">{label}</a>" for anchor, label in index) + "</nav>")
+    value_note = f"<p class=\"muted\">{_value_note(result)}</p>" if edges else ""
+    return (f"<section class=\"result\" id=\"result\">{note}{outputs}{nav}{errors}{value_note}{warnings}"
+            f"{duplicates}{empty}{figure}"
+            f"<h2 id=\"taxa\">Taxa</h2><ul>{''.join(items)}</ul>{unresolved}"
+            f"<p class=\"muted\">Studies read: {_esc(studies)}</p>{table}{_sources(net)}{skipped}</section>")
 
 
 def render_result(token: str, result: dict, message: str = "") -> str:

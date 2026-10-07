@@ -34,8 +34,9 @@ remotes::install_local("<this clone>/r")       # or, in a terminal: R CMD INSTAL
 ```
 
 The texts that ship with the tool, the help page and both READMEs, describe the released state, so they
-give the plain `install_github(...)` line and never a branch of ours; `tests/test_release.py` fails if
-work in progress creeps into them.
+give the `install_github(...)` line pinned to a release tag (`ref = "vX.Y.Z"`, set in the release commit)
+or plain between releases, and never a branch of ours; `tests/test_release.py` fails if work in progress
+creeps into them.
 
 ## Before you open a pull request
 

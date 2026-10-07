@@ -11,6 +11,12 @@ crm_write(x, dir)
 }
 \value{The paths written, invisibly.}
 \description{
-\code{consumed.csv}, \code{produced.csv}, \code{growth_rates.csv}, \code{initial_concentrations.csv} and \code{README.txt}, as
-foodnet's download holds them, so what arrived over the wire can be kept beside the analysis.
+The files of foodnet's download, for the phase \code{x} holds: \code{consumed.csv}, \code{produced.csv} and their
+\code{evidence_*.csv}, \code{growth_rates.csv}, \code{initial_concentrations.csv}, \code{biomass.csv}, \code{intervals.csv} (the
+hours each value was measured over) and \code{bounds.csv} (each amount's lowest and highest replicate), one row
+per cell with a phase column, and \code{README.txt}, which opens with the phase. After \code{\link{crm_phase}} the
+phase's files are named for it (\code{consumed_stationary.csv}, \code{intervals_stationary.csv},
+\code{README_stationary.txt}, ...), so both phases can be written to one folder; the growth rates and the
+medium are the same in both. The tables hold what the parameters in R hold, so some have fewer columns than the download's
+(no replicate counts, no rate sources, no value-medium header cell).
 }

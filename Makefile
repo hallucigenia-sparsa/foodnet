@@ -19,6 +19,7 @@ check: lint gate test
 r-check:
 	R CMD build r
 	R CMD check --no-manual foodnet_*.tar.gz
+	! grep -q "^Status:.*WARNING" foodnet.Rcheck/00check.log
 	rm -rf foodnet_*.tar.gz foodnet.Rcheck
 
 schema:

@@ -15,9 +15,11 @@ import http.client
 import json
 import os
 import platform
+import re
 import urllib.error
 import urllib.request
 
+from . import __version__
 from .brand import REPOSITORY_SLUG
 
 # The port the R package listens on by default. Not 1234 (Cytoscape), not grownet's 8793 (so both R
@@ -30,7 +32,13 @@ PATH = "/foodnet/crm"
 # released version and never for the branch it was written on (Karoline, 2026-10-04: "The help should
 # refer to the stage the tool is in when released"). Installing from an unmerged branch is a development
 # step; it is in docs/agents/NOTES.md and in CONTRIBUTING.md, not here.
-INSTALL_R = f'remotes::install_github("{REPOSITORY_SLUG}", subdir = "r")'
+#
+# A release pins the line to its own tag, so the R package installed is the one this version speaks to: the
+# listener's secret came in 0.2.0, and an unpinned line gave 0.1.0 users a newer R package that refused
+# their page (a review). A development version names no tag, since it has none.
+INSTALL_R = (f'remotes::install_github("{REPOSITORY_SLUG}", subdir = "r", ref = "v{__version__}")'
+             if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", __version__) else
+             f'remotes::install_github("{REPOSITORY_SLUG}", subdir = "r")')
 # Why an install can fail on a public repository: a GitHub token stored on the machine, for another
 # account or scope, makes GitHub answer 404 instead of serving it anonymously. The way around it is a
 # local install, which needs no GitHub access; clearing the token is not suggested, since that changes
@@ -105,7 +113,9 @@ def send(payload: dict, port: int = DEFAULT_PORT, timeout: float = 60.0) -> dict
     token = listen_token(port)
     if not token:
         raise RError(unreachable(port, f"no foodnet_listen() secret at {token_path(port)}; if R is listening, it "
-                                       "printed where it wrote its secret: set FOODNET_R_TOKEN_DIR to that folder"))
+                                       "printed where it wrote its secret: set FOODNET_R_TOKEN_DIR to that folder. "
+                                       "An R package older than 0.2.0 writes none: install the one matching "
+                                       f"this foodnet, {INSTALL_R}"))
     request = urllib.request.Request(url, data=body, method="POST",
                                      headers={"Content-Type": "application/json", "X-Foodnet-Token": token})
     try:

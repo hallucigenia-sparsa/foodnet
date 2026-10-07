@@ -41,8 +41,24 @@ def test_booleans_print_no_numbers(client):
 def test_the_page_shows_it_first_and_offers_it_as_a_download(client):
     from foodnet import gui
     page = gui.render_result("T", run(client))
-    assert page.index("Consumed and produced") < page.index("<h2>Taxa</h2>")
+    assert page.index("<h2 id=\"matrices\">Consumed and produced") < page.index("<h2 id=\"taxa\">Taxa</h2>")
     assert "/matrices.svg?token=T" in page and "Download the image (.svg)" in page
+
+
+def test_the_buttons_come_first_then_an_index_of_the_sections(client):
+    # Karoline, 2026-10-07: "buttons related to results should appear above the matrix images and there should
+    # be an index below the buttons to allow users to jump to different result sections"
+    import re
+
+    from foodnet import gui
+    page = gui.render_result("T", run(client, report_rates=True))
+    result = page[page.index('id="result"'):]
+    buttons, nav, figure = (result.index("Download network"), result.index('<nav class="index"'),
+                            result.index('id="matrices"'))
+    assert buttons < nav < figure and result.index("Get CRM parameters") < nav
+    links = re.findall(r'<a href="#([a-z]+)">', result[nav:result.index("</nav>", nav)])
+    assert links[:4] == ["matrices", "taxa", "arcs", "sources"]
+    assert all(f'id="{anchor}"' in result for anchor in links)
 
 
 def test_a_wide_matrix_stacks_its_panels(client):
@@ -84,15 +100,17 @@ def test_second_window_columns_carry_a_star_that_the_caption_explains(client):
 
 def test_every_cell_names_its_source_studies_on_mouseover(client):
     # Karoline, 2026-10-06: "make fields in the output matrices interactive, so a mouseover will show the
-    # source studies". An SVG title, which every browser shows as a tooltip, without JavaScript.
+    # source studies". The text is the cell's aria-label and its hover box, never an SVG title as well (2026-10-07:
+    # "hover above the matrix images now produces 2 boxes instead of one").
     root = ET.fromstring(figure.matrices_svg(run(client)))
-    titles = ["".join(t.itertext()) for t in root.iter(f"{SVG}title")]
+    assert not list(root.iter(f"{SVG}title"))
+    titles = [g.get("aria-label") for g in root.iter(f"{SVG}g") if g.get("class") == "fn-cell"]
     acetate = next(t for t in titles if t.startswith("Alpha alpha A1, acetate, produced"))
     assert "4 \u00b1 0.1 mM, 3 replicate(s)" in acetate          # both replicates +4, so sd 0
     assert "SMGDB00000001 (Synthetic study one)" in acetate and "EMGDB000000001" in acetate
     formate = next(t for t in titles if t.startswith("Beta beta B1, formate, produced"))
     assert "not assayed" in formate and "Seen in mMCB (+5 mM, 2 replicate(s)): SMGDB00000002" in formate
-    # one title per cell: 3 taxa x 4 metabolites x 2 matrices
+    # one per cell: 3 taxa x 4 metabolites x 2 matrices
     assert len(titles) == 24
 
 

@@ -253,7 +253,10 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     dropped, duplicate_lines = d.duplicates(cultures)
     rows = [r for r in rows if (cultures[r["culture"]].experiment, r["metabolite"]) not in dropped]
     # cultures with a phase value vote for the value medium; a whole-run change is a value, but no phase's
-    valued = {r["culture"] for r in rows if r["change"] is not None and "whole_run" not in r["cautions"]}
+    # and neither does a second-window change (Karoline, 2026-10-07: "phase values only"), so naming a compound
+    # for the second window never changes which medium gives the values
+    valued = {r["culture"] for r in rows if r["change"] is not None and "whole_run" not in r["cautions"]
+              and not r.get("second")}
     # the value medium is chosen among the cultures inside the scope; with outside evidence on, the cultures
     # outside it stay in the list and give presence only
     inside = [i for i, c in enumerate(cultures) if selecting.empty(selection) or selecting.matches(record(c), scope)]
@@ -370,8 +373,15 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     # the growth over the phase a CRM is parameterized from (foodnet.matrix.crm_phase)
     crm_ph = "window" if window else ("exponential" if s["phase"] == "both" else s["phase"])
     biomass = crm.biomass_changes([(i, cultures[i]) for i in sorted(chosen)], value_rows, crm_ph)
+    # with "Both", the stationary phase travels beside the exponential one in the CRM parameters (Karoline,
+    # 2026-10-07), with its own growth over it
+    biomass_by_phase = {crm_ph: biomass}
+    if crm_ph == "exponential" and s["phase"] == "both":
+        biomass_by_phase["stationary"] = crm.biomass_changes([(i, cultures[i]) for i in sorted(chosen)], value_rows,
+                                                             "stationary")
     if s["merge_genera"]:
         biomass = {}            # strains of one genus grow in units and to densities that do not average
+        biomass_by_phase = {ph: {} for ph in biomass_by_phase}
     slow = sorted(taxa[t]["name"] for t, b in biomass.items() if t in organism_rates and t in taxa
                   and b.get("phase_rate") and b["phase_rate"] > 1.1 * organism_rates[t]["rate"])
     net.meta["initial_concentrations_mM"] = {k: round(v["mean"], 6) for k, v in initial.items()}
@@ -415,6 +425,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
             "names": {n.id: n.name for n in taxa_nodes + metabolite_nodes},
             "presence": matrix_presence, "value_rule": rule, "duplicates": duplicate_lines,
             "rates": organism_rates, "without_a_rate": without_rate, "initial": initial, "biomass": biomass,
+            "biomass_by_phase": biomass_by_phase,
             "cultures": len(cultures), "value_cultures": len(chosen), "warnings": warnings,
             "skipped": skipped, "errors": errors}
 
@@ -494,15 +505,16 @@ def _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown
                    "nearest sample stands in for that end of the phase or window (caution window_beyond_data).")
     conflicts = sum(1 for c in value_cells.values() if "conflict" in c["cautions"])
     if conflicts:
-        out.append(f"{conflicts} value(s) pool experiments that disagree on the direction or on whether the "
-                   "compound changed beyond the detection limit (caution conflict): they are inconclusive, NA in "
-                   "the matrices and no arc; the report names the experiments.")
+        out.append(f"{conflicts} value(s) (over every phase and window searched) pool experiments that disagree "
+                   "on the direction or on whether the compound changed beyond the detection limit (caution "
+                   "conflict): they are inconclusive, NA in the matrices and no arc; the report names the "
+                   "experiments.")
     unsure = sum(1 for c in value_cells.values()
                  if c.get("state") == "inconclusive" and "conflict" not in c["cautions"])
     if unsure:
-        out.append(f"{unsure} value(s) are inconclusive: their replicates do not agree on a change beyond the "
-                   "detection limit, or on none, so they are neither an arc nor a measured zero (NA, evidence "
-                   "inconclusive).")
+        out.append(f"{unsure} value(s) (over every phase and window searched) are inconclusive: their replicates "
+                   "do not agree on a change beyond the detection limit, or on none, so they are neither an arc nor "
+                   "a measured zero (NA, evidence inconclusive).")
     coarse = sum(1 for c in value_cells.values() if "coarse_sampling" in c["cautions"])
     if coarse:
         out.append(f"{coarse} value(s) rest on a phase boundary placed on fewer than three growth samples (caution "

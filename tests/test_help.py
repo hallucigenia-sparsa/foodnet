@@ -58,7 +58,7 @@ def test_the_page_says_the_matrices_answer_a_mouseover(client):
     from foodnet import gui
     page = gui.render_result("T", run(client))
     remark = page.index("Hover over a cell to see its value")
-    assert page.index("<h2>Consumed and produced</h2>") < remark < page.index("<svg", remark)
+    assert page.index("<h2 id=\"matrices\">Consumed and produced</h2>") < remark < page.index("<svg", remark)
 
 
 def test_the_help_names_every_caution():

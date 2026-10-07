@@ -38,6 +38,10 @@ test_that("the shares scale is 0.1.0's matrix, and none is consumed minus produc
     expect_equal(unname(E["B", ]), c(0.25, 0.75, -0.375))
     E <- suppressWarnings(crm_efficiency(crm, scale = "none", na = "zero"))
     expect_equal(unname(E["A", ]), c(8, -4, 0))
+    # miaSim's signs: a resource taken up is positive and a by-product negative, the opposite of foodnet's
+    # signed matrix (A consumed 8 mM glucose: -8 there, +8 here; it produced 4 mM acetate: +4 there, -4 here)
+    E <- suppressWarnings(crm_efficiency(crm_subset(crm, taxa = "A"), na = "zero"))
+    expect_true(E["A", "glucose"] > 0 && E["A", "acetate"] < 0)
 })
 
 test_that("every NA set to 0 is counted by its kind", {

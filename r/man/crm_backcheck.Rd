@@ -3,7 +3,7 @@
 \alias{crm_backcheck}
 \title{Simulate each taxon alone and compare with its monoculture}
 \usage{
-crm_backcheck(x, monod_constant, missing_resource = 0, na = c("stop", "zero"), growth = c("measured", "phase_floor"))
+crm_backcheck(x, monod_constant, missing_resource = 0, na = c("stop", "zero"), growth = c("measured", "phase_floor"), allow = character())
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
@@ -11,6 +11,7 @@ crm_backcheck(x, monod_constant, missing_resource = 0, na = c("stop", "zero"), g
 \item{missing_resource}{A starting concentration for resources with none (default 0).}
 \item{na}{What \code{\link{crm_efficiency}} does with NA cells: \code{"stop"} (the default) or \code{"zero"}.}
 \item{growth}{\code{"measured"} or \code{"phase_floor"}: the growth rates, as in \code{\link{crm_scale}}.}
+\item{allow}{Caveats to accept, as in \code{\link{crm_efficiency}}.}
 }
 \value{A data frame: taxon, what (\code{"biomass"}, \code{"hours to grow"}, or a resource), direction, measured, simulated and their ratio. Biomass is in each growth curve's unit.}
 \description{

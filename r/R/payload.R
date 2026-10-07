@@ -38,6 +38,75 @@ as_matrix <- function(rows, rownames, colnames, kind = "numeric") {
     matrix(cells, nrow = n, ncol = m, byrow = TRUE, dimnames = list(rownames, colnames))
 }
 
+# A vector with names.
+#' @noRd
+named <- function(values, labels) {
+    names(values) <- labels
+    values
+}
+
+# A taxa by resources matrix of numbers that a payload from foodnet before 0.2.0 lacks (intervals in hours,
+# bounds in mM): all NA then.
+#' @noRd
+hours_matrix <- function(rows, taxa, resources) {
+    if (is.null(rows)) {
+        return(matrix(NA_real_, nrow = length(taxa), ncol = length(resources), dimnames = list(taxa, resources)))
+    }
+    as_matrix(rows, taxa, resources)
+}
+
+# One number per taxon from a payload field, named by taxon (NA where the field is missing).
+#' @noRd
+taxon_numbers <- function(obj, field, taxa) {
+    values <- if (length(obj[[field]])) vapply(obj[[field]], as_number, numeric(1)) else rep(NA_real_, length(taxa))
+    names(values) <- taxa
+    values
+}
+
+# One phase of the payload beside the CRM's own (foodnet's other_phases): the same fields, by the same
+# taxa and resources.
+#' @noRd
+as_phase_block <- function(b, taxa, resources) {
+    units <- if (length(b$biomass_unit)) vapply(b$biomass_unit, chr, character(1), NA_character_) else
+        rep(NA_character_, length(taxa))
+    names(units) <- taxa
+    list(phase = chr(b$phase),
+         consumed = as_matrix(b$consumed, taxa, resources),
+         produced = as_matrix(b$produced, taxa, resources),
+         evidence_consumed = as_matrix(b$evidence_consumed, taxa, resources, "character"),
+         evidence_produced = as_matrix(b$evidence_produced, taxa, resources, "character"),
+         interval_start = hours_matrix(b$interval_start_h, taxa, resources),
+         interval_end = hours_matrix(b$interval_end_h, taxa, resources),
+         consumed_lower = hours_matrix(b$consumed_lower, taxa, resources),
+         consumed_upper = hours_matrix(b$consumed_upper, taxa, resources),
+         produced_lower = hours_matrix(b$produced_lower, taxa, resources),
+         produced_upper = hours_matrix(b$produced_upper, taxa, resources),
+         biomass_change = taxon_numbers(b, "biomass_change", taxa),
+         biomass_start = taxon_numbers(b, "biomass_start", taxa),
+         biomass_unit = units,
+         phase_hours = taxon_numbers(b, "phase_hours", taxa),
+         phase_growth_rates = taxon_numbers(b, "phase_growth_rates", taxa),
+         cautions = cautions_rows(b$cautions),
+         inconclusive = caveats_rows(b$inconclusive),
+         presence_only = presence_rows(b$presence_only),
+         whole_run = chr_vector(b$whole_run),
+         biomass_falls = chr_vector(b$biomass_falls))
+}
+
+# The links seen only in another medium, as a data frame (taxon, resource, direction, media).
+#' @noRd
+presence_rows <- function(presence) {
+    if (!length(presence)) {
+        return(data.frame(taxon = character(0), resource = character(0), direction = character(0),
+                          media = character(0), stringsAsFactors = FALSE))
+    }
+    data.frame(taxon = vapply(presence, function(p) chr(p$taxon), character(1)),
+               resource = vapply(presence, function(p) chr(p$resource), character(1)),
+               direction = vapply(presence, function(p) chr(p$direction), character(1)),
+               media = vapply(presence, function(p) paste(chr_vector(p$media), collapse = "; "), character(1)),
+               stringsAsFactors = FALSE)
+}
+
 # A payload to the object this package works with.
 #' @noRd
 as_foodnet_crm <- function(payload) {
@@ -45,6 +114,15 @@ as_foodnet_crm <- function(payload) {
         stop_foodnet("this is not a foodnet CRM payload: it has no format field")
     }
     if (!chr(payload$format) %in% CRM_FORMATS) {
+        # a newer format can change what a number means, so it is not read as if it were this one (a review: the
+        # 0.1.0 package read 0.2.0's parameters with a warning and filled their inconclusive cells with 0)
+        major <- suppressWarnings(as.integer(sub("^foodnet\\.crm/v([0-9]+).*$", "\\1", chr(payload$format))))
+        newest <- max(as.integer(sub("^foodnet\\.crm/v", "", CRM_FORMATS)))
+        if (!is.na(major) && major > newest) {
+            stop_foodnet("these parameters are ", chr(payload$format), ", from a newer foodnet than this package ",
+                         "reads (", paste(CRM_FORMATS, collapse = ", "), "): install the R package of that ",
+                         "foodnet's version; its page prints the line")
+        }
         warning("this payload says it is ", chr(payload$format), ", and this package reads ",
                 paste(CRM_FORMATS, collapse = " and "), "; reading it anyway", call. = FALSE)
     }
@@ -65,18 +143,7 @@ as_foodnet_crm <- function(payload) {
     names(units) <- taxa
     inconclusive <- caveats_rows(payload$caveats$inconclusive)
     caveats <- payload$caveats
-    presence <- caveats$presence_only
-    presence <- if (length(presence)) {
-        data.frame(taxon = vapply(presence, function(p) chr(p$taxon), character(1)),
-                   resource = vapply(presence, function(p) chr(p$resource), character(1)),
-                   direction = vapply(presence, function(p) chr(p$direction), character(1)),
-                   media = vapply(presence, function(p) paste(chr_vector(p$media), collapse = "; "),
-                                  character(1)),
-                   stringsAsFactors = FALSE)
-    } else {
-        data.frame(taxon = character(0), resource = character(0), direction = character(0),
-                   media = character(0), stringsAsFactors = FALSE)
-    }
+    presence <- presence_rows(caveats$presence_only)
     structure(
         list(taxa = taxa,
              resources = resources,
@@ -84,6 +151,16 @@ as_foodnet_crm <- function(payload) {
              produced = as_matrix(payload$produced, taxa, resources),
              evidence_consumed = as_matrix(payload$evidence_consumed, taxa, resources, "character"),
              evidence_produced = as_matrix(payload$evidence_produced, taxa, resources, "character"),
+             interval_start = hours_matrix(payload$interval_start_h, taxa, resources),
+             interval_end = hours_matrix(payload$interval_end_h, taxa, resources),
+             consumed_lower = hours_matrix(payload$consumed_lower, taxa, resources),
+             consumed_upper = hours_matrix(payload$consumed_upper, taxa, resources),
+             produced_lower = hours_matrix(payload$produced_lower, taxa, resources),
+             produced_upper = hours_matrix(payload$produced_upper, taxa, resources),
+             bounds = chr(payload$bounds),
+             resource_phases = named(if (length(payload$resource_phases))
+                 vapply(payload$resource_phases, chr, character(1)) else rep(chr(payload$phase), length(resources)),
+                 resources),
              growth_rates = rates,
              growth_rate_unit = chr(payload$growth_rate_unit, "1/h"),
              growth_rate_detail = payload$growth_rate_detail,
@@ -94,6 +171,7 @@ as_foodnet_crm <- function(payload) {
              phase_hours = per_taxon("phase_hours"),
              phase_growth_rates = per_taxon("phase_growth_rates"),
              phase = chr(payload$phase),
+             other_phases = lapply(payload$other_phases, as_phase_block, taxa = taxa, resources = resources),
              values = chr(payload$values, "mM"),
              detection_limit = as_number(payload$detection_limit_mM),
              caveats = list(presence_only = presence,
@@ -106,6 +184,7 @@ as_foodnet_crm <- function(payload) {
                             mixed_media = isTRUE(caveats$mixed_media),
                             stationary_phase = isTRUE(caveats$stationary_phase),
                             whole_run = chr_vector(caveats$whole_run),
+                            biomass_falls = chr_vector(caveats$biomass_falls),
                             inconclusive = inconclusive,
                             incomplete = isTRUE(caveats$incomplete),
                             errors = chr_vector(caveats$errors),
@@ -224,7 +303,13 @@ print.foodnet_crm <- function(x, ...) {
                     paste(x$caveats$whole_run, collapse = ", ")))
     }
     if (x$caveats$stationary_phase) {
-        cat("   * these are stationary-phase amounts: uptake without growth, which a CRM reads as growth.\n")
+        cat("   * these are amounts from after the end of exponential growth, where cells may still grow, stop or\n")
+        cat("     die; a CRM reads every uptake as growth, so building one from them needs allow = \"stationary_phase\".\n")
+    }
+    if (length(x$caveats$biomass_falls)) {
+        cat(sprintf("   * biomass fell by more than half over the phase for %s: lysis and death release and take up\n",
+                    paste(x$caveats$biomass_falls, collapse = ", ")))
+        cat("     compounds, so their amounts need not be the living cells'.\n")
     }
     presence <- x$caveats$presence_only
     if (nrow(presence)) {
@@ -239,7 +324,7 @@ print.foodnet_crm <- function(x, ...) {
                     length(x$caveats$conflicts)))
     }
     shrunk <- names(x$biomass_change)[!is.na(x$biomass_change) & x$biomass_change <= 0]
-    if (length(shrunk)) {
+    if (length(shrunk) && !x$caveats$stationary_phase) {
         cat(sprintf("   * no biomass gain for %s: a miaSim simulation cannot scale it; leave it out (crm_subset)\n",
                     paste(shrunk, collapse = ", ")))
     }
@@ -248,7 +333,12 @@ print.foodnet_crm <- function(x, ...) {
                     paste(x$caveats$without_a_rate, collapse = ", ")))
         cat("       a simulation needs one from elsewhere; as_miasim() stops until you give it.\n")
     }
-    if (x$caveats$searched_both_phases) {
+    if (length(x$other_phases)) {
+        other <- names(x$other_phases)[1]
+        cat(sprintf("   * the %s phase came too (%s): crm_phase(x, \"%s\").\n", other,
+                    if (other == "stationary") "what changed after the end of exponential growth" else "the growth phase",
+                    other))
+    } else if (x$caveats$searched_both_phases && x$phase == "exponential") {
         cat("   * the search asked for both phases; a CRM describes growth, so these are the exponential phase.\n")
     }
     if (all(is.na(x$biomass_change))) {
@@ -258,7 +348,9 @@ print.foodnet_crm <- function(x, ...) {
     cat("   * the cells are measured amounts (net changes), not efficiencies: crm_efficiency(x) turns them\n")
     cat("     into miaSim's E (yields per mM taken up, by-products per unit of growth); crm_backcheck()\n")
     cat("     simulates each taxon alone and says how close it comes to its own monoculture.\n")
-    cat("  crm_consumed(x), crm_produced(x), crm_rates(x), crm_resources(x); crm_readme(x) for the full text.\n")
+    cat("  crm_consumed(x), crm_produced(x), crm_rates(x), crm_resources(x); x$interval_start and x$interval_end\n")
+    cat("  hold the hours each value was measured over, x$consumed_lower, x$consumed_upper, x$produced_lower and\n")
+    cat("  x$produced_upper its bounds in mM; crm_readme(x) for the full text.\n")
     invisible(x)
 }
 

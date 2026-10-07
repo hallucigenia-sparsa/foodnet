@@ -21,7 +21,8 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 
-SCHEMA = "foodnet.metabolite_network/v0"
+# v1 from 0.2.0: arcs gained n_experiments and the phase whole_run, which v0's schema refuses (a review)
+SCHEMA = "foodnet.metabolite_network/v1"
 KNOWN_SCHEMAS = (SCHEMA,)
 
 KINDS = ("taxon", "metabolite")

@@ -63,7 +63,9 @@ crm_resources <- function(x, missing = NULL) {
 #'
 #' A consumer-resource model such as miaSim's `simulateConsumerResource` takes an efficiency matrix `E`,
 #' taxa by resources, positive where a taxon consumes a resource and negative where it produces one. This
-#' builds one from the measured amounts.
+#' builds one from the measured amounts, the consumed and produced matrices, which are never negative. foodnet's
+#' single (signed) matrix has the opposite signs, production positive and consumption negative, as a change in
+#' the medium reads; it is not an `E` and is never used here.
 #'
 #' With `scale = "miasim"` (the default), `E` follows miaSim's own equations, read from its source
 #' (`consumerResourceModel`, miaSim 1.18): a taxon of abundance `x` grows at
@@ -83,16 +85,22 @@ crm_resources <- function(x, missing = NULL) {
 #'
 #' `scale = "shares"` is foodnet 0.1.0's matrix: each row divided by the total consumed, so consumed entries
 #' are shares of uptake and produced entries by-product per unit taken up; for other models.
-#' `scale = "none"` is consumed minus produced, in mM.
+#' `scale = "none"` is consumed minus produced, in mM: foodnet's signed matrix with its signs turned to
+#' miaSim's.
 #'
 #' `NA` cells have no size, and foodnet never writes one as zero, so by default (`na = "stop"`) this refuses
 #' until you fill them yourself or say how. With `na = "zero"` they count as 0, and a warning says how many
 #' of each kind were set to 0: never assayed, seen only in another medium (a real link), inconclusive
-#' (measured, but its replicates or experiments disagree) and without a phase.
+#' (measured, but its replicates or experiments disagree), without a phase, and, after [crm_phase()], a
+#' second-window compound (`second_window`: its change is given once, in the exponential phase).
+#'
+#' With the default `scale = "miasim"`, like [as_miasim()], this refuses parameters that pool every medium or
+#' come from the stationary phase, unless `allow` names them.
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param scale `"miasim"`, `"shares"` or `"none"`, as above.
 #' @param na `"stop"` or `"zero"`, as above.
+#' @param allow Caveats to accept: `"mixed_media"`, `"stationary_phase"`.
 #' @param growth `"measured"` (the default): the growth rates as foodnet fitted them. `"phase_floor"`: at
 #'   least the mean rate each taxon's own curves show over the phase (see [crm_scale()]).
 #' @return A numeric matrix, taxa by resources.
@@ -102,9 +110,12 @@ crm_resources <- function(x, missing = NULL) {
 #' }
 #' @export
 crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero"),
-                           growth = c("measured", "phase_floor")) {
+                           growth = c("measured", "phase_floor"), allow = character()) {
     stopifnot(inherits(x, "foodnet_crm"))
     scale <- match.arg(scale)
+    # miaSim's E reads every uptake as growth in one medium; "shares" and "none" are plain arithmetic on the
+    # amounts for other models, as in 0.1.0
+    if (scale == "miasim") refuse_caveats(x, allow)
     growth <- match.arg(growth)
     na <- match.arg(na)
     m <- amounts(x, na, booleans_ok = scale == "none")
@@ -126,6 +137,21 @@ crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("sto
     consumed / ifelse(total > 0, total, 1) - produced * ifelse(squares > 0, total / squares, 0)
 }
 
+# A stop for parameters a CRM cannot be built from as they are, unless `allow` names the caveat.
+#' @noRd
+refuse_caveats <- function(x, allow = character()) {
+    if (isTRUE(x$caveats$mixed_media) && !"mixed_media" %in% allow) {
+        stop_foodnet("these values pool every medium (Ignore media differences): their starting concentrations ",
+                     "describe no real medium. Run the search with one medium, or pass allow = \"mixed_media\".")
+    }
+    if (isTRUE(x$caveats$stationary_phase) && !"stationary_phase" %in% allow) {
+        stop_foodnet("these are amounts from after the end of exponential growth, where cells may still grow, ",
+                     "stop or die, while a CRM reads every uptake as growth. Use the exponential phase, or pass ",
+                     "allow = \"stationary_phase\".")
+    }
+    invisible(TRUE)
+}
+
 # The consumed and produced amounts with every NA set to 0 and counted by kind, or a stop.
 #' @noRd
 amounts <- function(x, na = "stop", booleans_ok = FALSE) {
@@ -138,13 +164,15 @@ amounts <- function(x, na = "stop", booleans_ok = FALSE) {
     if (anyNA(consumed) || anyNA(produced)) {
         if (na == "stop") {
             stop_foodnet(sum(is.na(consumed)) + sum(is.na(produced)), " cell(s) are NA (not assayed, seen ",
-                         "only in another medium, inconclusive or without a phase). Fill them, or use ",
-                         "crm_efficiency(x, na = \"zero\").")
+                         "only in another medium, inconclusive, without a phase, or a second-window compound ",
+                         "given in the other phase; x$evidence_consumed and x$evidence_produced say which). ",
+                         "Fill them, or use crm_efficiency(x, na = \"zero\").")
         }
         zeroed <- c(x$evidence_consumed[is.na(consumed)], x$evidence_produced[is.na(produced)])
         kinds <- table(zeroed)
         warning("NA cells counted as 0: ", paste0(kinds, " ", names(kinds), collapse = ", "),
                 if ("presence_only" %in% names(kinds)) " (presence_only links are real; their size is unknown)",
+                if ("second_window" %in% names(kinds)) " (second_window: measured over its own window, given once in the exponential phase)",
                 call. = FALSE)
         consumed[is.na(consumed)] <- 0
         produced[is.na(produced)] <- 0
@@ -261,14 +289,29 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     keep_t <- if (is.character(taxa)) match(taxa, x$taxa) else taxa
     keep_r <- if (is.character(resources)) match(resources, x$resources) else resources
     if (anyNA(keep_t) || anyNA(keep_r)) stop_foodnet("unknown taxon or resource")
-    for (name in c("consumed", "produced", "evidence_consumed", "evidence_produced")) {
-        x[[name]] <- x[[name]][keep_t, keep_r, drop = FALSE]
+    for (name in PHASE_MATRICES) {
+        if (!is.null(x[[name]])) x[[name]] <- x[[name]][keep_t, keep_r, drop = FALSE]
     }
-    for (name in c("growth_rates", "biomass_change", "biomass_start", "biomass_unit", "phase_hours",
-                   "phase_growth_rates")) {
+    for (name in c("growth_rates", PHASE_VECTORS)) {
         x[[name]] <- x[[name]][keep_t]
     }
+    for (ph in names(x$other_phases)) {
+        b <- x$other_phases[[ph]]
+        for (name in PHASE_MATRICES) b[[name]] <- b[[name]][keep_t, keep_r, drop = FALSE]
+        for (name in PHASE_VECTORS) b[[name]] <- b[[name]][keep_t]
+        keep_rows <- function(rows) {
+            if (NROW(rows)) rows[rows$taxon %in% x$taxa[keep_t] & rows$resource %in% x$resources[keep_r], , drop = FALSE]
+            else rows
+        }
+        b$cautions <- keep_rows(b$cautions)
+        b$inconclusive <- keep_rows(b$inconclusive)
+        b$presence_only <- keep_rows(b$presence_only)
+        b$whole_run <- intersect(b$whole_run, x$taxa[keep_t])
+        b$biomass_falls <- intersect(b$biomass_falls, x$taxa[keep_t])
+        x$other_phases[[ph]] <- b
+    }
     x$initial <- x$initial[keep_r]
+    if (!is.null(x$resource_phases)) x$resource_phases <- x$resource_phases[keep_r]
     kept <- x$taxa[keep_t]
     removed <- setdiff(x$taxa, kept)
     x$taxa <- kept
@@ -277,6 +320,7 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     x$caveats$presence_only <- p[p$taxon %in% kept & p$resource %in% x$resources, , drop = FALSE]
     x$caveats$without_a_rate <- intersect(x$caveats$without_a_rate, kept)
     x$caveats$whole_run <- intersect(x$caveats$whole_run, kept)
+    x$caveats$biomass_falls <- intersect(x$caveats$biomass_falls, kept)
     # the page's warnings were written for the whole search: keep those that name no taxon left out, and the
     # ones that name none (counts over the whole search are marked as such)
     if (length(x$caveats$warnings) && length(removed)) {
@@ -306,6 +350,56 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     x
 }
 
+# The fields that belong to one phase: what crm_phase() swaps and crm_subset() subsets, in the order a phase
+# block holds them.
+PHASE_MATRICES <- c("consumed", "produced", "evidence_consumed", "evidence_produced", "interval_start",
+                    "interval_end", "consumed_lower", "consumed_upper", "produced_lower", "produced_upper")
+PHASE_VECTORS <- c("biomass_change", "biomass_start", "biomass_unit", "phase_hours", "phase_growth_rates")
+PHASE_CAVEATS <- c("cautions", "inconclusive", "presence_only", "whole_run", "biomass_falls")
+
+#' Switch to another phase
+#'
+#' A search for both phases sends the exponential phase, which a consumer-resource model describes, and the
+#' stationary phase beside it: what changed after the end of exponential growth, to the last sample, which
+#' the exponential phase misses (a compound taken up only late, for one). Cells may still grow there, stop,
+#' or die (`x$biomass_change`, and the caveat `biomass_falls`). This returns the same parameters for that
+#' phase: its amounts, evidence, intervals, bounds, growth and caveats; the taxa, resources, growth rates and
+#' initial concentrations stay (the growth rates are the taxa's maximum rates, from exponential growth, in
+#' every phase). A compound measured over the second time window is given once, in the exponential phase's
+#' matrices, as its change over that window. [crm_efficiency()], [as_miasim()] and [crm_backcheck()] refuse stationary amounts
+#' unless `allow = "stationary_phase"`, since a model reads every uptake as growth.
+#'
+#' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
+#' @param phase The phase to switch to, one of `c(x$phase, names(x$other_phases))`.
+#' @return CRM parameters of class `foodnet_crm`, for `phase`; the phase switched from is kept in
+#'   `x$other_phases`, so switching back gives the original.
+#' @export
+crm_phase <- function(x, phase) {
+    stopifnot(inherits(x, "foodnet_crm"))
+    if (identical(phase, x$phase)) return(x)
+    b <- x$other_phases[[phase]]
+    if (is.null(b)) {
+        stop_foodnet("these parameters carry the ", paste(c(x$phase, names(x$other_phases)), collapse = " and "),
+                     " phase only; search for both phases in foodnet to have the stationary one too")
+    }
+    current <- list(phase = x$phase)
+    for (name in c(PHASE_MATRICES, PHASE_VECTORS)) {
+        current[[name]] <- x[[name]]
+        x[[name]] <- b[[name]]
+    }
+    for (name in PHASE_CAVEATS) {
+        current[[name]] <- x$caveats[[name]]
+        x$caveats[name] <- list(b[[name]])
+    }
+    x$caveats$stationary_phase <- phase == "stationary"
+    others <- x$other_phases
+    others[[phase]] <- NULL
+    others[[current$phase]] <- current
+    x$other_phases <- others
+    x$phase <- phase
+    x
+}
+
 #' The README foodnet wrote with these numbers
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
@@ -323,8 +417,14 @@ crm_readme <- function(x, print = TRUE) {
 
 #' Write the parameters as files
 #'
-#' `consumed.csv`, `produced.csv`, `growth_rates.csv`, `initial_concentrations.csv` and `README.txt`, as
-#' foodnet's download holds them, so what arrived over the wire can be kept beside the analysis.
+#' The files of foodnet's download, for the phase `x` holds: `consumed.csv`, `produced.csv` and their
+#' `evidence_*.csv`, `growth_rates.csv`, `initial_concentrations.csv`, `biomass.csv`, `intervals.csv` (the
+#' hours each value was measured over) and `bounds.csv` (each amount's lowest and highest replicate), one row
+#' per cell with a phase column, and `README.txt`, which opens with the phase. After [crm_phase()] the
+#' phase's files are named for it (`consumed_stationary.csv`, `intervals_stationary.csv`,
+#' `README_stationary.txt`, ...), so both phases can be written to one folder; the growth rates and the
+#' medium are the same in both. The tables hold what the parameters in R hold, so some have fewer columns than the download's
+#' (no replicate counts, no rate sources, no value-medium header cell).
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param dir Directory to write into. It is created when it does not exist.
@@ -333,16 +433,58 @@ crm_readme <- function(x, print = TRUE) {
 crm_write <- function(x, dir) {
     stopifnot(inherits(x, "foodnet_crm"))
     if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-    paths <- file.path(dir, c("consumed.csv", "produced.csv", "growth_rates.csv",
-                              "initial_concentrations.csv", "README.txt"))
-    write.csv(x$consumed, paths[1])
-    write.csv(x$produced, paths[2])
-    write.csv(data.frame(taxon = x$taxa, growth_rate = unname(x$growth_rates), unit = x$growth_rate_unit,
-                         stringsAsFactors = FALSE), paths[3], row.names = FALSE)
-    write.csv(data.frame(resource = x$resources, initial_mM = unname(x$initial), stringsAsFactors = FALSE),
-              paths[4], row.names = FALSE)
-    writeLines(x$readme, paths[5])
-    invisible(paths)
+    # the download names the CRM's own phase plainly and another phase by suffix: switched, x keeps the
+    # exponential phase among the others
+    own <- is.null(x$other_phases$exponential)
+    suffix <- if (own) "" else paste0("_", x$phase)
+    # after a switch, every file of the phase carries the suffix, so both phases can be written to one folder
+    # (a review: the second write replaced the first's intervals, bounds and README); the growth rates and the
+    # medium are the taxa's, whatever the phase
+    phased <- c("consumed.csv", "produced.csv", "evidence_consumed.csv", "evidence_produced.csv", "biomass.csv",
+                "intervals.csv", "bounds.csv")
+    path <- function(name) file.path(dir, if (name %in% phased) sub("\\.csv$", paste0(suffix, ".csv"), name) else name)
+    paths <- character(0)
+    put <- function(table, name, row.names = FALSE) {
+        p <- path(name)
+        write.csv(table, p, row.names = row.names)
+        paths <<- c(paths, p)
+    }
+    put(x$consumed, "consumed.csv", TRUE)
+    put(x$produced, "produced.csv", TRUE)
+    put(x$evidence_consumed, "evidence_consumed.csv", TRUE)
+    put(x$evidence_produced, "evidence_produced.csv", TRUE)
+    put(data.frame(taxon = x$taxa, growth_rate = unname(x$growth_rates), unit = x$growth_rate_unit,
+                   stringsAsFactors = FALSE), "growth_rates.csv")
+    put(data.frame(resource = x$resources, initial_mM = unname(x$initial), stringsAsFactors = FALSE),
+        "initial_concentrations.csv")
+    put(data.frame(taxon = x$taxa, biomass_start = unname(x$biomass_start),
+                   biomass_change = unname(x$biomass_change), unit = unname(x$biomass_unit),
+                   phase_hours = unname(x$phase_hours), stringsAsFactors = FALSE), "biomass.csv")
+    cells <- expand.grid(i = seq_along(x$taxa), j = seq_along(x$resources))
+    # a second-window compound was measured over that window, which the files say, as the download's do
+    column_phase <- if (is.null(x$resource_phases)) rep(x$phase, length(x$resources)) else
+        ifelse(x$resource_phases[x$resources] %in% "window", "window", x$phase)
+    measured <- cells[!is.na(x$interval_start[as.matrix(cells)]), , drop = FALSE]
+    put(data.frame(taxon = x$taxa[measured$i], resource = x$resources[measured$j],
+                   phase = column_phase[measured$j],
+                   start_h = x$interval_start[as.matrix(measured)], end_h = x$interval_end[as.matrix(measured)],
+                   hours = x$interval_end[as.matrix(measured)] - x$interval_start[as.matrix(measured)],
+                   stringsAsFactors = FALSE), "intervals.csv")
+    bounds <- do.call(rbind, lapply(c("consumed", "produced"), function(d) {
+        low <- x[[paste0(d, "_lower")]]
+        kept <- cells[!is.na(low[as.matrix(cells)]), , drop = FALSE]
+        at <- as.matrix(kept)
+        data.frame(taxon = x$taxa[kept$i], resource = x$resources[kept$j], phase = column_phase[kept$j],
+                   direction = rep(d, nrow(kept)),
+                   value_mM = x[[d]][at], lower_mM = low[at], upper_mM = x[[paste0(d, "_upper")]][at],
+                   stringsAsFactors = FALSE)
+    }))
+    put(bounds, "bounds.csv")
+    readme <- file.path(dir, if (own) "README.txt" else paste0("README", suffix, ".txt"))
+    writeLines(c(sprintf("These files hold the %s phase%s.", x$phase,
+                         if (own) "" else " (switched to with crm_phase(); the README below describes the search)"),
+                 "", x$readme), readme)
+    invisible(c(paths, readme))
 }
 
 #' Shape the parameters for miaSim
@@ -360,7 +502,8 @@ crm_write <- function(x, dir) {
 #' starting abundance for every taxon and Monod constants, so this stops when one is missing rather than
 #' passing a number nobody measured: miaSim would otherwise draw starting abundances and Monod constants at
 #' random. It also stops for parameters that pool every medium (their starting concentrations describe no
-#' real medium) or come from the stationary phase (uptake without growth), unless `allow` names them.
+#' real medium) or come from after the end of exponential growth (the stationary phase), unless `allow`
+#' names them.
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param x0 Starting abundances of the taxa, one per taxon in the order of `x$taxa` (or named), each in the
@@ -375,7 +518,12 @@ crm_write <- function(x, dir) {
 #' @param growth `"measured"` or `"phase_floor"`: the growth rates, as in [crm_scale()].
 #' @return A list with `n_species`, `n_resources`, `names_species`, `names_resources`, `E`, `x0`,
 #'   `resources`, `growth_rates`, `monod_constant` and `migration_p = 0`: miaSim adds random immigration
-#'   even with `stochastic = FALSE` (miaSim 1.18's `perturb`), which in these units would swamp growth.
+#'   even with `stochastic = FALSE` (miaSim 1.18's `perturb`), which in these units would swamp growth. Its
+#'   other noise (drift, epochs, external events) is off unless `stochastic = TRUE`, and measurement noise
+#'   unless `error_variance > 0`. To explore noise, change them in this list before the call, since it
+#'   already holds `migration_p` (`args$migration_p <- 0.01; args$stochastic <- TRUE`); to turn it all off
+#'   again, set `migration_p = 0, stochastic = FALSE, error_variance = 0`. Leave `norm = FALSE`: relative
+#'   abundances cannot be turned back by [crm_unscale()].
 #' @examples
 #' \dontrun{
 #' args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
@@ -389,14 +537,7 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     na <- match.arg(na)
     growth <- match.arg(growth)
     stopifnot(inherits(x, "foodnet_crm"))
-    if (x$caveats$mixed_media && !"mixed_media" %in% allow) {
-        stop_foodnet("these values pool every medium (Ignore media differences): their starting concentrations ",
-                     "describe no real medium. Run the search with one medium, or pass allow = \"mixed_media\".")
-    }
-    if (x$caveats$stationary_phase && !"stationary_phase" %in% allow) {
-        stop_foodnet("these are stationary-phase amounts: uptake without growth, which a CRM reads as growth. ",
-                     "Use the exponential phase, or pass allow = \"stationary_phase\".")
-    }
+    refuse_caveats(x, allow)
     if (missing(x0) || is.null(x0)) {
         stop_foodnet("give x0, a starting abundance per taxon in the unit of its growth curve (x$biomass_unit); ",
                      "x$biomass_start holds each taxon's own start. miaSim would otherwise draw them at random.")
@@ -433,7 +574,7 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
                 "them)", call. = FALSE)
     }
     if (is.null(E)) {
-        E <- crm_efficiency(x, na = na, growth = growth)
+        E <- crm_efficiency(x, na = na, growth = growth, allow = allow)
         x0 <- as.numeric(x0) / crm_scale(x, growth)       # into each taxon's own unit (crm_scale)
     }
     # migration_p = 0: miaSim adds random immigration even when stochastic is FALSE (its perturb() does not
@@ -457,6 +598,7 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
 #' @param missing_resource A starting concentration for resources with none (default 0).
 #' @param na What [crm_efficiency()] does with NA cells: `"stop"` (the default) or `"zero"`.
 #' @param growth `"measured"` or `"phase_floor"`: the growth rates, as in [crm_scale()].
+#' @param allow Caveats to accept, as in [crm_efficiency()].
 #' @return A data frame: taxon, what (`"biomass"`, `"hours to grow"`, or a resource), direction, measured,
 #'   simulated and their ratio. Biomass is in each growth curve's unit.
 #' @examples
@@ -465,7 +607,7 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
 #' }
 #' @export
 crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop", "zero"),
-                          growth = c("measured", "phase_floor")) {
+                          growth = c("measured", "phase_floor"), allow = character()) {
     na <- match.arg(na)
     growth <- match.arg(growth)
     stopifnot(inherits(x, "foodnet_crm"))
@@ -473,7 +615,7 @@ crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop"
         stop_foodnet("crm_backcheck() runs miaSim: install it with BiocManager::install(\"miaSim\")")
     }
     if (missing(monod_constant)) stop_foodnet("give monod_constant, in mM; foodnet measures none")
-    E <- crm_efficiency(x, na = na, growth = growth)
+    E <- crm_efficiency(x, na = na, growth = growth, allow = allow)
     scale <- crm_scale(x, growth)
     mu <- suppressWarnings(crm_growth(x, growth))
     n <- length(x$taxa)

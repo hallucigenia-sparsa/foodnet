@@ -257,10 +257,10 @@ def signed_csv(net: FoodNetwork, result: dict) -> str:
     return _csv([corner(result), *header], [[n, *map(_number, r)] for n, r in zip(names, rows, strict=True)])
 
 
-def pair_rows(net: FoodNetwork, result: dict, phases=None) -> dict:
+def pair_rows(net: FoodNetwork, result: dict, phases=None, cols=None) -> dict:
     """{"taxa", "columns", "consumed", "produced", "evidence_consumed", "evidence_produced"}."""
     taxa = taxa_rows(net, result)
-    cols = columns(net, result, phases)
+    cols = cols or columns(net, result, phases)
     out = {"taxa": row_labels(result, taxa), "columns": [label for _, _, label in cols]}
     for direction in ("consumed", "produced"):
         values, evidence = [], []
@@ -364,11 +364,11 @@ def cautions_csv(result: dict, phases=None) -> str:
     return _csv(["taxon", "metabolite", "phase", "state", "cautions", "notes"], rows)
 
 
-def biomass_csv(result: dict) -> str:
+def biomass_csv(result: dict, phase: str | None = None) -> str:
     net = result["network"]
     rows = []
     for t in taxa_rows(net, result):
-        b = (result.get("biomass") or {}).get(t.id)
+        b = _biomass(result, phase).get(t.id)
         rows.append([t.name, *(["NA", "NA", "", "NA", 0] if b is None else
                                [f"{b['start']:.6g}", f"{b['change']:.6g}", b["unit"], f"{b['hours']:.6g}", b["n"]])])
     return _csv(["taxon", "biomass_start", "biomass_change", "unit", "phase_hours", "replicates"], rows)
@@ -383,11 +383,123 @@ def crm_phase(result: dict) -> str:
     return phases[0] if len(phases) == 1 else "exponential"
 
 
+def crm_phases(result: dict) -> list:
+    """The phases the CRM parameters carry: `crm_phase`, and with "Both" the stationary phase beside it
+    (Karoline, 2026-10-07: what a fit or a simulation needs beyond community time series, so late uptake, such
+    as a compound taken up only after the end of exponential growth, is not lost)."""
+    ph = crm_phase(result)
+    both = ph == "exponential" and result["settings"].get("phase") == "both"
+    return [ph, "stationary"] if both else [ph]
+
+
+def crm_columns(net: FoodNetwork, result: dict, phase: str) -> list:
+    """The CRM's columns for `phase`: those of `crm_phase` with the phase swapped, so every phase has the same
+    resources in the same order; second-window metabolites keep their window (and `_phase_block` gives them in
+    the CRM's own phase only)."""
+    return [(m, ph if ph == "window" and m.id in second_window_metabolites(result) else phase, label)
+            for m, ph, label in columns(net, result, [crm_phase(result)])]
+
+
+def intervals(result: dict, taxa, cols) -> tuple:
+    """(start, end) matrices in hours: the interval each cell's value was measured over (the mean over its
+    experiments, whose replicates can start later or end earlier than others), or None where the cell has no
+    value (nothing measured, or inconclusive).
+    A fit turns an amount into a rate only with its own interval (Karoline, 2026-10-07)."""
+    starts, ends = [], []
+    for t in taxa:
+        cells = [result["cells"].get((t.id, m.id, ph)) or {} for m, ph, _ in cols]
+        # an inconclusive cell has no value, so no interval: its replicates' windows need not agree (a review)
+        kept = [c if c.get("n") and c.get("state") != "inconclusive" else {} for c in cells]
+        starts.append([c["start"] if c.get("start") is not None else None for c in kept])
+        ends.append([c["end"] if c.get("end") is not None else None for c in kept])
+    return starts, ends
+
+
+# the evidence of a second-window compound in a phase other than the CRM's own, which carries its one value
+SECOND_WINDOW = "second_window"
+# a taxon whose biomass fell by more than this share of its start over a phase is named (biomass_falls)
+FALL_SHARE = 0.5
+
+# the cells whose number a bound belongs to: an amount, or a measured 0, in the value medium
+BOUNDED = ("measured", "below_limit", "seen_elsewhere", "whole_run")
+
+
+def bounds(result: dict, taxon: str, met: str, ph: str, direction: str) -> tuple:
+    """(lower, upper) of a cell of the consumed or produced matrix, as amounts in mM (Karoline, 2026-10-07:
+    "Range of replicates"): the lowest and highest replicate change behind the value, as amounts this way,
+    clipped at 0. A 0 runs from 0 to the detection limit at least, since the assay resolves nothing below it,
+    so the bounds always hold the matrix's own number. None where the matrix has no number, the value rests
+    on one replicate, or values are booleans."""
+    v, evidence = entry(result, taxon, met, ph, direction)
+    cell = result["cells"].get((taxon, met, ph)) or {}
+    if _booleans(result) or evidence not in BOUNDED or cell.get("low") is None or cell.get("high") is None:
+        return None, None
+    low, high = (cell["low"], cell["high"]) if direction == "produced" else (-cell["high"], -cell["low"])
+    low, high = max(0.0, low), max(0.0, high)
+    if not v:
+        limit = cell.get("limit") or result["settings"]["detection_limit"]
+        return 0.0, max(limit, high)
+    return low, high
+
+
+def bound_rows(result: dict, taxa, cols, direction: str) -> tuple:
+    """(lower, upper) matrices of one direction, taxa by columns."""
+    pairs = [[bounds(result, t.id, m.id, ph, direction) for m, ph, _ in cols] for t in taxa]
+    return [[lo for lo, _ in row] for row in pairs], [[hi for _, hi in row] for row in pairs]
+
+
+def bounds_csv(result: dict) -> str:
+    """One row per bounded value of the CRM's phases."""
+    net = result["network"]
+    taxa = taxa_rows(net, result)
+    rows = []
+    for ph in crm_phases(result):
+        for t in taxa:
+            for m, cph, _ in crm_columns(net, result, ph):
+                if cph == "window" and ph != crm_phase(result):
+                    continue                    # a second-window compound is given once, in the CRM's phase
+                for direction in ("consumed", "produced"):
+                    lo, hi = bounds(result, t.id, m.id, cph, direction)
+                    if lo is not None:
+                        v, _ = entry(result, t.id, m.id, cph, direction)
+                        cell = result["cells"].get((t.id, m.id, cph)) or {}
+                        rows.append([t.name, m.name, cph, direction, _number(v), f"{lo:.6g}", f"{hi:.6g}",
+                                     cell.get("n_experiments"), cell.get("n")])
+    return _csv(["taxon", "resource", "phase", "direction", "value_mM", "lower_mM", "upper_mM", "experiments",
+                 "replicates"], rows)
+
+
+def _biomass(result: dict, phase: str | None = None) -> dict:
+    """Each taxon's growth over `phase` (by default the CRM's own phase)."""
+    if phase is None or phase == crm_phase(result):
+        return result.get("biomass") or {}
+    return (result.get("biomass_by_phase") or {}).get(phase) or {}
+
+
+def intervals_csv(result: dict) -> str:
+    """One row per measured cell of the CRM's phases: the interval its value covers, in hours."""
+    net = result["network"]
+    taxa = taxa_rows(net, result)
+    rows = []
+    for ph in crm_phases(result):
+        cols = crm_columns(net, result, ph)
+        starts, ends = intervals(result, taxa, cols)
+        for i, t in enumerate(taxa):
+            for j, (m, cph, _) in enumerate(cols):
+                if cph == "window" and ph != crm_phase(result):
+                    continue                    # a second-window compound is given once, in the CRM's phase
+                if starts[i][j] is not None and ends[i][j] is not None:
+                    rows.append([t.name, m.name, cph, f"{starts[i][j]:.6g}", f"{ends[i][j]:.6g}",
+                                 f"{ends[i][j] - starts[i][j]:.6g}"])
+    return _csv(["taxon", "resource", "phase", "start_h", "end_h", "hours"], rows)
+
+
 def readme(result: dict, which: str = "matrices") -> str:
     net = result["network"]
     s = result["settings"]
     rule = result["value_rule"]
     phase = net.meta.get("phase")
+    merged = bool(s.get("merge_genera"))
     window = net.meta.get("window")
     tally = counts(result)
     lines = [f"{'Consumer-resource model parameters' if which == 'crm' else 'Consumption and production matrices'}"
@@ -427,14 +539,21 @@ def readme(result: dict, which: str = "matrices") -> str:
     lines += [f"Values: {values}.",
               f"Detection limit: a mean change below {s['detection_limit']:g} mM counts as no change{spread}{own}.",
               "Rows are taxa, columns metabolites. In consumed.csv and produced.csv every number is a magnitude, "
-              "never negative; in the signed matrix a produced compound is positive and a consumed one negative. "
+              "never negative; in the signed matrix a produced compound is positive and a consumed one negative, "
+              "the opposite of a consumer-resource model's efficiency matrix (miaSim's E is positive for a "
+              "resource taken up), which the R package builds from consumed.csv and produced.csv. "
               "The first header cell names the medium the values come from.",
               "",
               "NA is never zero. A cell is NA when the compound was not assayed for that taxon in the value "
               "medium; when it was assayed but is inconclusive (its replicates, or its experiments, do not agree "
-              "on what happened); and in the stationary column when its cultures reached no stationary phase or had "
-              "no end of exponential growth (no_phase; the change over the whole run of the latter is in the "
-              "exponential column, marked whole_run)"
+              "on what happened); when its culture did not grow and showed no coherent metabolism (not_grown)"
+              + ({"both": "; in the stationary column when its cultures reached no stationary phase or had no end of "
+                          "exponential growth (no_phase; the change over the whole run of the latter is in the "
+                          "exponential column, marked whole_run)",
+                  "stationary": "; when its cultures reached no stationary phase (no_phase; a culture without an "
+                                "end of exponential growth is not NA here: its change over the whole run stands in "
+                                "the stationary column, marked whole_run)"}.get(phase, "")
+                 if not window else "")
               + {"na": "; or when its change was seen only in another medium (presence only)",
                  "true": "; a change seen only in another medium is written TRUE (Advanced settings), "
                          "and its direction is the matrix it stands in",
@@ -476,11 +595,37 @@ def readme(result: dict, which: str = "matrices") -> str:
                   "Biomass: each taxon's growth over the same phase, from its growth curve, in that curve's unit "
                   "(biomass.csv), with the phase's length in hours. A simulation's starting abundance for a taxon "
                   "must be in the same unit.",
+                  *(["Intervals: the hours each value was measured over, cell by cell (intervals.csv; in crm.json "
+                     "interval_start_h and interval_end_h): the first and last sample the change is taken between, "
+                     "the mean over its experiments. A second-window compound has its own window, and a replicate "
+                     "whose series starts late covers less of the phase. It is the window the change was measured "
+                     "over, not the time it took: a substrate exhausted early in the window was taken up faster than "
+                     "the amount over the window says."]),
+                  *(["Bounds: each amount's lowest and highest replicate (bounds.csv, with how many experiments and "
+                     "replicates; in crm.json consumed_lower, consumed_upper, produced_lower, produced_upper), as "
+                     "amounts clipped at 0. A 0 runs from 0 to the detection limit at least, since the assay "
+                     "resolves nothing below it. A value resting on one replicate has no bounds. They are the range "
+                     "the replicates span, not a confidence interval."] if not merged else
+                    ["Bounds and biomass: none, since taxa were merged to genus (strains grow in units and to "
+                     "densities that do not average)."]),
+                  *(["Stationary phase: the search asked for both phases, so the stationary phase comes too, in "
+                     "consumed_stationary.csv, produced_stationary.csv, their evidence files and "
+                     "biomass_stationary.csv (in crm.json under other_phases): what changed after the end of "
+                     "exponential growth, to the last sample. Its biomass change says whether the cells still rose "
+                     "or fell; where they fell by more than half (caveat biomass_falls), lysis and death release and "
+                     "take up compounds, so its amounts need not be the living cells'. A compound in the second time "
+                     "window is given once, in the exponential phase's matrices (evidence second_window here), as "
+                     "its change over that window, which is not growth-phase uptake (intervals.csv says the hours). "
+                     "The growth rates are the taxa's maximum rates, from exponential growth, in both phases. A "
+                     "consumer-resource model describes growth, so the R package builds a model from the stationary "
+                     "phase only when told to (crm_phase(x, \"stationary\"), then allow = \"stationary_phase\")."]
+                    if len(crm_phases(result)) > 1 and not merged else []),
                   *(["Values come from every medium pooled (Ignore media differences): the initial concentrations "
                      "mix media and describe none of them, so the R package refuses to build a CRM from these "
                      "unless told to."] if result["value_rule"]["rule"] == "all" else []),
-                  *(["These are stationary-phase amounts: uptake without growth, which a consumer-resource model "
-                     "reads as growth. The R package refuses to build a CRM from them unless told to."]
+                  *(["These are stationary-phase amounts: what changed after the end of exponential growth, where "
+                     "cells may still grow, stop or die (biomass.csv says which), while a consumer-resource model "
+                     "reads every uptake as growth. The R package refuses to build a CRM from them unless told to."]
                     if crm_phase(result) == "stationary" else []),
                   "",
                   "These are measured amounts. miaSim's simulateConsumerResource takes an efficiency matrix E and "
@@ -518,6 +663,70 @@ def _numbers(rows) -> list:
     return [[None if isinstance(v, str) else v for v in row] for row in rows]
 
 
+def _phase_block(result: dict, phase: str) -> dict:
+    """One phase's part of the CRM parameters: the amounts, their evidence and intervals, and each taxon's growth
+    over the phase."""
+    net = result["network"]
+    taxa = taxa_rows(net, result)
+    cols = crm_columns(net, result, phase)
+    pair = pair_rows(net, result, cols=cols)
+    starts, ends = intervals(result, taxa, cols)
+    consumed_lower, consumed_upper = bound_rows(result, taxa, cols, "consumed")
+    produced_lower, produced_upper = bound_rows(result, taxa, cols, "produced")
+    if phase != crm_phase(result):
+        # a second-window compound was measured over its own window, which the CRM's phase already carries: here
+        # it would count the same change twice (a review: R. intestinalis trehalose, 0.233 mM in both phases)
+        for j, (_, ph, _) in enumerate(cols):
+            if ph != "window":
+                continue
+            for i in range(len(taxa)):
+                for grid in (pair["consumed"], pair["produced"], starts, ends, consumed_lower, consumed_upper,
+                             produced_lower, produced_upper):
+                    grid[i][j] = None
+                pair["evidence_consumed"][i][j] = pair["evidence_produced"][i][j] = SECOND_WINDOW
+    biomass = [_biomass(result, phase).get(t.id) for t in taxa]
+    names = result.get("names") or {}
+    presence = []
+    for i, t in enumerate(taxa):
+        for j, (m, cph, _) in enumerate(cols):
+            for direction in ("consumed", "produced"):
+                if pair[f"evidence_{direction}"][i][j] == "presence_only":
+                    media = sorted({e["medium"] for e in (result["presence"].get((t.id, m.id, cph)) or {})
+                                    .get(direction, [])})
+                    presence.append({"taxon": pair["taxa"][i], "resource": m.name, "direction": direction,
+                                     "media": media})
+    shown = {(m.id, ph) for m, ph, _ in cols}
+    return {
+        "phase": phase,
+        "consumed": _numbers(pair["consumed"]), "produced": _numbers(pair["produced"]),
+        "evidence_consumed": pair["evidence_consumed"], "evidence_produced": pair["evidence_produced"],
+        "interval_start_h": starts, "interval_end_h": ends,
+        "consumed_lower": consumed_lower, "consumed_upper": consumed_upper,
+        "produced_lower": produced_lower, "produced_upper": produced_upper,
+        "biomass_change": [None if b is None else b["change"] for b in biomass],
+        "biomass_start": [None if b is None else b["start"] for b in biomass],
+        "biomass_unit": [None if b is None else b["unit"] for b in biomass],
+        "phase_hours": [None if b is None else b["hours"] for b in biomass],
+        "phase_growth_rates": [None if b is None else b.get("phase_rate") for b in biomass],
+        # taxa whose biomass fell by more than half over the phase: lysis and death release and take up compounds,
+        # so its amounts need not be the living cells' (Karoline, 2026-10-07: "Describe it, flag decline")
+        # what the caveats say of this phase: links seen only in another medium, and taxa whose values span the
+        # whole run (in the exponential column; the stationary one has no phase for them)
+        "presence_only": presence,
+        "whole_run": whole_run_taxa(result) if phase == crm_phase(result) else [],
+        "biomass_falls": [pair["taxa"][i] for i, b in enumerate(biomass)
+                          if b is not None and b["start"] > 0 and b["change"] < -FALL_SHARE * b["start"]],
+        "cautions": [{"taxon": names.get(t, t), "resource": names.get(m, m), "cautions": list(c["cautions"]),
+                      "notes": list(c["notes"])}
+                     for (t, m, p), c in sorted(result["cells"].items())
+                     if (m, p) in shown and (p == crm_phase(result) or p != "window")
+                     and (c["cautions"] or c["notes"])],
+        "inconclusive": [{"taxon": pair["taxa"][i], "resource": m.name, "direction": d}
+                         for i, _ in enumerate(taxa) for j, (m, _, _) in enumerate(cols)
+                         for d in ("consumed", "produced")
+                         if pair[f"evidence_{d}"][i][j] == "inconclusive"]}
+
+
 def crm_payload(result: dict) -> dict:
     """What Send to R posts and the R package reads: the CRM's matrices with their caveats as data."""
     net = result["network"]
@@ -528,15 +737,7 @@ def crm_payload(result: dict) -> dict:
     initial = [None if result["initial"].get(m.id) is None else result["initial"][m.id]["mean"] for m in mets]
     rates = [result["rates"].get(t.id, {}).get("rate") for t in taxa]
     biomass = [(result.get("biomass") or {}).get(t.id) for t in taxa]
-    presence = []
-    for i, t in enumerate(taxa):
-        for j, m in enumerate(mets):
-            for direction in ("consumed", "produced"):
-                if pair[f"evidence_{direction}"][i][j] == "presence_only":
-                    media = sorted({e["medium"] for e in (result["presence"].get((t.id, m.id, ph)) or {})
-                                    .get(direction, [])})
-                    presence.append({"taxon": pair["taxa"][i], "resource": m.name, "direction": direction,
-                                     "media": media})
+    block = _phase_block(result, ph)
     return {
         "format": CRM_FORMAT, "tool": net.meta.get("tool", "foodnet"), "tool_version": net.meta.get("tool_version", ""),
         "derived_at": net.meta.get("derived_at", ""), "source_db": net.meta.get("source_db", ""),
@@ -545,6 +746,9 @@ def crm_payload(result: dict) -> dict:
         "detection_limit_mM": result["settings"]["detection_limit"],
         "taxa": pair["taxa"], "taxon_ids": [t.id for t in taxa],
         "resources": [m.name for m in mets], "resource_ids": [m.id for m in mets],
+        # what each resource's values were measured over in the CRM's phase: that phase, or "window" for a
+        # compound of the second time window
+        "resource_phases": [ph for _, ph, _ in columns(net, result, [ph])],
         # a CRM takes numbers: a TRUE entry is no amount, so it is sent as missing (the evidence matrices
         # still say presence_only)
         "consumed": _numbers(pair["consumed"]), "produced": _numbers(pair["produced"]),
@@ -553,6 +757,11 @@ def crm_payload(result: dict) -> dict:
         "growth_rate_detail": {pair["taxa"][i]: result["rates"][t.id] for i, t in enumerate(taxa)
                                if t.id in result["rates"]},
         "initial_concentrations": initial, "initial_unit": "mM",
+        # the hours each value was measured over, cell by cell (None: nothing measured)
+        "interval_start_h": block["interval_start_h"], "interval_end_h": block["interval_end_h"],
+        # bounds on each amount (None: one unit, or no number)
+        "bounds": "lowest and highest replicate, as amounts; a 0 from 0 to the detection limit at least",
+        **{k: block[k] for k in ("consumed_lower", "consumed_upper", "produced_lower", "produced_upper")},
         # each taxon's growth over the same phase, in its growth curve's unit: what turns the amounts into
         # miaSim's yields (crm_efficiency in the R package); a simulation's starting abundance is in that unit
         "biomass_change": [None if b is None else b["change"] for b in biomass],
@@ -560,7 +769,7 @@ def crm_payload(result: dict) -> dict:
         "biomass_unit": [None if b is None else b["unit"] for b in biomass],
         "phase_hours": [None if b is None else b["hours"] for b in biomass],
         "phase_growth_rates": [None if b is None else b.get("phase_rate") for b in biomass],
-        "caveats": {"presence_only": presence, "conflicts": conflicts(result),
+        "caveats": {"presence_only": block["presence_only"], "conflicts": conflicts(result),
                     "duplicates": list(result["duplicates"]),
                     "without_a_rate": [pair["taxa"][i] for i, t in enumerate(taxa) if t.id not in result["rates"]],
                     "media": list(result["value_rule"]["media"]), "value_rule": result["value_rule"]["rule"],
@@ -575,15 +784,11 @@ def crm_payload(result: dict) -> dict:
                     "incomplete": bool(result.get("errors")), "errors": list(result.get("errors") or []),
                     "warnings": list(result.get("warnings") or []),
                     # per value: what the evidence matrices cannot hold (cautions.csv in the zip)
-                    "cautions": [{"taxon": (result.get("names") or {}).get(t, t),
-                                  "resource": (result.get("names") or {}).get(m, m), "cautions": list(c["cautions"]),
-                                  "notes": list(c["notes"])}
-                                 for (t, m, p), c in sorted(result["cells"].items())
-                                 if p == ph and (c["cautions"] or c["notes"])],
-                    "inconclusive": [{"taxon": pair["taxa"][i], "resource": m.name, "direction": d}
-                                     for i, _ in enumerate(taxa) for j, m in enumerate(mets)
-                                     for d in ("consumed", "produced")
-                                     if pair[f"evidence_{d}"][i][j] == "inconclusive"]},
+                    "cautions": block["cautions"], "inconclusive": block["inconclusive"],
+                    "biomass_falls": block["biomass_falls"]},
+        # with "Both", the stationary phase beside the exponential one, with the same taxa and resources
+        "phases": crm_phases(result),
+        "other_phases": {p: _phase_block(result, p) for p in crm_phases(result)[1:]},
         "readme": readme(result, "crm"),
         "studies": sorted(net.studies), "settings": result["settings"],
     }
@@ -604,7 +809,19 @@ def crm_package(result: dict) -> bytes:
         z.writestr("growth_rates.csv", rates_csv(result))
         z.writestr("initial_concentrations.csv", initial_csv(result))
         z.writestr("biomass.csv", biomass_csv(result))
-        z.writestr("cautions.csv", cautions_csv(result, [crm_phase(result)]))
+        z.writestr("intervals.csv", intervals_csv(result))
+        z.writestr("bounds.csv", bounds_csv(result))
+        for ph in crm_phases(result)[1:]:
+            other = pair_rows(net, result, cols=crm_columns(net, result, ph))
+            for direction in ("consumed", "produced"):
+                z.writestr(f"{direction}_{ph}.csv", _matrix_csv(other["taxa"], other["columns"], other[direction],
+                                                                first=corner(result)))
+                z.writestr(f"evidence_{direction}_{ph}.csv",
+                           _matrix_csv(other["taxa"], other["columns"], other[f"evidence_{direction}"], str,
+                                       first=corner(result)))
+            z.writestr(f"biomass_{ph}.csv", biomass_csv(result, ph))
+        z.writestr("cautions.csv", cautions_csv(result, crm_phases(result)
+                                                + (["window"] if second_window_metabolites(result) else [])))
         z.writestr("crm.json", json.dumps(crm_payload(result), indent=1))
         z.writestr("README.txt", readme(result, "crm"))
     return buffer.getvalue()

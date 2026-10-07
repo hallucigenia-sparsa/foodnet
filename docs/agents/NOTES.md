@@ -15,8 +15,23 @@ gate applies.
   growth ending at the 90% rule or earlier where the growth rate drops (E. coli LF82 at 8 h); new evidence
   states (inconclusive, no_phase, seen_elsewhere); CRM parameters rebuilt on miaSim's equations with a unit of
   abundance per taxon (crm_scale) and crm_backcheck(); a secret for the R listener; INCOMPLETE and every
-  warning carried into every file. The Figure 3c reproduction recipe in the paper folder was made with 0.1.0
-  rules and must be rerun before it is cited with 0.2.0.
+  warning carried into every file.
+- 2026-10-07: **reference tests.** The comparisons with the hand-checked reference and with the published network
+  (below) run as reference tests with every change, outside this repository since the reference is unpublished.
+  Under 0.2.0 every replicate's change still matches the reference; values move by up to 0.16 mM as each
+  experiment counts once; three cells are now inconclusive, accepted by Karoline as exceptions.
+- 2026-10-07: **pre-release audit of 0.2.0** by five independent reviewers (release engineering, documentation,
+  R and miaSim use, physiology on live data, and a critic), six rounds until none found anything new. It
+  changed: bounds to the replicate range (Karoline), second-window values out of the value-medium vote and out
+  of the stationary block (counted once), the stationary phase described as after the end of exponential
+  growth with `biomass_falls`, the R install line pinned to the release (a 0.1.0 page cannot talk to a 0.2.0
+  R package), the network schema to v1, the release check (r/DESCRIPTION, README pins, CITATION date), the
+  sdist's tests (MANIFEST.in), CI failing on an R CMD check WARNING, and many texts. Left to Karoline: most
+  arcs carry a caution, so one that matters is easy to miss.
+- 2026-10-07: **CRM parameters carry each value's interval and bounds, and with Both the stationary phase**
+  (METHOD_NOTES 29). Karoline set the scope: CRM mode hands a fit or a simulator everything beyond community time series;
+  fitting to community data is mGrowthCtrl's. `crm_phase()` in R switches phase; a payload from 0.1.0 still
+  reads (no intervals, NA).
 - 2026-10-06: **0.1.0 released**: on PyPI (wheel and source archive) and as a GitHub release with
   `foodnet-v0.1.0-windows.zip`, from tag v0.1.0 on 7ebe84b. Karoline tested the Windows program, Cytoscape and
   R beforehand. The first tag went on before the release commit and the release check stopped that run

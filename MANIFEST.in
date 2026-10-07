@@ -1,0 +1,12 @@
+# What the source archive needs for its own tests to run (a review: without these, pytest from the sdist
+# failed to collect); setuptools picks up tests/test_*.py by itself.
+include tests/conftest.py
+graft tests/fixtures
+graft checks
+graft schema
+include CHANGELOG.md CITATION.cff
+include README.md AGENTS.md CONTRIBUTING.md RELEASING.md SECURITY.md
+recursive-include packaging *.py
+graft docs
+graft r
+prune r/foodnet.Rcheck

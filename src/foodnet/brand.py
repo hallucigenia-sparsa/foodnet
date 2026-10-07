@@ -153,6 +153,8 @@ textarea:focus, input:focus, select:focus, button:focus, .btn:focus {{ outline: 
 .btn.primary, button.primary {{ background: var(--made); border-color: var(--made); color: #fff; font-weight: 600; }}
 .btn.quiet {{ background: transparent; padding: .3rem .7rem; }}
 .bar {{ display: flex; gap: .6rem; margin-top: .9rem; flex-wrap: wrap; align-items: center; }}
+nav.index {{ display: flex; flex-wrap: wrap; gap: .3rem 1rem; margin: .9rem 0 0; padding: .5rem 0;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: .92rem; }}
 .beside {{ display: inline-flex; gap: .35rem; align-items: center; white-space: nowrap; }}
 /* a mode is a switch: the track is green when it is on, white when the settings are the defaults. It is
    a submit button, so the page needs no JavaScript for it; the server re-renders it the other way. */

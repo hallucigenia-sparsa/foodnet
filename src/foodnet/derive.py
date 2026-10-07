@@ -609,7 +609,9 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
 
     A cell: {"mean", "sd", "n", "n_experiments", "values", "direction" (produced, consumed or None),
     "state" (produced, consumed, no_change or inconclusive), "experiments", "studies", "media", "cautions",
-    "notes", "start", "end", "p_value", "initial"}. `limits` maps a metabolite to its own detection limit.
+    "notes", "start", "end", "p_value", "low", "high", "initial"}: `low` and `high` are the lowest and highest
+    replicate change behind the value (None on one replicate); `start` and `end` the interval it covers, the
+    mean over its experiments. `limits` maps a metabolite to its own detection limit.
 
     Each experiment is judged on its replicates (`classify`). With one experiment, that is the cell. With
     several, every experiment that is not inconclusive must say the same: then that is the cell, its mean is
@@ -742,6 +744,17 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
                                 if key[2] == "exponential" else ""))
         mean = statistics.mean(units)
         sd = statistics.stdev(units) if len(units) > 1 else None
+        # bounds on the change: the range of the replicates behind the value (Karoline, 2026-10-07: "bounds
+        # resulting from their entries", then "Range of replicates" over an interval on the mean, which was
+        # narrower than the replicates and on two experiments absurdly wide); none on one replicate
+        spread = (min(values), max(values)) if len(values) > 1 else (None, None)
+        # the interval each experiment covered, counted once per experiment as the value is
+        by_exp = defaultdict(list)
+        for r in valued:
+            if cultures[r["culture"]].experiment in used:
+                by_exp[cultures[r["culture"]].experiment].append(r)
+        start = statistics.mean(statistics.mean(r["start"] for r in rs) for rs in by_exp.values())
+        end = statistics.mean(statistics.mean(r["end"] for r in rs) for rs in by_exp.values())
         test = paired(units, [0.0] * len(units))
         if len(values) == 1:
             cautions.add("single_replicate")
@@ -763,9 +776,9 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
                       "whole_run": "whole_run" in cautions,
                       "direction": PRODUCED if k == 1 else CONSUMED if k == -1 else None, "state": STATE[k],
                       "experiments": experiments, "studies": studies, "media": media, "cautions": sorted(cautions),
-                      "notes": notes, "start": statistics.mean(r["start"] for r in valued),
-                      "end": statistics.mean(r["end"] for r in valued),
+                      "notes": notes, "start": start, "end": end,
                       "p_value": test["p"] if test else None,
+                      "low": spread[0], "high": spread[1],
                       "initial": statistics.mean(r["initial"] for r in valued), "exponential_h": exponential,
                       "limit": lim}
     return cells

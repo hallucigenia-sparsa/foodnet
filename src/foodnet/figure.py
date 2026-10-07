@@ -237,11 +237,13 @@ def matrices_svg(result: dict) -> str:
             for j, (m, ph, _) in enumerate(cols):
                 x, y = x0 + j * CELL_W, top + i * CELL_H
                 v, evidence = pair[direction][i][j], pair[f"evidence_{direction}"][i][j]
-                # each cell is a group with a title, which a browser shows on mouseover: what the cell is and
-                # the studies behind it (Karoline, 2026-10-06: "a mouseover will show the source studies")
+                # each cell shows on mouseover what it is and the studies behind it (Karoline, 2026-10-06: "a
+                # mouseover will show the source studies"), in the box _hover_tips draws. Not also as an SVG title:
+                # a browser shows that as a second box (Karoline, 2026-10-07: "2 boxes instead of one"), so the text
+                # is the cell's aria-label, which screen readers read and browsers do not show
                 text = tooltip(result, t, m, ph, direction, evidence, v)
                 tips.append((x, y, text))
-                out.append(f'<g id="fn-c{len(tips)}" class="fn-cell"><title>{html.escape(text)}</title>')
+                out.append(f'<g id="fn-c{len(tips)}" class="fn-cell" aria-label="{html.escape(text)}">')
                 lone = evidence == "single_replicate"
                 whole = evidence == "whole_run"
                 frame = (f'<rect x="{x + 2}" y="{y + 2}" width="{CELL_W - 4}" height="{CELL_H - 4}" fill="none" '

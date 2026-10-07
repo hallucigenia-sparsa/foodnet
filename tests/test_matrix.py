@@ -105,10 +105,10 @@ def test_with_both_phases_the_crm_takes_the_exponential_one(client):
 def test_the_crm_package_holds_every_file(client):
     r = run(client, report_rates=True)
     z = zipfile.ZipFile(io.BytesIO(matrix.crm_package(r)))
-    assert sorted(z.namelist()) == ["README.txt", "biomass.csv", "cautions.csv", "consumed.csv", "crm.json",
-                                    "evidence_consumed.csv",
+    assert sorted(z.namelist()) == ["README.txt", "biomass.csv", "bounds.csv", "cautions.csv", "consumed.csv",
+                                    "crm.json", "evidence_consumed.csv",
                                     "evidence_produced.csv", "growth_rates.csv", "initial_concentrations.csv",
-                                    "produced.csv"]
+                                    "intervals.csv", "produced.csv"]
 
 
 def test_the_crm_payload_carries_each_taxons_growth_over_the_phase(client):
@@ -158,3 +158,96 @@ def test_true_entries_reach_a_crm_as_missing(client):
     p = matrix.crm_payload(r)
     assert p["produced"][1][2] is None and p["evidence_produced"][1][2] == "presence_only"
     assert "set to TRUE in the matrices" in p["readme"]
+
+
+# Karoline, 2026-10-07: in CRM mode foodnet gives "everything [a fit] needs beyond time series data
+# (consumption/production matrices and bounds resulting from their entries)"; with Both, the stationary phase
+# comes too, and every value says the interval it was measured over.
+
+def test_every_crm_value_carries_the_interval_it_was_measured_over(client):
+    p = matrix.crm_payload(run(client, report_rates=True, second_window_metabolites="glucose"))
+    a, b = p["taxa"].index("Alpha alpha A1"), p["taxa"].index("Beta beta B1")
+    acetate, glucose = p["resources"].index("acetate"), p["resources"].index("glucose")
+    # A's exponential phase ends at 12 h, B's at 16 h (conftest.py); glucose runs to the last sample at 24 h
+    assert (p["interval_start_h"][a][acetate], p["interval_end_h"][a][acetate]) == (0, 12)
+    assert (p["interval_start_h"][b][glucose], p["interval_end_h"][b][glucose]) == (0, 24)
+    # nothing measured, no interval
+    assert p["interval_start_h"][p["taxa"].index("Gamma gamma C1")][acetate] is None
+
+
+def test_with_both_phases_the_crm_carries_the_stationary_phase_beside_the_exponential(client):
+    r = run(client, phase="both", report_rates=True, judge_confidence=False)
+    p = matrix.crm_payload(r)
+    assert p["phase"] == "exponential" and p["phases"] == ["exponential", "stationary"]
+    st = p["other_phases"]["stationary"]
+    a, glc = p["taxa"].index("Alpha alpha A1"), p["resources"].index("glucose")
+    # A's glucose falls 0.5 mM after its growth ended at 12 h, over to the last sample at 24 h
+    assert st["consumed"][a][glc] == pytest.approx(0.5) and st["evidence_consumed"][a][glc] == "measured"
+    assert (st["interval_start_h"][a][glc], st["interval_end_h"][a][glc]) == (12, 24)
+    assert st["phase_hours"][a] == 12 and st["biomass_change"][a] == 0
+    z = zipfile.ZipFile(io.BytesIO(matrix.crm_package(r)))
+    assert {"consumed_stationary.csv", "produced_stationary.csv", "evidence_consumed_stationary.csv",
+            "evidence_produced_stationary.csv", "biomass_stationary.csv"} <= set(z.namelist())
+    assert "Alpha alpha A1,glucose,stationary,12,24,12" in z.read("intervals.csv").decode().splitlines()
+    assert "crm_phase(x, \"stationary\")" in p["readme"]
+    json.dumps(p)
+
+
+def test_one_phase_carries_no_other(client):
+    p = matrix.crm_payload(run(client, report_rates=True))
+    assert p["phases"] == ["exponential"] and p["other_phases"] == {}
+
+
+def test_each_amount_carries_the_range_of_its_replicates(client):
+    # Karoline, 2026-10-07: "include the bounds", then "Range of replicates". A's acetate: replicates +4.1,
+    # +3.9, +4.0 mM (conftest.py)
+    p = matrix.crm_payload(run(client, report_rates=True))
+    a, acetate, glucose = p["taxa"].index("Alpha alpha A1"), p["resources"].index("acetate"), p["resources"].index(
+        "glucose")
+    assert (p["produced_lower"][a][acetate], p["produced_upper"][a][acetate]) == pytest.approx((3.9, 4.1))
+    # a consumed amount is a magnitude, so its bounds are too: glucose -8.1, -7.9, -8.0
+    assert (p["consumed_lower"][a][glucose], p["consumed_upper"][a][glucose]) == pytest.approx((7.9, 8.1))
+    # a measured 0 runs from 0 to the detection limit at least, so it holds the matrix's own 0
+    assert (p["consumed_lower"][a][acetate], p["consumed_upper"][a][acetate]) == (0, 0.2)
+    # nothing measured, no bound
+    assert p["consumed_lower"][p["taxa"].index("Gamma gamma C1")][glucose] is None
+    z = zipfile.ZipFile(io.BytesIO(matrix.crm_package(run(client, report_rates=True))))
+    assert "Alpha alpha A1,acetate,exponential,produced,4,3.9,4.1,1,3" in z.read("bounds.csv").decode()
+
+
+def test_the_bounds_always_hold_the_matrix_value(client):
+    r = run(client, report_rates=True, phase="both", judge_confidence=False)
+    p = matrix.crm_payload(r)
+    for block in (p, p["other_phases"]["stationary"]):
+        for d in ("consumed", "produced"):
+            for row, lows, highs in zip(block[d], block[f"{d}_lower"], block[f"{d}_upper"], strict=True):
+                for v, lo, hi in zip(row, lows, highs, strict=True):
+                    if lo is not None:
+                        assert lo <= v <= hi
+
+
+def test_a_second_window_compound_is_given_once_not_in_both_phases(client):
+    # a review: with Both and a second window, the stationary block repeated the second-window amount, so
+    # summing the phases counted it twice
+    r = run(client, report_rates=True, phase="both", second_window_metabolites="glucose")
+    p = matrix.crm_payload(r)
+    a, glc = p["taxa"].index("Alpha alpha A1"), p["resources"].index("glucose")
+    assert p["consumed"][a][glc] == pytest.approx(8.5)
+    st = p["other_phases"]["stationary"]
+    assert st["consumed"][a][glc] is None and st["evidence_consumed"][a][glc] == "second_window"
+    assert st["interval_start_h"][a][glc] is None and st["consumed_upper"][a][glc] is None
+    z = zipfile.ZipFile(io.BytesIO(matrix.crm_package(r)))
+    assert [line for line in z.read("intervals.csv").decode().splitlines() if ",glucose," in line] == [
+        "Alpha alpha A1,glucose,window,0,24,24", "Beta beta B1,glucose,window,0,24,24"]
+
+
+def test_a_second_window_does_not_change_the_value_medium(client):
+    # Karoline, 2026-10-07: second-window values do not vote for the value medium ("phase values only")
+    plain = run(client)["value_rule"]["media"]
+    assert run(client, second_window_metabolites="glucose formate")["value_rule"]["media"] == plain
+
+
+def test_booleans_give_no_bounds(client):
+    r = run(client, report_rates=True, booleans=True)
+    p = matrix.crm_payload(r)
+    assert all(v is None for row in p["produced_lower"] for v in row)

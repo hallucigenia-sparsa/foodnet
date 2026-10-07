@@ -126,6 +126,13 @@ serve_one <- function(server, token) {
         return(answer(con, "this port belongs to the foodnet R package; foodnet posts CRM parameters to it",
                       type = "text/plain"))
     }
+    if (is.na(request$origin) && is.na(request$token)) {
+        # a page from this machine that sends no secret: foodnet before 0.2.0, whose own message points at this
+        # package, so the person at R is told what to update (a review)
+        message("foodnet: a page without this listener's secret tried to send parameters. A foodnet older than ",
+                "0.2.0 sends none: update it to this package's version (uv tool upgrade foodnet, or pipx upgrade ",
+                "foodnet) and press Send to R again.")
+    }
     if (!is.na(request$origin) || is.na(request$token) || !identical(request$token, token)) {
         # a web page (browsers name their origin) or a request without this session's secret
         return(answer(con, paste0("{\"received\": false, \"error\": \"this listener takes parameters from the ",

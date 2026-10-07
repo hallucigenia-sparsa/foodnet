@@ -83,7 +83,7 @@ def test_a_search_shows_its_arcs_and_every_download_works(server):
     job = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["job"][0]
     q = f"token=tok&job={job}"
     body, _ = _get(f"{server}/download?{q}&format=json")
-    assert json.loads(body)["schema"] == "foodnet.metabolite_network/v0"
+    assert json.loads(body)["schema"] == "foodnet.metabolite_network/v1"
     body, _ = _get(f"{server}/download?{q}&format=graphml")
     assert body.startswith(b"<?xml")
     body, _ = _get(f"{server}/download?{q}&format=matrix")

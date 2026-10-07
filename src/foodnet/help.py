@@ -95,7 +95,8 @@ EDGE_FIELDS = {
     "source": "Where the arc starts: the taxon for a produced arc, the metabolite for a consumed one.",
     "target": "Where it ends.",
     "direction": "produced or consumed.",
-    "phase": "exponential, stationary, or window.",
+    "phase": "exponential, stationary, window, or whole_run (a culture without an end of exponential growth: "
+             "its change over the whole run).",
     "evidence": "measured (a value from the value medium) or presence_only (seen in another medium, and not in "
                 "the value medium).",
     "amount": "mM, the size of the mean net change in this direction. Missing for presence_only arcs and with "
@@ -227,17 +228,28 @@ to fix the choice.</p>
 pool whatever a record calls it. A compound that was not assayed for a taxon is never written as zero.</p>
 <h2 id="matrices">The two matrix formats</h2>
 <p><strong>Taxa x metabolites (CSV)</strong>: one matrix, rows taxa, columns metabolites, each cell the mean change in
-mM, positive when produced and negative when consumed. <strong>Consumed and produced matrices (zip)</strong>: two
+mM, positive when produced and negative when consumed (miaSim's efficiency matrix has the opposite signs, so the
+R package builds it from the two matrices below, not from this one). <strong>Consumed and produced matrices
+(zip)</strong>: two
 matrices of non-negative amounts, with an evidence matrix for each and a README. In both: a number is a change
 beyond the detection limit, 0 is measured without one, NA is no value. The evidence matrices say which:
-measured, below_limit, seen_elsewhere (0 in the value medium, a change this way in another), inconclusive,
-no_phase, presence_only, not_assayed. The first header cell names the medium the values come from. With the
+measured, below_limit (0), whole_run (a change over the whole run, for a culture without an end of
+exponential growth), single_replicate (a value from one replicate), seen_elsewhere (0 in the value medium, a
+change this way in another), inconclusive, no_phase (no stationary phase, or no end of growth), not_grown (the
+culture did not grow), presence_only, not_assayed. In the CRM parameters' stationary phase, a compound of the
+second time window is second_window: its change over that window is given once, in the exponential phase.
+The first header cell names the medium the values come from. With the
 phase choice Both, each metabolite has a column per phase.</p>
 <h2 id="crm">Consumer-resource models and R</h2>
 <p>CRM mode collects growth rates: from the replicates whose metabolites gave the values, else from another
 monoculture in the same medium. Get CRM parameters then downloads the matrices, the rates, the initial medium
-concentrations and each taxon's biomass change over the phase with a README, or sends them to R. With Both, the
-CRM uses the exponential phase.</p>
+concentrations, each taxon's biomass change over the phase, the hours each value was measured over
+(intervals.csv) and bounds on each amount (bounds.csv: its lowest and highest replicate; a 0 from 0 to the
+detection limit at least) with
+a README, or sends them to R. With Both, the CRM uses the exponential phase and carries the
+stationary phase beside it: what changed after the end of exponential growth, where cells may still grow, stop
+or die (its biomass change says which); in R,
+<code>crm_phase(crm, "stationary")</code> switches to it.</p>
 <p>The R companion package receives them. Install it once with <code>{_e(rbridge.INSTALL_R)}</code>
 ({_e(rbridge.INSTALL_TROUBLE)}), then <code>library(foodnet); crm &lt;- foodnet_listen()</code> and press Send to R.
 <code>crm_efficiency(crm)</code> builds <a href="{MIASIM}">miaSim</a>'s efficiency matrix from its equations, in a

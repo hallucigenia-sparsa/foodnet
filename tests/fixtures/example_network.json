@@ -1,5 +1,5 @@
 {
-  "schema": "foodnet.metabolite_network/v0",
+  "schema": "foodnet.metabolite_network/v1",
   "meta": {
     "tool": "foodnet",
     "tool_version": "0.1.0",

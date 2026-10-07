@@ -168,10 +168,10 @@ with metabolite data."
     changing beyond the limit in the first interval after it carries `still_changing`, on its exponential
     value (which lacks that change, and which the CRM takes) and on its stationary value when that change is
     at least a quarter of it. On E. coli LF82 this marks the glucose taken up from 8 to 12 h, so the
-    exponential phase's -3.1 mM, against -8.2 mM over 0 to 12 h, does not pass as its glucose uptake. Not chosen: a whole-run fallback for cultures
-    without a boundary (the unblanked OD of study SMGDB00000010, which starts near 0.7, still reads five
-    taxa that made 4 to 6 mM butyrate as not grown; they are `no_phase`, and a time window gives them
-    values), and flags for failed samples and transient peaks.
+    exponential phase's -3.1 mM, against -8.2 mM over 0 to 12 h, does not pass as its glucose uptake. Not chosen then: a whole-run fallback for cultures
+    without a boundary (the unblanked OD of study SMGDB00000010, which starts near 0.7, read five taxa that
+    made 4 to 6 mM butyrate as not grown), which decision 28 later adopted, and flags for failed samples and
+    transient peaks.
 25. **Media differ by amount too, and by more phrasings.** An alteration keeps its amount (0.1% and 0.75%
     linoleic acid, study SMGDB00000014; 0 to 5 mg/L pantothenate, study SMGDB00000019, formerly one medium).
 26. **CRM parameters follow miaSim's equations.** Karoline, 2026-10-06: "rebuild from miaSim". Read from
@@ -196,6 +196,11 @@ with metabolite data."
     curve, and a simulation grew it at half speed. The payload carries each taxon's phase mean rate, the page
     and R warn when it exceeds the fitted rate, and `growth = "phase_floor"` uses it there; the default stays
     the fitted rate (grownet's method, Karoline's choice of 2026-10-04).
+27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
+    this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
+    be read says `incomplete` in its files and the command line exits 3; the page never serves another
+    search's data for a job that is gone.
+
 28. **A culture without an end of exponential growth gives its change over the whole run.** Karoline,
     2026-10-06 ("the physiologist proposal sounds like a good answer"; "In the phase column, marked"). The
     growth curve only places the boundary between the phases; it is no claim that cultures metabolize only
@@ -238,10 +243,25 @@ with metabolite data."
     values), so it can stop a call, but cannot make one: a change needs at least two unflagged replicates
     that show it themselves (a fifteenth round found a Bacteroides pair, +0.20 and a flagged +0.21 mM, read as
     butyrate production).
-27. **Hardening.** The R listener takes parameters only with a one-time secret it writes to a file only
-    this user can read, since base R cannot bind a port to 127.0.0.1; a result whose records could not all
-    be read says `incomplete` in its files and the command line exits 3; the page never serves another
-    search's data for a job that is gone.
+
+29. **What CRM mode hands over: everything beyond community time series.** Karoline, 2026-10-07: "Foodnet in
+    CRM mode needs to give to a routine like [a CRM fit to community data] everything it needs beyond time
+    series data (consumption/production matrices and bounds resulting from their entries), like [the
+    hand-checked reference] does and allow a simulator like miaSim's to explore what community dynamics would
+    look like based on these matrices without actual community data. So [that fit] is the step we do once we
+    have community data, and is beyond foodnet's scope (that's what mGrowthCtrl is for)." So the parameters carry, per value, the hours it
+    was measured over, and with Both the stationary phase beside the exponential one, with its own growth
+    ("yes, add 1 and 2 now"), and bounds on each amount ("include the bounds"). A review found the first bounds (the
+    one-sided 90% t bound on each side of the mean: an 80% interval on the mean) narrower than the replicates,
+    absurdly wide on two experiments, and excluding a matrix 0; Karoline chose "Range of replicates": the
+    lowest to the highest replicate change behind the value, as amounts, and for a 0 from 0 to the detection
+    limit at least, so the bounds always hold the matrix's number. The stationary phase is "what changed after
+    the end of exponential growth" ("Describe it, flag decline"): cells may still grow there (E. coli LF82
+    takes up glucose from 8 to 12 h while its counts rise), stop, or die (B. thetaiotaomicron's counts fall
+    98%), so each taxon's biomass change says which, and taxa whose biomass fell by more than half carry
+    `biomass_falls`. A second-window compound is given once, in the CRM's own phase, and second-window values
+    do not vote for the value medium ("No, phase values only"), so naming one never changes the medium. Concentration time courses are not exported. Fitting to community data
+    belongs to mGrowthCtrl.
 
 ## Known limits
 
@@ -251,7 +271,8 @@ with metabolite data."
   tests the default exponential-phase rule on held-out studies.
 - **False arcs.** Each experiment is decided at one-sided 90% confidence, so a compound at the limit is
   called beyond it about one time in ten; in simulation a true zero gave an arc in at most 4% of cells with
-  two or more replicates. Over the 80 or so values of a search of all of mGrowthDB a few arcs are expected to
+  two or more replicates. (This and the figures below come from simulations run during the review of
+  2026-10-06; the tests do not rerun them, so a change to the decision rules must rerun them by hand.) Over the 80 or so values of a search of all of mGrowthDB a few arcs are expected to
   be false; the q-values are reported, not used to decide.
 - **Pairs err more readily than triplicates.** A pair decides when both replicates lie beyond the limit, with
   no estimate of noise: on noisy data (a standard deviation of 1 mM) about a third of pair-decided arcs on a

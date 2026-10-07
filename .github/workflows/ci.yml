@@ -73,6 +73,8 @@ jobs:
         run: |
           R CMD build r
           R CMD check --no-manual foodnet_*.tar.gz
+          # a WARNING (an export without a help page, say) fails too: R CMD check exits 0 on one (a review)
+          if grep -q "^Status:.*WARNING" foodnet.Rcheck/00check.log; then exit 1; fi
       - name: show the check log when it fails
         if: failure()
         run: cat foodnet.Rcheck/00check.log || true

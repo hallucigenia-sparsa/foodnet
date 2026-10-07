@@ -85,7 +85,7 @@ def legend_svg() -> str:
     rows.append(_arrow(y, brand.PRODUCED, opacity=0.45))
     rows.append(_text(190, y, "stationary phase (fainter); exponential phase and window full; whole run between"))
     y += ROW + 6
-    rows.append(_text(20, y, "Cautions (an arc column; the arc is shown)", "600"))
+    rows.append(_text(20, y, "Cautions (an arc column; unless one says no arc, the arc is shown)", "600"))
     for flag in CAUTIONS:
         y += 26
         rows.append(_text(40, y, f"{flag}: {CAUTION_TEXT[flag]}"))

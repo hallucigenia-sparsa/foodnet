@@ -327,3 +327,15 @@ def test_a_flagged_replicate_can_stop_a_call_but_not_make_one():
     assert derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]["state"] == "inconclusive"
     rows = _rows([(0, 1.0), (1, 1.1)])
     assert derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]["state"] == "produced"
+
+
+def test_a_cells_interval_counts_each_experiment_once_as_its_value_does():
+    # a review: the value is the mean of the experiments' means, but the interval was the mean over replicates,
+    # so ten replicates of a 0-12 h experiment outweighed two of a 0-48 h one
+    cultures = [_culture("E1", [0, 1, 2, 3]) for _ in range(10)] + [_culture("E2", [0, 1, 2, 3]) for _ in range(2)]
+    rows = _rows([(i, 1.0) for i in range(12)])
+    for r in rows[10:]:
+        r["end"] = 48
+    cell = derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]
+    assert (cell["start"], cell["end"]) == (0, 30)
+    assert (cell["low"], cell["high"]) == (1.0, 1.0)

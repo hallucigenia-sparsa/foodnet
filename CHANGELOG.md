@@ -5,6 +5,41 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Upgrading from 0.1.0 (breaking changes)
+- **Install the R package of the same version as foodnet**: the R listener now needs a secret the page reads
+  from a file, so a 0.1.0 page cannot send to a 0.2.0 package, nor a 0.2.0 page to a 0.1.0 one. The page, the
+  help and the READMEs print the install line for the version (`ref = "v0.2.0"`). The R package now refuses
+  parameters from a newer major payload format instead of reading them.
+- R: `as_miasim(x, x0, monod_constant, E = NULL, ...)` takes the starting abundances and Monod constants
+  second and third and requires them (0.1.0: `as_miasim(x, E, x0, monod_constant)`, and miaSim drew them at
+  random when missing); `crm_efficiency()` builds miaSim's E in each taxon's own unit (`scale = "miasim"`),
+  replacing `normalize =` (`scale = "shares"` is 0.1.0's matrix); `na` defaults to `"stop"`, so NA cells are
+  refused until you say how (`na = "zero"`).
+- The CRM payload is `foodnet.crm/v1` (0.1.0: v0) and the network format `foodnet.metabolite_network/v1`
+  (arcs gained `n_experiments` and the phase `whole_run`, which the v0 schema refuses).
+- The first header cell of every matrix CSV names the value medium (`taxon [values from ...]`), so code that
+  finds the row names by the header `taxon` must take the first column instead.
+- The command line exits 3 when records could not be read (`--allow-incomplete` accepts the result).
+- Values are judged differently (below), so cells can move between a number, 0 and NA.
+
+### Added
+- CRM parameters say, cell by cell, the hours each value was measured over (`interval_start_h` and
+  `interval_end_h` in crm.json, intervals.csv in the download; `x$interval_start` and `x$interval_end` in R):
+  the window the change was measured over, the mean over its experiments.
+- CRM parameters carry bounds on each amount (`consumed_lower`, `consumed_upper`, `produced_lower`,
+  `produced_upper` in crm.json and in R, bounds.csv in the download): the lowest and highest replicate, as
+  amounts clipped at 0; a 0 runs from 0 to the detection limit at least.
+- With Both, the CRM parameters carry the stationary phase beside the exponential one (`other_phases` in
+  crm.json; consumed_stationary.csv, produced_stationary.csv, their evidence and biomass_stationary.csv in the
+  download): what changed after the end of exponential growth, with the caveat `biomass_falls` for taxa whose
+  biomass fell by more than half. In R, `crm_phase(x, "stationary")` switches to it; `crm_efficiency()`,
+  `as_miasim()` and `crm_backcheck()` build from it only with `allow = "stationary_phase"`.
+- R: `crm_scale()`, `crm_unscale()`, `crm_subset()`, `crm_backcheck()`, `crm_phase()`, and
+  `growth = "phase_floor"`; `crm_write()` writes the download's files.
+- Cautions within_scatter, within_evaporation (with the Evaporation setting), pair_decided and start_differs.
+- The result opens with its buttons (downloads, Cytoscape, report, CRM parameters), then an index of its
+  sections, then the matrices image.
+
 ### Changed
 - A cell's value counts each experiment once: the mean and its test are over the experiments' means;
   `n_experiments` is a new arc field.
@@ -16,11 +51,12 @@ semantic versioning.
   out and named (experiment_left_out). The end of exponential growth by the growth rate is marked
   (growth_rate_boundary), and a compound still changing right after it (still_changing).
   Advanced settings can judge by the mean alone, and give compounds their own detection limits.
-- New evidence states in the matrices: inconclusive, no_phase, seen_elsewhere and single_replicate; the image
-  draws them. Every matrix CSV names its value medium (and INCOMPLETE when it is) in its first header cell,
+- New evidence states in the matrices: inconclusive, no_phase, seen_elsewhere, single_replicate, whole_run
+  and not_grown; the image draws them. Every matrix CSV names its value medium (and INCOMPLETE when it is) in its first header cell,
   and the zips hold cautions.csv and the page's warnings in their README.
-- Only taxa with values vote for the value medium; the page names taxa with more data in another medium, a
-  narrow win, and taxa without a growth phase.
+- Only taxa with phase values vote for the value medium (not whole-run or second-window values, so naming a
+  compound for the second window never changes the medium); the page names taxa with more data in another
+  medium, a narrow win, and taxa without a growth phase.
 - Merging to genus applies the detection limit and makes disagreeing taxa inconclusive.
 - Exponential growth ends at the 90% rule or earlier, where the growth rate has fallen below a tenth of its
   maximum over two consecutive intervals (E. coli LF82 now ends at 8 h, not 84 to 108 h); the first growth
@@ -30,7 +66,7 @@ semantic versioning.
 - A culture without an end of exponential growth gives its change over the whole run, marked whole_run (arcs
   in phase whole_run, a dashed frame in the image), instead of no value, when it grew by the 1.5-fold rule or
   its optical density rose by 0.1, or when its compounds moved as metabolism moves them (growth_unclear); one
-  that did neither gives no value (not_grown). An OD curve growing by the fold rule must also rise by 0.05.
+  that did neither gives no value (not_grown). The fold rule reads the curve smoothed by a running median.
 - R: as_miasim() and crm_backcheck() switch off miaSim's random immigration (migration_p = 0), which it adds
   even when stochastic is FALSE and which swamped growth in foodnet's units.
 - Media are told apart by the amounts their descriptions state (in one notation) and by more phrasings.
@@ -42,6 +78,7 @@ semantic versioning.
 - Succinic and valeric acid join their bases.
 
 ### Fixed
+- Hovering over a cell of the matrices image shows one box, not also the browser's own tooltip.
 - The R listener accepted parameters from any machine on the network and from web pages; it now needs a
   one-time secret only this user can read, and a stray request can no longer stop it.
 - A result built on records that could not be read gave no sign in its files and exit status 0; it now says

@@ -8,7 +8,9 @@ unreleased. The notes file gets that section, for the GitHub release, after a pa
 Windows program.
 
 CITATION.cff is checked because 0.1.0 shipped while it still said 0.0.2: nothing read it, so nothing
-caught it, and a citation that misstates the version is exactly the kind of thing a reader trusts.
+caught it, and a citation that misstates the version is exactly the kind of thing a reader trusts. Its date
+must be the changelog's, r/DESCRIPTION must carry the same version, and the R install lines in the READMEs
+must name this release.
 """
 import re
 import sys
@@ -37,6 +39,21 @@ def check(tag: str, root: Path = ROOT) -> tuple:
     dated = re.search(r"^date-released: *\"?([0-9]{4}-[0-9]{2}-[0-9]{2})\"?$", citation, re.M)
     if not dated:
         problems.append("CITATION.cff has no date-released")
+    # the R package is installed from GitHub, so its version is the only sign an installed copy is stale, and
+    # the install lines name the release, so R and Python match (a review: both had gone stale)
+    description = (root / "r" / "DESCRIPTION").read_text(encoding="utf-8")
+    described = re.search(r"^Version: *(\S+)$", description, re.M)
+    if not described or described.group(1) != version:
+        problems.append(f"r/DESCRIPTION says Version {described.group(1) if described else '(none)'}, "
+                        f"pyproject.toml says {version}")
+    for readme in ("README.md", "r/README.md"):
+        text = (root / readme).read_text(encoding="utf-8")
+        refs = re.findall(r'ref = "v([^"]+)"', text)
+        if not refs:
+            problems.append(f'{readme} does not install the R package at its release (ref = "v{version}")')
+        for ref in refs:
+            if ref != version:
+                problems.append(f"{readme} installs the R package at v{ref}, not v{version}")
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     section = re.search(rf"^## \[{re.escape(version)}\](.*?)$(.*?)(?=^## \[|\Z)", changelog, re.M | re.S)
     if not section:
@@ -45,6 +62,10 @@ def check(tag: str, root: Path = ROOT) -> tuple:
     else:
         if "unreleased" in section.group(1).lower():
             problems.append(f"CHANGELOG.md still marks {version} unreleased")
+        day = re.search(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", section.group(1))
+        if dated and day and day.group(0) != dated.group(1):
+            problems.append(f"CITATION.cff says date-released {dated.group(1)}, CHANGELOG.md dates {version} "
+                            f"{day.group(0)}")
         notes = section.group(2).strip()
     return problems, notes
 

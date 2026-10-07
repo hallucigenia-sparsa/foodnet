@@ -3,19 +3,22 @@
 \alias{crm_efficiency}
 \title{The efficiency matrix of a consumer-resource model}
 \usage{
-crm_efficiency(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero"), growth = c("measured", "phase_floor"))
+crm_efficiency(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero"), growth = c("measured", "phase_floor"), allow = character())
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
 \item{scale}{\code{"miasim"}, \code{"shares"} or \code{"none"}, as above.}
 \item{na}{\code{"stop"} or \code{"zero"}, as above.}
+\item{allow}{Caveats to accept: \code{"mixed_media"}, \code{"stationary_phase"}.}
 \item{growth}{\code{"measured"} (the default): the growth rates as foodnet fitted them. \code{"phase_floor"}: at least the mean rate each taxon's own curves show over the phase (see \code{\link{crm_scale}}).}
 }
 \value{A numeric matrix, taxa by resources.}
 \description{
 A consumer-resource model such as miaSim's \code{simulateConsumerResource} takes an efficiency matrix \code{E},
 taxa by resources, positive where a taxon consumes a resource and negative where it produces one. This
-builds one from the measured amounts.
+builds one from the measured amounts, the consumed and produced matrices, which are never negative. foodnet's
+single (signed) matrix has the opposite signs, production positive and consumption negative, as a change in
+the medium reads; it is not an \code{E} and is never used here.
 
 With \code{scale = "miasim"} (the default), \code{E} follows miaSim's own equations, read from its source
 (\code{consumerResourceModel}, miaSim 1.18): a taxon of abundance \code{x} grows at
@@ -35,12 +38,17 @@ close a choice of them comes. \code{\link{as_miasim}} puts the starting abundanc
 
 \code{scale = "shares"} is foodnet 0.1.0's matrix: each row divided by the total consumed, so consumed entries
 are shares of uptake and produced entries by-product per unit taken up; for other models.
-\code{scale = "none"} is consumed minus produced, in mM.
+\code{scale = "none"} is consumed minus produced, in mM: foodnet's signed matrix with its signs turned to
+miaSim's.
 
 \code{NA} cells have no size, and foodnet never writes one as zero, so by default (\code{na = "stop"}) this refuses
 until you fill them yourself or say how. With \code{na = "zero"} they count as 0, and a warning says how many
 of each kind were set to 0: never assayed, seen only in another medium (a real link), inconclusive
-(measured, but its replicates or experiments disagree) and without a phase.
+(measured, but its replicates or experiments disagree), without a phase, and, after \code{\link{crm_phase}}, a
+second-window compound (\code{second_window}: its change is given once, in the exponential phase).
+
+With the default \code{scale = "miasim"}, like \code{\link{as_miasim}}, this refuses parameters that pool every medium or
+come from the stationary phase, unless \code{allow} names them.
 }
 \examples{
 \dontrun{

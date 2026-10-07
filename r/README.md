@@ -8,9 +8,13 @@ simulator: everything it returns is a plain matrix, vector or list.
 ## Install
 
 ```r
-install.packages("remotes")
+install.packages(c("remotes", "BiocManager"))
 remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r")
+BiocManager::install("miaSim")                          # for the simulations
 ```
+
+Install the version of your food**net** (the page and its help print the line for yours): the package and
+the page talk to each other, and a newer package refuses an older page.
 
 If that fails with "HTTP error 404", a GitHub token stored on this machine is being used and cannot see the
 repository. Installing from a clone needs no GitHub access: `remotes::install_local("<the repository>/r")`.
@@ -38,9 +42,12 @@ phase.
 | `crm_consumed(crm)`, `crm_produced(crm)` | taxa by resources, the amounts in mM; NA is never zero |
 | `crm_rates(crm)` | the growth rates (1/h); `missing =` fills the ones nobody measured, only if you say so |
 | `crm_resources(crm)` | the initial concentrations of the medium (mM) |
-| `crm_efficiency(crm)` | miaSim's efficiency matrix E, in each taxon's own unit of abundance |
+| `crm_efficiency(crm)` | miaSim's efficiency matrix E, in each taxon's own unit of abundance: positive for a resource taken up, negative for a by-product, the opposite of foodnet's signed matrix (built from the consumed and produced matrices, never from that one) |
 | `crm_scale(crm)`, `crm_unscale(crm, abundance)` | that unit, in the growth curve's unit, and simulated abundances back in the curve's unit |
 | `crm_subset(crm, taxa, resources)` | the same parameters for fewer taxa or resources |
+| `crm_phase(crm, "stationary")` | the stationary phase, when the search asked for both phases |
+| `crm$interval_start`, `crm$interval_end` | taxa by resources, the hours each value was measured over |
+| `crm$consumed_lower`, `crm$consumed_upper`, `crm$produced_lower`, `crm$produced_upper` | each amount's lowest and highest replicate (mM); a 0 from 0 to the detection limit at least |
 | `crm_backcheck(crm, monod_constant)` | each taxon simulated alone, against its own monoculture |
 | `as_miasim(crm, x0, monod_constant)` | the arguments of `miaSim::simulateConsumerResource` |
 | `crm_readme(crm)`, `crm_write(crm, dir)` | the README food**net** wrote, and the parameters as files |
@@ -54,6 +61,14 @@ tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_stor
 abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse))
 ```
 
+A run is deterministic as `as_miasim()` shapes it. In miaSim 1.18, `simulateConsumerResource` adds a random
+immigrant at rate `migration_p` (default 0.01) even with `stochastic = FALSE`, so `as_miasim()` passes
+`migration_p = 0`; drift, epochs and external events are off unless `stochastic = TRUE`, and measurement
+noise unless `error_variance > 0`. To explore noise, change them in the list before the call, since it already
+holds `migration_p` (`args$migration_p <- 0.01; args$stochastic <- TRUE`); to turn it all off again, set
+`migration_p = 0, stochastic = FALSE, error_variance = 0`. Leave `norm = FALSE`: relative abundances cannot
+be turned back by `crm_unscale()`.
+
 miaSim (1.18, `consumerResourceModel`) grows a taxon by its growth rate times the sum over resources of
 `E * R / (R + K)`, takes up each resource at `R / (R + K)` per unit of abundance whatever the size of E,
 and makes each by-product at `|E|` times its growth. It has no uptake rate, so the unit of abundance
@@ -63,8 +78,7 @@ curve units (biomass change `dx`, growth rate `mu`, total uptake `C`, `S` the su
 In it, E is each consumed resource's share of the uptake (they sum to 1, so a saturated taxon grows at its
 measured rate and a trace substrate weighs little) and `-produced * C / S` on each by-product, so a taxon
 alone gains its measured biomass and makes its measured by-products in proportion to what it takes up.
-Below saturation it grows slower than measured. `crm_subset(crm, taxa = )` leaves out a taxon a
-simulation cannot use. The same data in another unit give the same simulation. `as_miasim` puts
+Below saturation it grows slower than measured. The same data in another unit give the same simulation. `as_miasim` puts
 the starting abundances (in each growth curve's unit, `crm$biomass_unit`) into these units, and
 `crm_unscale` turns simulated ones back. How much a taxon takes up of each resource follows the Monod
 constants, which foodnet does not measure; `crm_backcheck()` shows how close a choice comes, and how long

@@ -102,15 +102,20 @@ def initial_concentrations(value_cultures) -> dict:
 def biomass_changes(value_cultures, rows, phase: str) -> dict:
     """{taxon: {"change", "start", "unit", "hours", "n"}}: the growth of each taxon over `phase`, from the
     value-set cultures' growth curves, interpolated at the start and end of the window their metabolite
-    values cover (one culture's rows share it), averaged over the cultures. A taxon whose curves come in
+    values cover (the window most of the culture's compounds share, since they can end at different
+    samples), averaged over the cultures of each experiment and then over the experiments. A taxon whose curves come in
     several techniques or units takes the one most of its cultures use (n says how many); one without a
     curve or a window is absent."""
-    windows, whole = {}, set()
+    windows, whole, seen = {}, set(), {}
     for r in rows:
         if r["phase"] == phase and r["change"] is not None and not r.get("second"):
-            windows.setdefault(r["culture"], (r["start"], r["end"]))
+            # the window most of the culture's compounds share, whatever order they come in (a review: formate
+            # ending at 20 h and glucose at 120 h in one culture gave one or the other), ties to the longest
+            seen.setdefault(r["culture"], []).append((r["start"], r["end"]))
             if "whole_run" in r["cautions"]:
                 whole.add(r["culture"])
+    for culture, found in seen.items():
+        windows[culture] = max(set(found), key=lambda w: (found.count(w), w[1] - w[0]))
     # as in the values (foodnet.derive.pool): where a taxon has cultures with a phase, its whole-run cultures
     # are left out, so the biomass comes from the same cultures and window as the amounts (a tenth review
     # round: study SMGDB00000010 deposits R. intestinalis and a Lachnospiraceae strain under one taxon)
@@ -130,16 +135,21 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         # be "Cells/mL" and still measure different things (DNA from lysed cells counts in one, not the other)
         technique, curve_unit = c.growth.get("technique") or "", c.growth.get("unit") or ""
         unit = technique if curve_unit.casefold() in ("", technique.casefold()) else f"{technique} {curve_unit}"
-        by_taxon[c.taxon["id"]].append({"unit": unit,
+        by_taxon[c.taxon["id"]].append({"unit": unit, "experiment": c.experiment,
                                         "start": x0, "change": x1 - x0, "hours": end - start})
     out = {}
     for taxon, found in by_taxon.items():
         units = [f["unit"] for f in found]
         unit = max(sorted(set(units)), key=units.count)
         same = [f for f in found if f["unit"] == unit]
-        start = statistics.mean(f["start"] for f in same)
-        change = statistics.mean(f["change"] for f in same)
-        hours = statistics.mean(f["hours"] for f in same)
+
+        def per_experiment(key, same=same):
+            # each experiment counted once, as the values and their intervals are
+            by_exp = {}
+            for f in same:
+                by_exp.setdefault(f["experiment"], []).append(f[key])
+            return statistics.mean(statistics.mean(v) for v in by_exp.values())
+        start, change, hours = per_experiment("start"), per_experiment("change"), per_experiment("hours")
         out[taxon] = {"change": change, "start": start, "unit": unit, "hours": hours, "n": len(same),
                       # the mean specific growth rate over the phase: a maximum rate below it cannot be right
                       "phase_rate": (math.log((start + change) / start) / hours

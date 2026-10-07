@@ -52,7 +52,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="every batch monoculture with metabolites in mGrowthDB (the page's All)")
     d.add_argument("--conditions", default="", help="media, experiments or studies to limit the search to "
                    "(comma separated); empty: all data, values from the medium holding data for the most taxa")
-    d.add_argument("--phase", choices=list(PHASE_LABELS), default=DEFAULTS["phase"])
+    d.add_argument("--phase", choices=list(PHASE_LABELS), default=DEFAULTS["phase"],
+                   help="the growth phase the changes are taken over (default exponential; both: a column per phase)")
     d.add_argument("--window", nargs=2, type=float, metavar=("START", "END"),
                    help="a time window in hours that replaces the phases")
     d.add_argument("--second-window", nargs="+", metavar="NAME",
@@ -62,7 +63,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="its end in hours (default: each culture's last sample)")
     d.add_argument("--fraction", type=float, default=DEFAULTS["fraction"],
                    help="exponential growth ends at this share of the maximal abundance (default 0.9)")
-    d.add_argument("--no-growth-factor", type=float, default=DEFAULTS["no_growth_factor"])
+    d.add_argument("--no-growth-factor", type=float, default=DEFAULTS["no_growth_factor"],
+                   help="a culture that rose less than this many times did not grow by the fold rule (default 1.5)")
     d.add_argument("--detection-limit", type=float, default=DEFAULTS["detection_limit"], help="mM (default 0.2)")
     d.add_argument("--evaporation", type=float, default=DEFAULTS["evaporation"],
                    help="share of a compound's level evaporation could change over a run (default 0.1)")
@@ -78,34 +80,43 @@ def build_parser() -> argparse.ArgumentParser:
                    help="how a cell seen only in another medium is written in the matrices (default na)")
     d.add_argument("--report-rates", action="store_true", help="collect growth rates")
     d.add_argument("--crm-mode", action="store_true", help="what a consumer-resource model needs (growth rates on)")
-    d.add_argument("--rate-method", choices=list(rates.METHODS), default=DEFAULTS["rate_method"])
-    d.add_argument("--rate-window", type=int, default=DEFAULTS["rate_window"])
+    d.add_argument("--rate-method", choices=list(rates.METHODS), default=DEFAULTS["rate_method"],
+                   help="how the maximum specific growth rate is fitted")
+    d.add_argument("--rate-window", type=int, default=DEFAULTS["rate_window"],
+                   help="points in the sliding window of the rate fit")
     d.add_argument("--merge-arcs", action="store_true", help="one arc across studies")
-    d.add_argument("--min-studies", type=int, default=DEFAULTS["min_studies"])
+    d.add_argument("--min-studies", type=int, default=DEFAULTS["min_studies"],
+                   help="keep only arcs resting on at least this many studies (with --merge-arcs)")
     d.add_argument("--merge-genera", action="store_true", help="one node per genus")
-    d.add_argument("--exclude-studies", default=DEFAULTS["exclude_studies"])
+    d.add_argument("--exclude-studies", default=DEFAULTS["exclude_studies"],
+                   help="study ids never used, comma separated")
     d.add_argument("--exclude-experiments", default=DEFAULTS["exclude_experiments"],
                    help="experiment ids never used, comma separated")
     d.add_argument("--no-strict-media", action="store_true",
                    help="tell media apart by their names only, not by altered composition or atmosphere")
-    d.add_argument("--exclude-metabolites", default=DEFAULTS["exclude_metabolites"])
+    d.add_argument("--exclude-metabolites", default=DEFAULTS["exclude_metabolites"],
+                   help="metabolite names left out, comma separated (default: none)")
     d.add_argument("--include-non-batch", action="store_true",
                    help="also read chemostat and serial dilution monocultures")
-    d.add_argument("--spike-factor", type=float, default=DEFAULTS["spike_factor"])
-    d.add_argument("--correction", choices=["bh", "by"], default=DEFAULTS["correction"])
-    d.add_argument("--format", choices=["json", "graphml", "matrix", "matrices"], default="json")
+    d.add_argument("--spike-factor", type=float, default=DEFAULTS["spike_factor"],
+                   help="a growth curve with one or two points this many times above both neighbors sets no phase")
+    d.add_argument("--correction", choices=["bh", "by"], default=DEFAULTS["correction"],
+                   help="multiple testing correction of the reported q-values (they never decide)")
+    d.add_argument("--format", choices=["json", "graphml", "matrix", "matrices"], default="json",
+                   help="network as JSON or GraphML, the taxa x metabolites matrix (CSV), or the consumed and "
+                        "produced matrices (zip)")
     d.add_argument("--out", help="where to write the network (default: standard output; matrices need a file)")
     d.add_argument("--report", help="also write the report to this file")
     d.add_argument("--figure", help="also write the consumed and produced matrices as an image (SVG)")
     d.add_argument("--rates", help="also write the growth rates (CSV); needs --report-rates or --crm-mode")
     d.add_argument("--crm", help="also write the CRM parameters (zip); needs --report-rates or --crm-mode")
     d.add_argument("--to-r", action="store_true", help="send the CRM parameters to a listening R session")
-    d.add_argument("--r-port", type=int, default=None)
+    d.add_argument("--r-port", type=int, default=None, help="the port foodnet_listen() listens on (default 8794)")
     d.add_argument("--allow-incomplete", action="store_true",
                    help=f"exit 0 even when mGrowthDB records could not be read (otherwise {INCOMPLETE}; the files "
                         "say incomplete either way)")
     d.add_argument("--to-cytoscape", action="store_true", help="send the network to a running Cytoscape")
-    d.add_argument("--cytoscape-port", type=int, default=1234)
+    d.add_argument("--cytoscape-port", type=int, default=1234, help="Cytoscape's REST port (default 1234)")
 
     v = sub.add_parser("validate", help="check a network file against the schema")
     v.add_argument("file")

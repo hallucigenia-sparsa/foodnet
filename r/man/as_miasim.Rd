@@ -16,7 +16,7 @@ as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource
 \item{na}{What \code{\link{crm_efficiency}} does with NA cells: \code{"stop"} (the default) or \code{"zero"}.}
 \item{growth}{\code{"measured"} or \code{"phase_floor"}: the growth rates, as in \code{\link{crm_scale}}.}
 }
-\value{A list with \code{n_species}, \code{n_resources}, \code{names_species}, \code{names_resources}, \code{E}, \code{x0}, \code{resources}, \code{growth_rates}, \code{monod_constant} and \code{migration_p = 0}: miaSim adds random immigration even with \code{stochastic = FALSE} (miaSim 1.18's \code{perturb}), which in these units would swamp growth.}
+\value{A list with \code{n_species}, \code{n_resources}, \code{names_species}, \code{names_resources}, \code{E}, \code{x0}, \code{resources}, \code{growth_rates}, \code{monod_constant} and \code{migration_p = 0}: miaSim adds random immigration even with \code{stochastic = FALSE} (miaSim 1.18's \code{perturb}), which in these units would swamp growth. Its other noise (drift, epochs, external events) is off unless \code{stochastic = TRUE}, and measurement noise unless \code{error_variance > 0}. To explore noise, change them in this list before the call, since it already holds \code{migration_p} (\code{args$migration_p <- 0.01; args$stochastic <- TRUE}); to turn it all off again, set \code{migration_p = 0, stochastic = FALSE, error_variance = 0}. Leave \code{norm = FALSE}: relative abundances cannot be turned back by \code{\link{crm_unscale}}.}
 \description{
 Returns the arguments \code{miaSim::simulateConsumerResource} takes: the numbers of taxa and resources and
 their names, the efficiency matrix \code{E}, the initial resource concentrations, the growth rates, the
@@ -31,7 +31,8 @@ A simulation needs a growth rate for every taxon, a starting concentration for e
 starting abundance for every taxon and Monod constants, so this stops when one is missing rather than
 passing a number nobody measured: miaSim would otherwise draw starting abundances and Monod constants at
 random. It also stops for parameters that pool every medium (their starting concentrations describe no
-real medium) or come from the stationary phase (uptake without growth), unless \code{allow} names them.
+real medium) or come from after the end of exponential growth (the stationary phase), unless \code{allow}
+names them.
 }
 \examples{
 \dontrun{

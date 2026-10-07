@@ -40,11 +40,16 @@ workflow's short-lived GitHub identity instead ("trusted publishing").
 
 1. **A release pull request** that:
    - sets the version in `pyproject.toml` and in `src/foodnet/__init__.py` (`__version__`);
-   - turns `## [x.y.z] (unreleased)` in `CHANGELOG.md` into `## [x.y.z] (YYYY-MM-DD)`, and starts a new
-     unreleased section above it if work continues.
-   - bumps `Version:` in `r/DESCRIPTION` when anything in `r/` changed, since the R package is installed
-     from GitHub and its version is the only signal an installed copy is out of date.
-   `python packaging/check_release.py vX.Y.Z` must say the tag is ready, and `make check` must pass:
+   - turns `## [Unreleased]` in `CHANGELOG.md` into `## [x.y.z] (YYYY-MM-DD)`, and starts a new
+     `## [Unreleased]` section above it if work continues;
+   - sets `version` and `date-released` in `CITATION.cff` (the changelog's date);
+   - sets `Version:` in `r/DESCRIPTION` to the same version (between releases it is the last release plus
+     `.9000`), since the R package is installed from GitHub and its version is the only signal an installed
+     copy is out of date;
+   - adds `ref = "vX.Y.Z"` to the R install lines of `README.md` and `r/README.md` (the page prints the
+     matching line by itself), so the R package installed is the one this version talks to; between
+     releases they carry no ref, since the tag does not exist yet.
+   `python packaging/check_release.py vX.Y.Z` must say the tag is ready (it checks every item above), and `make check` must pass:
    among other things it refuses texts that describe work in progress rather than the released state (an
    install line pointing at one of our branches, for example).
 2. **Merge it, then tag `main`:**
