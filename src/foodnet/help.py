@@ -291,11 +291,16 @@ judge the constants over the exponential phase, whose length is the time each ta
 in the CRM example, they do not: the measured hours are the window's length, and the biomass ratio is near 1
 while the constants lie well below the resource concentrations, so <code>crm_backcheck()</code> warns. To choose
 them, search the same taxa with the exponential phase (switch the window off in Advanced settings) and check
-there. It takes <code>crm</code> itself and builds the efficiency matrix; <code>na = "zero"</code> counts NA cells
-as 0 and says how many of each kind.</li>
-<li>Simulate the community: <code>args &lt;- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1,
-missing_resource = 0, na = "zero")</code>, then <code>tse &lt;- do.call(miaSim::simulateConsumerResource, c(args,
-list(t_end = 48, t_store = 480)))</code>.</li>
+there. A ratio that stays put as the constants fall toward 0 is not theirs to fix: the taxon then grows as fast
+as the data let it, and what is left lies in the data. Its growth rate may be below its phase's own mean rate
+(<code>print(crm)</code> says so; <code>growth = "phase_floor"</code>, given to <code>crm_backcheck()</code> and
+<code>as_miasim()</code> alike, uses the phase's rate there), or part of its uptake may come after the growth rate
+fell (still_changing, which the warnings name). It takes <code>crm</code> itself and builds the efficiency matrix;
+<code>na = "zero"</code> counts NA cells as 0 and says how many of each kind.</li>
+<li>Simulate the community with the parameters and the arguments you checked in step 4 (the same
+<code>monod_constant</code>, and <code>growth</code> if you set it): <code>args &lt;- as_miasim(crm, x0 =
+crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")</code>, then <code>tse &lt;-
+do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))</code>.</li>
 <li>Back in each growth curve's unit: <code>abundance &lt;- crm_unscale(crm, SummarizedExperiment::assay(tse))</code>,
 plotted over hours with <code>matplot(SummarizedExperiment::colData(tse)$time, t(log10(abundance)), type =
 "l")</code>.</li>

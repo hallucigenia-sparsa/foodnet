@@ -749,7 +749,9 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
             if _class(moved, lim) and (key[2] == "exponential"
                                        or abs(moved) >= STILL_SHARE * abs(statistics.mean(units))):
                 cautions.add("still_changing")
-                missed = moved
+                # only an exponential value misses that change; a stationary one starts at the growth-rate
+                # boundary and holds it (a review: "X mM more" on stationary values invited adding the two)
+                missed = moved if key[2] == "exponential" else None
                 notes.append(f"still changing by {moved:+.2f} mM between the end of growth by the growth rate and "
                              "where the 90% rule would have ended it"
                              + (" (that change is in the stationary value, not this one)"
@@ -971,7 +973,9 @@ def merge_genus_cells(cells: dict, taxa: dict, limit: float = DETECTION_LIMIT, l
                   "start": _mean_of(c["start"] for _, c in members), "end": _mean_of(c["end"] for _, c in members),
                   "p_value": None, "initial": _mean_of(c["initial"] for _, c in members),
                   "exponential_h": _mean_of(c.get("exponential_h") for _, c in members),
-                  "merged_taxa": sorted(t for t, _ in members), "limit": lim}
+                  "merged_taxa": sorted(t for t, _ in members), "limit": lim,
+                  # what the merged taxa's exponential values miss, so the warning still ranks by it
+                  "missed": _mean_of(c.get("missed") for _, c in members)}
         if not any(c["n"] for _, c in members):
             merged["state"] = None
         out[key] = merged

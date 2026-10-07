@@ -142,7 +142,9 @@ crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("sto
 #' @noRd
 need_crm <- function(x) {
     if (!inherits(x, "foodnet_crm")) {
-        called <- tryCatch(deparse(sys.call(-1)[[1]]), error = function(e) "this function")
+        called <- tryCatch(deparse(sys.call(-1)[[1]]), error = function(e) "")
+        # through lapply() or do.call() the caller has no name of ours: say it in general (a review)
+        if (!called %in% getNamespaceExports("foodnet")) called <- "this function"
         stop_foodnet(called, "() takes the CRM parameters themselves (crm, from foodnet_listen() or ",
                      "foodnet_crm()), not ", if (is.matrix(x)) "a matrix such as crm_efficiency()'s E" else class(x)[1],
                      ": it builds what it needs from them, as in ", called, "(crm, ...)")

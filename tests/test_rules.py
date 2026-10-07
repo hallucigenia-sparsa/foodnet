@@ -381,3 +381,15 @@ def test_still_changing_looks_at_the_whole_stretch_to_the_ninety_percent_boundar
     assert derive._next_change(series, 8, 76) == pytest.approx(-0.4)     # 0.1 per interval, 0.4 over the stretch
     assert derive._next_change(series, 8) == pytest.approx(-0.1)         # without it: the next interval only
     assert derive._next_change(series, 8, 200) == pytest.approx(-0.4)    # never beyond the last sample
+
+
+def test_only_an_exponential_value_misses_the_change_after_the_growth_rate_fell():
+    # a review: a stationary value starts at the growth-rate boundary and holds that change, so it misses nothing
+    from foodnet.search import _tier_warning
+    cells = {("t1", "glc", "stationary"): {"n": 3, "state": "consumed", "mean": -5.15, "missed": None,
+                                            "cautions": ["growth_rate_boundary", "still_changing"]},
+             ("t1", "glc", "exponential"): {"n": 3, "state": "consumed", "mean": -3.08, "missed": -5.15,
+                                             "cautions": ["growth_rate_boundary", "still_changing"]}}
+    text = _tier_warning(cells, {"t1": "Alpha"}, {"glc": "glucose"})
+    assert text.index("Alpha glucose -3.08 mM (exponential") < text.index("Alpha glucose -5.15 mM (stationary")
+    assert "stationary: growth_rate_boundary" not in text and text.count("mM more after the growth rate fell") == 1

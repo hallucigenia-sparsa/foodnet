@@ -41,8 +41,11 @@ semantic versioning.
   a miaSim simulation step by step, which the example runs as it is.
 - Cautions are ranked: tier 1, the value spans the wrong or an uneven stretch of time; tier 2, whether there is
   a change, or how large, is less certain; tier 3, how the phase was found. The page's first warning, also in
-  the files' README and R's print, names the tier 1 changes, largest first. still_changing tests the whole
-  stretch from the growth-rate boundary to where the 90% rule would have ended growth.
+  the files' README and R's print, names the tier 1 values: first those still changing after the growth rate
+  fell, by the share of the change their exponential value misses, then the others by size. still_changing
+  tests the whole stretch from the growth-rate boundary to where the 90% rule would have ended growth.
+- R: `crm_backcheck()` warns that over a time window neither of its rows judges the Monod constants; the
+  help says to choose them on the exponential phase.
 - R: each function taking the parameters says so when handed something else (crm_efficiency()'s E, say), and
   a taxon a miaSim simulation cannot use is named with what it lacks and the crm_subset() line that leaves it
   out, by crm_scale(), as_miasim() and print().
