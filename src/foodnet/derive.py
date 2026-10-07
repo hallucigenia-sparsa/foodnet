@@ -974,8 +974,10 @@ def merge_genus_cells(cells: dict, taxa: dict, limit: float = DETECTION_LIMIT, l
                   "p_value": None, "initial": _mean_of(c["initial"] for _, c in members),
                   "exponential_h": _mean_of(c.get("exponential_h") for _, c in members),
                   "merged_taxa": sorted(t for t, _ in members), "limit": lim,
-                  # what the merged taxa's exponential values miss, so the warning still ranks by it
-                  "missed": _mean_of(c.get("missed") for _, c in members)}
+                  # what the genus value misses, built as the value is: the median over the voting taxa, 0 for a
+                  # taxon that misses nothing (a review: a mean over the still-changing ones alone overstated it)
+                  "missed": (statistics.median(c.get("missed") or 0.0 for _, c in voting)
+                             if any(c.get("missed") is not None for _, c in voting) else None)}
         if not any(c["n"] for _, c in members):
             merged["state"] = None
         out[key] = merged

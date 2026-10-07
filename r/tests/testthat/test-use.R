@@ -198,3 +198,17 @@ test_that("an error names the function that was called", {
     E <- suppressWarnings(crm_efficiency(foodnet:::as_foodnet_crm(example_payload()), scale = "shares", na = "zero"))
     expect_error(as_miasim(E, x0 = 1, monod_constant = 1), "as_miasim\\(\\) takes the CRM parameters themselves")
 })
+
+test_that("unscaling takes the unit the simulation used", {
+    # a review: as_miasim(growth = "phase_floor") then crm_unscale() without it put a taxon off by its rate ratio
+    p <- example_payload()
+    p$growth_rates <- list(0.1, 0.3)
+    p$phase_growth_rates <- list(0.2, 0.1)                          # A's fitted rate is below its phase's rate
+    crm <- foodnet:::as_foodnet_crm(p)
+    args <- suppressWarnings(as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0,
+                                       na = "zero", growth = "phase_floor"))
+    expect_equal(unname(crm_unscale(crm, args$x0, args = args)), unname(crm$biomass_start))
+    expect_false(isTRUE(all.equal(unname(suppressWarnings(crm_unscale(crm, args$x0))), unname(crm$biomass_start))))
+    expect_error(crm_unscale(crm, args$x0, growth = "measured", args = args), "the simulation used")
+    expect_null(attr(c(args, list(t_end = 1)), "foodnet_growth"))   # never reaches miaSim
+})

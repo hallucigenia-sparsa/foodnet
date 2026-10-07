@@ -166,7 +166,7 @@ E <- crm_efficiency(crm, na = "zero")                      # miaSim's E, in each
 crm_backcheck(crm, monod_constant = 1, na = "zero")        # each taxon alone against its own monoculture
 args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
-abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse))   # back in each growth curve's unit
+abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse), args = args)   # back in each growth curve's unit
 ```
 
 A run is deterministic as `as_miasim()` shapes it. In miaSim 1.18, `simulateConsumerResource` adds a random

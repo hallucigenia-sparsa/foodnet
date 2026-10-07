@@ -47,7 +47,7 @@ phase.
 | `crm_rates(crm)` | the growth rates (1/h); `missing =` fills the ones nobody measured, only if you say so |
 | `crm_resources(crm)` | the initial concentrations of the medium (mM) |
 | `crm_efficiency(crm)` | miaSim's efficiency matrix E, in each taxon's own unit of abundance: positive for a resource taken up, negative for a by-product, the opposite of foodnet's signed matrix (built from the consumed and produced matrices, never from that one) |
-| `crm_scale(crm)`, `crm_unscale(crm, abundance)` | that unit, in the growth curve's unit, and simulated abundances back in the curve's unit |
+| `crm_scale(crm)`, `crm_unscale(crm, abundance, args = args)` | that unit, in the growth curve's unit, and simulated abundances back in the curve's unit |
 | `crm_subset(crm, taxa, resources)` | the same parameters for fewer taxa or resources |
 | `crm_phase(crm, "stationary")` | the stationary phase, when the search asked for both phases |
 | `crm$interval_start`, `crm$interval_end` | taxa by resources, the hours each value was measured over |
@@ -61,7 +61,7 @@ phase.
 crm_backcheck(crm, monod_constant = 1, na = "zero")
 args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
-abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse))
+abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse), args = args)
 ```
 
 A run is deterministic as `as_miasim()` shapes it. In miaSim 1.18, `simulateConsumerResource` adds a random

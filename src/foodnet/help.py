@@ -301,9 +301,9 @@ fell (still_changing, which the warnings name). It takes <code>crm</code> itself
 <code>monod_constant</code>, and <code>growth</code> if you set it): <code>args &lt;- as_miasim(crm, x0 =
 crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")</code>, then <code>tse &lt;-
 do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))</code>.</li>
-<li>Back in each growth curve's unit: <code>abundance &lt;- crm_unscale(crm, SummarizedExperiment::assay(tse))</code>,
-plotted over hours with <code>matplot(SummarizedExperiment::colData(tse)$time, t(log10(abundance)), type =
-"l")</code>.</li>
+<li>Back in each growth curve's unit: <code>abundance &lt;- crm_unscale(crm, SummarizedExperiment::assay(tse),
+args = args)</code>, which takes the unit the simulation used from <code>args</code>, plotted over hours with
+<code>matplot(SummarizedExperiment::colData(tse)$time, t(log10(abundance)), type = "l")</code>.</li>
 </ol>
 <p>The run is deterministic as <code>as_miasim()</code> shapes it: miaSim adds random immigrants at
 <code>migration_p</code> even without <code>stochastic</code>, so it passes <code>migration_p = 0</code>. To explore

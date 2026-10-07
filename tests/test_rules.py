@@ -393,3 +393,17 @@ def test_only_an_exponential_value_misses_the_change_after_the_growth_rate_fell(
     text = _tier_warning(cells, {"t1": "Alpha"}, {"glc": "glucose"})
     assert text.index("Alpha glucose -3.08 mM (exponential") < text.index("Alpha glucose -5.15 mM (stationary")
     assert "stationary: growth_rate_boundary" not in text and text.count("mM more after the growth rate fell") == 1
+
+
+def test_a_genus_misses_what_its_median_misses():
+    # a review: one taxon of three still changing by -6 mM made the genus "miss" -6 mM on a -2 mM median
+    taxa = {t: {"id": t, "name": f"Genus sp{i}", "genus": "Genus"} for i, t in enumerate(("a", "b", "c"))}
+    cell = {"n": 3, "n_experiments": 1, "values": [], "direction": "consumed", "state": "consumed", "experiments": [],
+            "studies": [], "media": [], "notes": [], "start": 0.0, "end": 12.0, "p_value": None, "initial": 5.0,
+            "exponential_h": 12.0, "limit": 0.2}
+    cells = {("a", "x", "exponential"): {**cell, "mean": -2.0, "cautions": ["still_changing"], "missed": -6.0},
+             ("b", "x", "exponential"): {**cell, "mean": -2.0, "cautions": [], "missed": None},
+             ("c", "x", "exponential"): {**cell, "mean": -1.0, "cautions": [], "missed": None}}
+    merged = derive.merge_genus_cells(cells, taxa, 0.2)
+    (genus_cell,) = merged.values()
+    assert genus_cell["mean"] == -2.0 and genus_cell["missed"] == 0.0

@@ -275,11 +275,23 @@ crm_scale <- function(x, growth = c("measured", "phase_floor")) {
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param abundance Abundances from a simulation built with [as_miasim()]: a vector with one value per
 #'   taxon, or a matrix with taxa as rows (as `SummarizedExperiment::assay()` of miaSim's result).
-#' @param growth The `growth` given to [as_miasim()].
+#' @param growth The `growth` given to [as_miasim()]; with `args`, read from them.
+#' @param args The list [as_miasim()] returned, so the unit is the one the simulation used (recommended):
+#'   given `"phase_floor"` there and not here, a taxon whose rate it raised came back off by the ratio of
+#'   the two rates.
 #' @return The same, multiplied by [crm_scale()].
 #' @export
-crm_unscale <- function(x, abundance, growth = c("measured", "phase_floor")) {
-    scale <- crm_scale(x, match.arg(growth))
+crm_unscale <- function(x, abundance, growth = c("measured", "phase_floor"), args = NULL) {
+    if (!is.null(args)) {
+        used <- attr(args, "foodnet_growth")
+        if (is.null(used)) stop_foodnet("args is not the list as_miasim() returned")
+        if (is.na(used)) stop_foodnet("as_miasim() was given your own E, so its abundances are in your units already")
+        if (!missing(growth) && !identical(match.arg(growth), used)) {
+            stop_foodnet("growth = \"", match.arg(growth), "\", but the simulation used \"", used, "\"")
+        }
+        growth <- used
+    }
+    scale <- crm_scale(x, match.arg(growth, c("measured", "phase_floor")))
     if (is.matrix(abundance)) {
         if (nrow(abundance) != length(scale)) {
             stop_foodnet("abundance needs one row per taxon (", length(scale), "), as assay() of miaSim's result; ",
@@ -562,7 +574,7 @@ crm_write <- function(x, dir) {
 #' \dontrun{
 #' args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
 #' tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
-#' cells <- crm_unscale(crm, SummarizedExperiment::assay(tse))
+#' cells <- crm_unscale(crm, SummarizedExperiment::assay(tse), args = args)
 #' }
 #' @export
 as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource = NULL,
@@ -611,15 +623,21 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
         warning("these parameters are incomplete: records could not be read from mGrowthDB (print(x) lists ",
                 "them)", call. = FALSE)
     }
+    own_E <- !is.null(E)
     if (is.null(E)) {
         E <- crm_efficiency(x, na = na, growth = growth, allow = allow)
         x0 <- as.numeric(x0) / crm_scale(x, growth)       # into each taxon's own unit (crm_scale)
     }
     # migration_p = 0: miaSim adds random immigration even when stochastic is FALSE (its perturb() does not
     # scale that term by stochastic), and in these units one event is as large as a starting population
-    list(n_species = n, n_resources = m, names_species = x$taxa, names_resources = x$resources, E = E,
-         x0 = unname(as.numeric(x0)), resources = unname(resources), growth_rates = unname(rates),
-         monod_constant = unname(K), migration_p = 0)
+    args <- list(n_species = n, n_resources = m, names_species = x$taxa, names_resources = x$resources, E = E,
+                 x0 = unname(as.numeric(x0)), resources = unname(resources), growth_rates = unname(rates),
+                 monod_constant = unname(K), migration_p = 0)
+    # the unit the abundances are in, for crm_unscale(args = ): with "phase_floor" given here and not there, a
+    # taxon came back off by the ratio of its two rates (a review); NA with your own E (no unit of ours).
+    # c(args, list(...)) drops it, so do.call() never passes it to miaSim.
+    attr(args, "foodnet_growth") <- if (own_E) NA_character_ else growth
+    args
 }
 
 #' Simulate each taxon alone and compare with its monoculture

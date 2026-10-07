@@ -38,6 +38,6 @@ names them.
 \dontrun{
 args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
-cells <- crm_unscale(crm, SummarizedExperiment::assay(tse))
+cells <- crm_unscale(crm, SummarizedExperiment::assay(tse), args = args)
 }
 }
