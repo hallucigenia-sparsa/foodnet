@@ -144,7 +144,10 @@ def exponential_end(times, values, fraction: float = FRACTION, factor: float = N
     # "moved": the 90% rule alone would have ended growth more than one sample later (E. coli LF82: 8 h
     # instead of 84 h), which the arcs flag; one sample earlier is within the sampling's own resolution
     return {"end": end, "index": i, "last": i == len(pairs) - 1, "coarse": i < 2, "by": by,
-            "moved": by == "rate" and late - i > 1}
+            "moved": by == "rate" and late - i > 1,
+            # where the 90% rule alone would have ended growth: still_changing looks at the whole stretch from
+            # the boundary to here (a review: the next interval alone missed slow changes over 8 to 76 h)
+            "late": times[late]}
 
 
 def grown_by_od(curve: dict) -> bool:

@@ -165,7 +165,7 @@ test_that("subsetting keeps the warnings about kept taxa only, once marked, and 
 test_that("a taxon a simulation cannot use is named with what it lacks, and how to leave it out", {
     crm <- foodnet:::as_foodnet_crm(example_payload())                 # B has no growth rate
     expect_error(crm_scale(crm), "and B \\(no growth rate\\) lacks them")
-    expect_error(crm_scale(crm), "crm_subset\\(x, taxa = setdiff\\(x\\$taxa, c\\(\"B\"\\)\\)\\)")
+    expect_error(crm_scale(crm), "crm <- crm_subset\\(crm, taxa = setdiff\\(crm\\$taxa, c\\(\"B\"\\)\\)\\)")
 })
 
 test_that("passing E where the parameters belong says so", {
@@ -173,4 +173,15 @@ test_that("passing E where the parameters belong says so", {
     E <- suppressWarnings(crm_efficiency(crm, scale = "shares", na = "zero"))
     expect_error(crm_backcheck(E, monod_constant = 1), "takes the CRM parameters themselves")
     expect_error(crm_efficiency(E), "not a matrix such as crm_efficiency\\(\\)'s E")
+})
+
+test_that("a novice is told what to type, in the names the help uses", {
+    crm <- foodnet:::as_foodnet_crm(example_payload())               # B has no growth rate
+    # the NA stop points at the argument of the function called, not at crm_efficiency()
+    expect_error(as_miasim(crm_subset(crm, taxa = "A"), x0 = 1, monod_constant = 1), "pass na = \"zero\" to the function you called")
+    # a taxon a simulation cannot use is named before x0 is judged, with a line that runs as typed
+    expect_error(as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, na = "zero"),
+                 "crm <- crm_subset\\(crm, taxa = setdiff\\(crm\\$taxa, c\\(\"B\"\\)\\)\\)")
+    out <- paste(capture.output(print(crm)), collapse = "\n")
+    expect_match(out, "a miaSim simulation cannot use B \\(no growth rate\\)")
 })

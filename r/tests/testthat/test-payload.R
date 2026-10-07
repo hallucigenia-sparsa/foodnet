@@ -128,13 +128,12 @@ test_that("second-window compounds keep their window label through a subset", {
     expect_equal(unique(rows$phase[rows$resource == "glucose"]), "exponential")
 })
 
-test_that("printing names the values whose cautions change their meaning first", {
+test_that("printing carries the page's ranking once, not a list of its own", {
     p <- example_payload()
     p$caveats$caution_tiers <- list(still_changing = 1, pair_decided = 2, growth_rate_boundary = 3)
-    p$caveats$cautions <- list(list(taxon = "A", resource = "glucose", cautions = list("growth_rate_boundary", "still_changing"), notes = list()),
-                               list(taxon = "B", resource = "acetate", cautions = list("pair_decided"), notes = list()),
-                               list(taxon = "B", resource = "glucose", cautions = list("growth_rate_boundary"), notes = list()))
+    p$caveats$warnings <- list("1 change(s) span the wrong or an uneven stretch of time (tier 1; read these first), largest first: A glucose -8.00 mM (exponential: still_changing).")
+    p$caveats$cautions <- list(list(taxon = "A", resource = "glucose", cautions = list("growth_rate_boundary", "still_changing"), notes = list()))
     out <- paste(capture.output(print(foodnet:::as_foodnet_crm(p))), collapse = "\n")
-    expect_match(out, "1 value\\(s\\) carry a caution that changes what they mean \\(tier 1\\), read them first: A glucose")
-    expect_match(out, "1 more carry only cautions of certainty \\(tier 2\\)")
+    expect_equal(lengths(regmatches(out, gregexpr("tier 1", out))), 1)
+    expect_match(out, "x\\$caveats\\$caution_tiers ranks them")
 })

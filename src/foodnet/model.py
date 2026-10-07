@@ -49,7 +49,7 @@ CAUTIONS = (
     "no_variance",             # the replicates are identical (rounding, or one series deposited twice): no test
     "amounts_differ",          # the experiments agree in direction, with amounts more than twofold apart
     "experiment_left_out",     # an inconclusive experiment that does not contradict the others is left out
-    "still_changing",          # the compound kept changing beyond the limit right after growth slowed
+    "still_changing",          # the compound changed beyond the limit between the rate-rule and the 90% boundary
     "growth_rate_boundary",    # the growth-rate rule ended growth more than one sample before the 90% rule
     "whole_run",               # no end of exponential growth was found: the change over the whole run
     "not_grown",               # the culture grew by neither the fold rule nor an OD rise of 0.1: no value
@@ -62,19 +62,23 @@ CAUTIONS = (
     "pair_decided",            # an experiment of two replicates decided it (a change or no change), no interval
 )
 
-# How much a caution matters (Karoline, 2026-10-07: "can we rank them somehow?", then the three tiers as
-# proposed), since most values carry one (24 of 31 on all of mGrowthDB) and the one that matters got lost:
-#   1: the value means something other than it seems (it misses part of the change, spans the whole run, or
-#      rests on records that cover different spans); read it before using the value;
-#   2: the same meaning, less certain;
-#   3: how the phase boundary was found, which changes nothing by itself (where it does, a tier 1 caution says
-#      so: growth_rate_boundary shows its effect as still_changing).
+# How much a caution matters (Karoline, 2026-10-07: "can we rank them somehow?"; regrouped the same day after a
+# review, "Regroup as proposed"), since most values carry one and the one that matters got lost:
+#   1: the value spans the wrong or an uneven stretch of time (part of the change falls outside it, it spans
+#      the whole run, or its replicates or records cover different spans); read it before using the value;
+#   2: whether there is a change, or how large, is less certain;
+#   3: how the phase was found, or presence only. growth_rate_boundary changes nothing by itself: where the
+#      compound changed between the two boundaries, the value carries still_changing, checked over that whole
+#      stretch.
 # conflict and inconclusive (and not_grown) explain why a cell has no value, so they rank no value.
 CAUTION_TIERS = {
-    "still_changing": 1, "start_differs": 1, "amounts_differ": 1, "short_record": 1, "whole_run": 1,
-    "growth_unclear": 1, "growth_unknown": 1, "window_beyond_data": 1,
-    "pair_decided": 2, "boundaries_differ": 2, "within_scatter": 2, "experiment_left_out": 2, "no_variance": 2,
-    "single_replicate": 2, "coarse_sampling": 2, "phase_from_other_replicates": 2, "within_evaporation": 2,
+    # the value spans the wrong or an uneven stretch of time
+    "still_changing": 1, "whole_run": 1, "growth_unclear": 1, "growth_unknown": 1, "short_record": 1,
+    "window_beyond_data": 1, "start_differs": 1, "boundaries_differ": 1,
+    # whether there is a change, or how large, is less certain
+    "pair_decided": 2, "single_replicate": 2, "no_variance": 2, "amounts_differ": 2, "within_scatter": 2,
+    "within_evaporation": 2, "experiment_left_out": 2, "coarse_sampling": 2, "phase_from_other_replicates": 2,
+    # how the phase was found (its effect, where there is one, is still_changing), or presence only
     "growth_rate_boundary": 3, "stationary_not_reached": 3, "not_detected_in_value_medium": 3,
 }
 

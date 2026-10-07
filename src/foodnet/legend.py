@@ -28,7 +28,8 @@ CAUTION_TEXT = {
     "no_variance": "identical replicates (rounding, or one series twice): no test",
     "amounts_differ": "the experiments agree in direction, with amounts more than twofold apart",
     "experiment_left_out": "an inconclusive experiment that does not contradict the others is left out",
-    "still_changing": "the compound kept changing right after growth slowed (a slow-down, or a second substrate)",
+    "still_changing": "the compound kept changing after the growth rate fell, before the 90% rule would have ended "
+                      "growth (a slow-down, or a second substrate)",
     "growth_rate_boundary": "growth ended where its rate fell, more than a sample before 90% of its maximum",
     "whole_run": "no end of growth was found, so the change is over the whole run, not a phase",
     "not_grown": "the culture did not grow (neither 1.5-fold nor, in OD, by 0.1) nor metabolize: no value, no arc",

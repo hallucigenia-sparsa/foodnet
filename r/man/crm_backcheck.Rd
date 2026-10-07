@@ -13,7 +13,7 @@ crm_backcheck(x, monod_constant, missing_resource = 0, na = c("stop", "zero"), g
 \item{growth}{\code{"measured"} or \code{"phase_floor"}: the growth rates, as in \code{\link{crm_scale}}.}
 \item{allow}{Caveats to accept, as in \code{\link{crm_efficiency}}.}
 }
-\value{A data frame: taxon, what (\code{"biomass"}, \code{"hours to grow"}, or a resource), direction, measured, simulated and their ratio. Biomass is in each growth curve's unit.}
+\value{A data frame: taxon, what (\code{"biomass"}, \code{"hours to grow"}, or a resource), direction, measured, simulated and their ratio. Biomass is in each growth curve's unit. "biomass" compares what the taxon gains over its phase; "hours to grow" compares the time it takes to gain its measured biomass with the length of its phase (NA: it never gains it within three phase lengths). Read both: over a time window that runs until the uptake stops, the biomass ratio is near 1 whatever the Monod constants, and only the hours say whether they are right.}
 \description{
 Runs miaSim's consumer-resource model for each taxon on its own, from its measured starting abundance
 and the medium's starting concentrations, over the length of its phase, and compares what it gains and

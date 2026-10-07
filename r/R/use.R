@@ -178,8 +178,8 @@ amounts <- function(x, na = "stop", booleans_ok = FALSE) {
         if (na == "stop") {
             stop_foodnet(sum(is.na(consumed)) + sum(is.na(produced)), " cell(s) are NA (not assayed, seen ",
                          "only in another medium, inconclusive, without a phase, or a second-window compound ",
-                         "given in the other phase; x$evidence_consumed and x$evidence_produced say which). ",
-                         "Fill them, or use crm_efficiency(x, na = \"zero\").")
+                         "given in the other phase; crm$evidence_consumed and crm$evidence_produced say which). ",
+                         "Fill them, or pass na = \"zero\" to the function you called to count them as 0.")
         }
         zeroed <- c(x$evidence_consumed[is.na(consumed)], x$evidence_produced[is.na(produced)])
         kinds <- table(zeroed)
@@ -195,7 +195,7 @@ amounts <- function(x, na = "stop", booleans_ok = FALSE) {
         paste(moving$taxon, moving$resource)[grepl("still_changing", moving$cautions)]
     if (length(moving)) {
         # a script that never prints the parameters still hears it
-        warning(length(moving), " value(s) miss use that went on after growth slowed (still_changing), so E ",
+        warning(length(moving), " value(s) miss use that went on after the growth rate fell (still_changing), so E ",
                 "underrates them: ", paste(utils::head(moving, 4), collapse = ", "),
                 if (length(moving) > 4) " and more" else "", ". A time window over both phases gives the whole change.",
                 call. = FALSE)
@@ -249,9 +249,9 @@ crm_scale <- function(x, growth = c("measured", "phase_floor")) {
         }, character(1))
         stop_foodnet("a miaSim simulation needs a growth rate, a biomass gain and a measured uptake for every ",
                      "taxon, and ", paste(what, collapse = "; "), if (length(lacking) == 1) " lacks" else " lack",
-                     " them. Leave ", if (length(lacking) == 1) "it" else "them", " out: x <- crm_subset(x, taxa = ",
-                     "setdiff(x$taxa, c(", paste0("\"", lacking, "\"", collapse = ", "), "))); or use ",
-                     "crm_efficiency(x, scale = \"shares\") for a model that reads E as shares.")
+                     " them. Leave ", if (length(lacking) == 1) "it" else "them", " out (crm being your parameters): ",
+                     "crm <- crm_subset(crm, taxa = setdiff(crm$taxa, c(", paste0("\"", lacking, "\"", collapse = ", "),
+                     "))); or use crm_efficiency(crm, scale = \"shares\") for a model that reads E as shares.")
     }
     out <- dx * total / (rates * squares)
     names(out) <- x$taxa
@@ -544,12 +544,11 @@ crm_write <- function(x, dir) {
 #'   other noise (drift, epochs, external events) is off unless `stochastic = TRUE`, and measurement noise
 #'   unless `error_variance > 0`. To explore noise, change them in this list before the call, since it
 #'   already holds `migration_p` (`args$migration_p <- 0.01; args$stochastic <- TRUE`); to turn it all off
-#'   again, set `migration_p = 0, stochastic = FALSE, error_variance = 0`. Leave `norm = FALSE`: relative
+#'   again, `args$migration_p <- 0; args$stochastic <- FALSE; args$error_variance <- 0`. Leave `norm = FALSE`: relative
 #'   abundances cannot be turned back by [crm_unscale()].
 #' @examples
 #' \dontrun{
 #' args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
-#' set.seed(1)
 #' tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 #' cells <- crm_unscale(crm, SummarizedExperiment::assay(tse))
 #' }
@@ -570,8 +569,13 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     }
     n <- length(x$taxa)
     m <- length(x$resources)
+    # a taxon a simulation cannot use is named first, with what it lacks, rather than as an NA in x0 (a review:
+    # "x0 needs one number per taxon" sent a user looking at x0)
+    if (is.null(E)) crm_scale(x, growth)
     x0 <- if (!is.null(names(x0)) && all(x$taxa %in% names(x0))) x0[x$taxa] else x0
-    if (length(x0) != n || anyNA(x0)) stop_foodnet("x0 needs one number per taxon (", n, ")")
+    if (length(x0) != n) stop_foodnet("x0 needs one number per taxon (", n, "), in the order of crm$taxa or named")
+    if (anyNA(x0)) stop_foodnet("x0 is NA for ", paste(x$taxa[is.na(x0)], collapse = ", "), ": give a starting ",
+                                "abundance, or leave the taxon out with crm_subset()")
     K <- if (length(monod_constant) == 1) matrix(monod_constant, n, m) else as.matrix(monod_constant)
     if (!identical(dim(K), c(n, m)) || anyNA(K)) stop_foodnet("monod_constant needs one number or a ", n, " by ",
                                                              m, " matrix")
@@ -622,7 +626,11 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
 #' @param growth `"measured"` or `"phase_floor"`: the growth rates, as in [crm_scale()].
 #' @param allow Caveats to accept, as in [crm_efficiency()].
 #' @return A data frame: taxon, what (`"biomass"`, `"hours to grow"`, or a resource), direction, measured,
-#'   simulated and their ratio. Biomass is in each growth curve's unit.
+#'   simulated and their ratio. Biomass is in each growth curve's unit. "biomass" compares what the taxon gains
+#'   over its phase; "hours to grow" compares the time it takes to gain its measured biomass with the length
+#'   of its phase (NA: it never gains it within three phase lengths). Read both: over a time window that runs
+#'   until the uptake stops, the biomass ratio is near 1 whatever the Monod constants, and only the hours say
+#'   whether they are right.
 #' @examples
 #' \dontrun{
 #' crm_backcheck(crm, monod_constant = 1, na = "zero")

@@ -16,7 +16,7 @@ as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource
 \item{na}{What \code{\link{crm_efficiency}} does with NA cells: \code{"stop"} (the default) or \code{"zero"}.}
 \item{growth}{\code{"measured"} or \code{"phase_floor"}: the growth rates, as in \code{\link{crm_scale}}.}
 }
-\value{A list with \code{n_species}, \code{n_resources}, \code{names_species}, \code{names_resources}, \code{E}, \code{x0}, \code{resources}, \code{growth_rates}, \code{monod_constant} and \code{migration_p = 0}: miaSim adds random immigration even with \code{stochastic = FALSE} (miaSim 1.18's \code{perturb}), which in these units would swamp growth. Its other noise (drift, epochs, external events) is off unless \code{stochastic = TRUE}, and measurement noise unless \code{error_variance > 0}. To explore noise, change them in this list before the call, since it already holds \code{migration_p} (\code{args$migration_p <- 0.01; args$stochastic <- TRUE}); to turn it all off again, set \code{migration_p = 0, stochastic = FALSE, error_variance = 0}. Leave \code{norm = FALSE}: relative abundances cannot be turned back by \code{\link{crm_unscale}}.}
+\value{A list with \code{n_species}, \code{n_resources}, \code{names_species}, \code{names_resources}, \code{E}, \code{x0}, \code{resources}, \code{growth_rates}, \code{monod_constant} and \code{migration_p = 0}: miaSim adds random immigration even with \code{stochastic = FALSE} (miaSim 1.18's \code{perturb}), which in these units would swamp growth. Its other noise (drift, epochs, external events) is off unless \code{stochastic = TRUE}, and measurement noise unless \code{error_variance > 0}. To explore noise, change them in this list before the call, since it already holds \code{migration_p} (\code{args$migration_p <- 0.01; args$stochastic <- TRUE}); to turn it all off again, \code{args$migration_p <- 0; args$stochastic <- FALSE; args$error_variance <- 0}. Leave \code{norm = FALSE}: relative abundances cannot be turned back by \code{\link{crm_unscale}}.}
 \description{
 Returns the arguments \code{miaSim::simulateConsumerResource} takes: the numbers of taxa and resources and
 their names, the efficiency matrix \code{E}, the initial resource concentrations, the growth rates, the
@@ -37,7 +37,6 @@ names them.
 \examples{
 \dontrun{
 args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
-set.seed(1)
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 cells <- crm_unscale(crm, SummarizedExperiment::assay(tse))
 }

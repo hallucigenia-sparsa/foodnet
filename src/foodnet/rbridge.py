@@ -44,8 +44,9 @@ INSTALL_R = (f'remotes::install_github("{REPOSITORY_SLUG}", subdir = "r", ref = 
 # local install, which needs no GitHub access; clearing the token is not suggested, since that changes
 # the session for everything else in it (Karoline, 2026-10-04: "I don't think we should recommend it for
 # users, as it alters their system settings in ways that can affect them negatively").
-INSTALL_TROUBLE = ('If that fails with "HTTP error 404", a GitHub token stored on this machine is being '
-                   'used and cannot see the repository. Installing from a clone needs no GitHub access: '
+INSTALL_TROUBLE = ('If that fails with "HTTP error 404" or "cannot open URL", either the release it names is not '
+                   'published yet, or a GitHub token stored on this machine is being used and cannot see the '
+                   'repository. Installing from a clone needs no GitHub access: '
                    'remotes::install_local("<the repository>/r"), or R CMD INSTALL r in a terminal.')
 
 

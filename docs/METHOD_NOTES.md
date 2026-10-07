@@ -264,16 +264,19 @@ with metabolite data."
     belongs to mGrowthCtrl.
 
 30. **Cautions are ranked.** Karoline, 2026-10-07, after a review found 24 of 31 values on all of mGrowthDB
-    carrying a caution, so the one that matters was easy to miss: "can we rank them somehow?", then the three
-    tiers as proposed, shown on the page, in the README and in R's print. Tier 1 changes what the value means
-    (still_changing, start_differs, amounts_differ, short_record, whole_run, growth_unclear, growth_unknown,
-    window_beyond_data); tier 2 makes it less certain (pair_decided, boundaries_differ, within_scatter,
-    experiment_left_out, no_variance, single_replicate, coarse_sampling, phase_from_other_replicates,
-    within_evaporation); tier 3 says how the phase was found (growth_rate_boundary, stationary_not_reached,
-    not_detected_in_value_medium); conflict, inconclusive and not_grown explain a missing value. The page names
-    the tier 1 values first (on all of mGrowthDB, 20 of 40 values, changes and measured zeros, against 28 with any caution).
-    growth_rate_boundary, the most common caution, is tier 3: where the earlier end of growth matters, the
-    value carries still_changing.
+    carrying a caution, so the one that matters was easy to miss: "can we rank them somehow?". A second review
+    the same day found the first grouping inconsistent, and she chose "Regroup as proposed", "Check the whole
+    stretch" and "Changes first, by size". Tier 1, the value spans the wrong or an uneven stretch of time:
+    still_changing, whole_run, growth_unclear, growth_unknown, short_record, window_beyond_data, start_differs,
+    boundaries_differ. Tier 2, whether there is a change, or how large, is less certain: pair_decided,
+    single_replicate, no_variance, amounts_differ, within_scatter, within_evaporation, experiment_left_out,
+    coarse_sampling, phase_from_other_replicates. Tier 3, how the phase was found, or presence only:
+    growth_rate_boundary, stationary_not_reached, not_detected_in_value_medium. conflict, inconclusive and
+    not_grown explain a missing value. growth_rate_boundary changes nothing by itself because still_changing
+    now tests the whole stretch from the growth-rate boundary to where the 90% rule would have ended growth
+    (it tested only the next interval, and E. coli LF82's slow trehalose uptake between 8 and 76 h went
+    unflagged). The page's first warning names the tier 1 changes, largest first, counts the measured zeros of
+    that tier, and says how many values carry only tier 2 cautions; R's print carries that warning.
 
 ## Known limits
 

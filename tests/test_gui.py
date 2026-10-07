@@ -179,5 +179,13 @@ def test_the_help_walks_through_a_miasim_simulation():
     i = text.index('id="miasim"')
     steps = text[i:text.index("<h2", i + 1)]
     for step in ("CRM example", "foodnet_listen()", "crm_subset(", "crm_backcheck(crm", "as_miasim(crm",
-                 "simulateConsumerResource", "crm_unscale(crm", "migration_p = 0, stochastic = FALSE"):
+                 "simulateConsumerResource", "crm_unscale(crm",
+                 "args$migration_p &lt;- 0; args$stochastic &lt;- FALSE"):
         assert step in steps, step
+
+
+def test_the_crm_example_starts_from_the_defaults_not_from_leftover_settings(server):
+    # a review: a leftover "merge to genus" turned the five species into four genera
+    page, _ = _search(server, crm_example="1", merge_genera="on", exclude_metabolites="glucose", phase="both")
+    assert 'name="merge_genera" value="1" checked' not in page and 'value="glucose"' not in page
+    assert "Bacteroides thetaiotaomicron" in page and 'value="48.0"' in page

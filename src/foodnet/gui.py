@@ -872,7 +872,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._send(render_form(self.token, "\n".join(EXAMPLE), settings, conditions=settings.get("conditions", "")))
             return
         if form.get("crm_example"):
-            settings = {**settings, **CRM_EXAMPLE["settings"], "conditions": "\n".join(CRM_EXAMPLE["conditions"])}
+            # from the defaults, so a setting left from an earlier search (merge to genus, say) does not change it
+            settings = {**DEFAULTS, **CRM_EXAMPLE["settings"], "conditions": "\n".join(CRM_EXAMPLE["conditions"])}
             self._send(render_form(self.token, "\n".join(CRM_EXAMPLE["taxa"]), settings, message=CRM_EXAMPLE_MESSAGE,
                                    conditions=settings["conditions"]))
             return

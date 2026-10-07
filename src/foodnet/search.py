@@ -502,24 +502,29 @@ def _genus_rates(found, missing, taxa):
 
 
 def _tier_warning(cells, taxon_names: dict, metabolite_names: dict, shown: int = 8) -> str:
-    """The values whose cautions change what they mean (tier 1), named, and how many more carry only cautions
-    of certainty (tier 2): the ranking Karoline chose on 2026-10-07, so the caution that matters is not lost
-    among the rest."""
+    """The changes whose cautions say they span the wrong or an uneven stretch of time (tier 1), named largest
+    first, with the measured zeros of that tier counted, and how many more values carry only cautions of
+    certainty (tier 2): the ranking Karoline chose on 2026-10-07 ("Changes first, by size"), so the caution
+    that matters is not lost among the rest."""
     values = [(key, c) for key, c in cells.items() if c.get("n") and c.get("state") in ("produced", "consumed",
                                                                                          "no_change")]
-    first = sorted(((key, c) for key, c in values if caution_tier(c["cautions"]) == 1),
-                   key=lambda kc: (taxon_names.get(kc[0][0], kc[0][0]), metabolite_names.get(kc[0][1], kc[0][1]),
-                                   kc[0][2]))
+    first = [(key, c) for key, c in values if caution_tier(c["cautions"]) == 1]
+    changes = sorted(((key, c) for key, c in first if c["state"] != "no_change"),
+                     key=lambda kc: -abs(kc[1].get("mean") or 0.0))
+    zeros = len(first) - len(changes)
     second = sum(1 for _, c in values if caution_tier(c["cautions"]) == 2)
     if not first:
         return ""
-    named = [f"{taxon_names.get(t, t)} {metabolite_names.get(m, m)} ({ph}: "
+    named = [f"{taxon_names.get(t, t)} {metabolite_names.get(m, m)} {c['mean']:+.2f} mM ({ph}: "
              + ", ".join(x for x in c["cautions"] if CAUTION_TIERS.get(x) == 1) + ")"
-             for (t, m, ph), c in first[:shown]]
-    more = f" and {len(first) - shown} more" if len(first) > shown else ""
-    return (f"{len(first)} of {len(values)} value(s) carry a caution that changes what they mean (tier 1; read "
-            f"these first): {'; '.join(named)}{more}. {second} more carry only cautions of certainty (tier 2); the "
-            "rest none, or only how the phase was found (tier 3). cautions.csv lists every caution of every value.")
+             for (t, m, ph), c in changes[:shown]]
+    more = f" and {len(changes) - shown} more" if len(changes) > shown else ""
+    head = (f"{len(changes)} change(s) span the wrong or an uneven stretch of time (tier 1; read these first), "
+            f"largest first: {'; '.join(named)}{more}." if changes else "")
+    tail = (f" {zeros} measured zero(s) carry such a caution too." if zeros else "")
+    return ((head + tail).strip() + f" Of {len(values)} value(s), {second} more carry only cautions of certainty "
+            "(tier 2); the rest none, or only how the phase was found (tier 3). cautions.csv lists every caution "
+            "of every value.")
 
 
 def _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown_in=(), boxed=False) -> list:

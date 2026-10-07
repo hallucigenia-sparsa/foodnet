@@ -262,33 +262,10 @@ print.foodnet_crm <- function(x, ...) {
     }
     flagged <- x$caveats$cautions
     if (NROW(flagged)) {
-        moving <- flagged[grepl("still_changing", flagged$cautions), , drop = FALSE]
-        if (nrow(moving)) {
-            named <- paste(moving$taxon, moving$resource)
-            cat(sprintf("   * %d value(s) miss use that went on after growth slowed (still_changing): %s%s\n",
-                        nrow(moving), paste(utils::head(named, 6), collapse = ", "),
-                        if (length(named) > 6) paste0(" and ", length(named) - 6, " more") else ""))
-        }
-        tiers <- x$caveats$caution_tiers
-        if (length(tiers)) {
-            # the most serious tier of each value's cautions (Karoline, 2026-10-07: rank them)
-            tier_of <- function(words) {
-                found <- tiers[intersect(strsplit(words, " ", fixed = TRUE)[[1]], names(tiers))]
-                if (length(found)) min(found) else NA
-            }
-            tier <- vapply(flagged$cautions, tier_of, numeric(1))
-            first <- flagged[!is.na(tier) & tier == 1, , drop = FALSE]
-            if (nrow(first)) {
-                named <- paste(first$taxon, first$resource)
-                cat(sprintf("   * %d value(s) carry a caution that changes what they mean (tier 1), read them first: %s%s\n",
-                            nrow(first), paste(utils::head(named, 6), collapse = ", "),
-                            if (length(named) > 6) paste0(" and ", length(named) - 6, " more") else ""))
-            }
-            cat(sprintf("   * %d more carry only cautions of certainty (tier 2); x$caveats$cautions lists every caution.\n",
-                        sum(!is.na(tier) & tier == 2)))
-        } else {
-            cat(sprintf("   * %d value(s) carry cautions: x$caveats$cautions lists them.\n", nrow(flagged)))
-        }
+        # the warnings above already rank the cautions (tier 1 first, largest change first), counted on the
+        # values as the page counts them; a second list here counted other cells (a review)
+        cat(sprintf("   * %d value(s) carry cautions: x$caveats$cautions lists each with its notes%s.\n",
+                    nrow(flagged), if (length(x$caveats$caution_tiers)) ", x$caveats$caution_tiers ranks them" else ""))
     }
     phase <- x$phase_growth_rates
     slow <- if (is.null(phase)) character(0) else
@@ -343,15 +320,23 @@ print.foodnet_crm <- function(x, ...) {
         cat(sprintf("   * %d value(s) have experiments that disagree (NA): crm_readme(x) names them.\n",
                     length(x$caveats$conflicts)))
     }
-    shrunk <- names(x$biomass_change)[!is.na(x$biomass_change) & x$biomass_change <= 0]
-    if (length(shrunk) && !x$caveats$stationary_phase) {
-        cat(sprintf("   * no biomass gain for %s: a miaSim simulation cannot scale it; leave it out (crm_subset)\n",
-                    paste(shrunk, collapse = ", ")))
-    }
     if (length(x$caveats$without_a_rate)) {
         cat(sprintf("   * %d taxon(s) have no growth rate: %s\n", length(x$caveats$without_a_rate),
                     paste(x$caveats$without_a_rate, collapse = ", ")))
         cat("       a simulation needs one from elsewhere; as_miasim() stops until you give it.\n")
+    }
+    # what a miaSim simulation needs of every taxon, said in one place with the line that leaves a taxon out
+    # (a review: the growth rate alone was named, so a user went looking for one where more was missing)
+    uptake <- rowSums(ifelse(is.na(x$consumed), 0, x$consumed))
+    unusable <- x$taxa[is.na(x$growth_rates) | is.na(x$biomass_change) | x$biomass_change <= 0 | uptake <= 0]
+    if (length(unusable) && !x$caveats$stationary_phase) {
+        what <- vapply(unusable, function(t) paste0(t, " (no ", paste(c(
+            if (is.na(x$growth_rates[[t]])) "growth rate",
+            if (is.na(x$biomass_change[[t]])) "biomass change" else if (x$biomass_change[[t]] <= 0) "biomass gain",
+            if (uptake[[t]] <= 0) "measured uptake"), collapse = ", no "), ")"), character(1))
+        cat(sprintf("   * a miaSim simulation cannot use %s; leave %s out: crm <- crm_subset(crm, taxa = setdiff(crm$taxa, c(%s)))\n",
+                    paste(what, collapse = "; "), if (length(unusable) == 1) "it" else "them",
+                    paste0("\"", unusable, "\"", collapse = ", ")))
     }
     if (length(x$other_phases)) {
         other <- names(x$other_phases)[1]

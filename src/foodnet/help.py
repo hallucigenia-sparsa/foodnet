@@ -118,11 +118,12 @@ EDGE_FIELDS = {
     "medium": "The medium (or media) the arc rests on.",
     "study_ids": "The studies the arc rests on.",
     "experiments": "The mGrowthDB experiments behind it.",
-    "cautions": ", ".join(CAUTIONS) + " (see the legend). Ranked: tier 1 changes what the value means ("
-                + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 1) + "), tier 2 makes it less certain ("
-                + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 2) + "), tier 3 says how the phase was "
-                "found (" + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 3) + "); the page names the "
-                "tier 1 values first.",
+    "cautions": ", ".join(CAUTIONS) + " (see the legend). Ranked: tier 1, the value spans the wrong or an "
+                "uneven stretch of time (" + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 1)
+                + "); tier 2, whether there is a change, or how large, is less certain ("
+                + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 2) + "); tier 3, how the phase was "
+                "found, or presence only (" + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 3) + "). The "
+                "page names the tier 1 changes first, largest first.",
     "notes": "Remarks in words: what disagreed, what another medium showed.",
     "merged_arcs": "With merged arcs, how many studies the arc joins.",
     "merged_taxa": "With merging to genus, the taxa behind the arc.",
@@ -223,7 +224,7 @@ experiments. Within an experiment, the replicates must pin the change down: with
 confidence interval on their mean must lie beyond the detection limit, so five replicates at -8 mM stay a change
 if one sample failed; with two, both must lie beyond it, so -0.2 and +1.9 mM are inconclusive, not production;
 one replicate decides nothing. Where the growth rate ended growth more than a sample
-before the 90% rule (growth_rate_boundary) and a compound kept changing right after, its values say
+before the 90% rule (growth_rate_boundary) and a compound kept changing between the two, its values say
 still_changing: the exponential value then lacks part of what the culture took up or made while slowing
 (E. coli LF82's glucose). The same experiment deposited under two studies is counted once.</p>
 <p>Because the value medium is chosen for the whole search, a taxon's values can change with the other taxa
@@ -267,10 +268,13 @@ arguments of <code>simulateConsumerResource</code>, and never lets it draw start
 random.</p>
 <h2 id="miasim">Simulate with miaSim, step by step</h2>
 <p>Press <strong>CRM example</strong> to follow these steps with five gut species in Wilkins-Chalgren (studies 2, 4,
-7 and 9, 0 to 48 h, trehalose over the whole run); with your own taxa, switch CRM mode on instead.</p>
+7 and 9, 0 to 48 h, trehalose over the whole run); with your own taxa, switch CRM mode on instead. The example
+uses a time window, so every taxon has a growth rate, a biomass gain and an uptake and the steps run as they are;
+with the exponential phase (the default) the same taxa run too, and the back-check (step 4) says more.</p>
 <ol>
 <li>Install the R package and <a href="{MIASIM}">miaSim</a> once: <code>install.packages(c("remotes",
-"BiocManager"))</code>, <code>{_e(rbridge.INSTALL_R)}</code>, <code>BiocManager::install("miaSim")</code>.</li>
+"BiocManager"))</code>, <code>{_e(rbridge.INSTALL_R)}</code>, <code>BiocManager::install("miaSim")</code>
+({_e(rbridge.INSTALL_TROUBLE)}).</li>
 <li>In R: <code>library(foodnet); crm &lt;- foodnet_listen()</code>. On this page press Get taxon-metabolite network,
 then Get CRM parameters with Send to R. (Without a listener: <code>crm &lt;- foodnet_crm(url)</code>, with the
 address shown under the button.)</li>
@@ -279,19 +283,24 @@ taxon without a growth rate, a biomass gain or an uptake. A simulation cannot us
 <code>crm &lt;- crm_subset(crm, taxa = setdiff(crm$taxa, c("its name")))</code> (the error names it, if you go
 on).</li>
 <li>Choose Monod constants, which foodnet does not measure, and check them: <code>crm_backcheck(crm, monod_constant
-= 1, na = "zero")</code> simulates each taxon alone and compares it with its monoculture (a biomass ratio near 1
-means it gains what it gained). It takes <code>crm</code> itself and builds the efficiency matrix; <code>na =
-"zero"</code> counts NA cells as 0 and says how many of each kind.</li>
+= 1, na = "zero")</code> simulates each taxon alone and compares it with its monoculture. Read two rows per taxon:
+"biomass" (a ratio near 1: it gains what it gained over the phase) and "hours to grow" (a ratio near 1: it takes
+as long as it did; below 1, faster). Over a time window that runs until the uptake stops, as in the CRM example,
+the biomass ratio is near 1 whatever the Monod constants, so judge them on the hours. It takes <code>crm</code>
+itself and builds the efficiency matrix; <code>na = "zero"</code> counts NA cells as 0 and says how many of each
+kind.</li>
 <li>Simulate the community: <code>args &lt;- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1,
 missing_resource = 0, na = "zero")</code>, then <code>tse &lt;- do.call(miaSim::simulateConsumerResource, c(args,
 list(t_end = 48, t_store = 480)))</code>.</li>
 <li>Back in each growth curve's unit: <code>abundance &lt;- crm_unscale(crm, SummarizedExperiment::assay(tse))</code>,
-for example <code>matplot(t(log10(abundance)), type = "l")</code>.</li>
+plotted over hours with <code>matplot(SummarizedExperiment::colData(tse)$time, t(log10(abundance)), type =
+"l")</code>.</li>
 </ol>
 <p>The run is deterministic as <code>as_miasim()</code> shapes it: miaSim adds random immigrants at
 <code>migration_p</code> even without <code>stochastic</code>, so it passes <code>migration_p = 0</code>. To explore
 noise, change <code>args</code> before the call (<code>args$migration_p &lt;- 0.01; args$stochastic &lt;-
-TRUE</code>); to turn it off again, <code>migration_p = 0, stochastic = FALSE, error_variance = 0</code>.</p>
+TRUE</code>); to turn it off again, <code>args$migration_p &lt;- 0; args$stochastic &lt;- FALSE;
+args$error_variance &lt;- 0</code>.</p>
 <h2 id="cytoscape">Cytoscape and the downloads</h2>
 <p>Send to Cytoscape puts the network into a running Cytoscape in the style of the legend. A downloaded GraphML can take
 the same style: <a href="{style_link}">foodnet_style.xml</a> (File, Import, Styles from File). JSON is the canonical

@@ -39,8 +39,13 @@ semantic versioning.
 - Cautions within_scatter, within_evaporation (with the Evaporation setting), pair_decided and start_differs.
 - A CRM example button (five gut species in Wilkins-Chalgren, CRM mode on) and a help section that walks through
   a miaSim simulation step by step, which the example runs as it is.
-- Cautions are ranked: tier 1 changes what a value means, tier 2 makes it less certain, tier 3 says how the
-  phase was found. The page, the README and R's print name the tier 1 values first.
+- Cautions are ranked: tier 1, the value spans the wrong or an uneven stretch of time; tier 2, whether there is
+  a change, or how large, is less certain; tier 3, how the phase was found. The page's first warning, also in
+  the files' README and R's print, names the tier 1 changes, largest first. still_changing tests the whole
+  stretch from the growth-rate boundary to where the 90% rule would have ended growth.
+- R: each function taking the parameters says so when handed something else (crm_efficiency()'s E, say), and
+  a taxon a miaSim simulation cannot use is named with what it lacks and the crm_subset() line that leaves it
+  out, by crm_scale(), as_miasim() and print().
 - The result opens with its buttons (downloads, Cytoscape, report, CRM parameters), then an index of its
   sections, then the matrices image.
 

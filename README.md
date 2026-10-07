@@ -1,8 +1,8 @@
 # foodnet: who produces and who consumes which metabolite
 
 [![ci](https://github.com/hallucigenia-sparsa/foodnet/actions/workflows/ci.yml/badge.svg)](https://github.com/hallucigenia-sparsa/foodnet/actions/workflows/ci.yml)
-[![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hallucigenia-sparsa/foodnet/blob/main/LICENSE)
+[![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://github.com/hallucigenia-sparsa/foodnet/blob/main/pyproject.toml)
 
 food**net** builds bipartite taxon and metabolite networks from the batch monocultures in
 [mGrowthDB](https://mgrowthdb.gbiomed.kuleuven.be/): which taxon produces which compound, and which consumes
@@ -49,7 +49,7 @@ id, one per line), or press Example, and press Get taxon-metabolite network. The
 buttons (downloads, Send to Cytoscape, the report, the CRM parameters) and an index of its sections; then
 come the consumed and produced matrices as an image, the taxa, the arcs and the sources.
 
-![the legend](docs/legend.svg)
+![the legend](https://raw.githubusercontent.com/hallucigenia-sparsa/foodnet/main/docs/legend.svg)
 
 ## What it does
 
@@ -101,11 +101,11 @@ and a consumer-resource model built from it is a hypothesis to check against the
 hand-checked matrix with settings chosen for it, and compared directions with a published figure. A net change
 hides a compound made and used again within a phase, and one failed sample at a phase end becomes the value.
 Growth on an unblanked optical density that starts high can read as no growth; such cultures give their
-change over the whole run (whole_run), not a phase. See [docs/METHOD_NOTES.md](docs/METHOD_NOTES.md).
+change over the whole run (whole_run), not a phase. See [docs/METHOD_NOTES.md](https://github.com/hallucigenia-sparsa/foodnet/blob/main/docs/METHOD_NOTES.md).
 
 Acid and base forms of one compound are one metabolite (acetic acid and acetate), since mGrowthDB records
 both and an HPLC measures one pool. A compound that was never assayed for a taxon is never written as zero.
-Every decision and its reason is in [docs/METHOD_NOTES.md](docs/METHOD_NOTES.md).
+Every decision and its reason is in [docs/METHOD_NOTES.md](https://github.com/hallucigenia-sparsa/foodnet/blob/main/docs/METHOD_NOTES.md).
 
 ## The outputs
 
@@ -116,7 +116,7 @@ Every decision and its reason is in [docs/METHOD_NOTES.md](docs/METHOD_NOTES.md)
   dashed frame for a change over the whole run.
   Downloadable as SVG, and in the matrices zip. Hovering over a cell shows its value, its replicates and the
   studies, experiments and medium behind it (also in the downloaded SVG, opened in a browser).
-- **Network**: JSON (the canonical format, [schema](schema/metabolite_network.schema.json)) or GraphML.
+- **Network**: JSON (the canonical format, [schema](https://github.com/hallucigenia-sparsa/foodnet/blob/main/schema/metabolite_network.schema.json)) or GraphML.
 - **Taxa x metabolites matrix** (CSV): one cell per taxon and metabolite, the mean change in mM, positive
   when produced and negative when consumed. miaSim's efficiency matrix has the opposite signs (positive for
   a resource taken up), so this matrix is not an `E`: the R package builds `E` from the consumed and produced
@@ -165,7 +165,6 @@ crm <- foodnet_listen()                      # and press Send to R on the page
 E <- crm_efficiency(crm, na = "zero")                      # miaSim's E, in each taxon's own unit
 crm_backcheck(crm, monod_constant = 1, na = "zero")        # each taxon alone against its own monoculture
 args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
-set.seed(1)
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse))   # back in each growth curve's unit
 ```
@@ -175,7 +174,7 @@ immigrant at rate `migration_p` (default 0.01) even with `stochastic = FALSE`, s
 `migration_p = 0`; drift, epochs and external events are off unless `stochastic = TRUE`, and measurement
 noise unless `error_variance > 0`. To explore noise, change them in the list before the call, since it already
 holds `migration_p` (`args$migration_p <- 0.01; args$stochastic <- TRUE`); to turn it all off again, set
-`migration_p = 0, stochastic = FALSE, error_variance = 0`. Leave `norm = FALSE`: relative abundances cannot
+`args$migration_p <- 0; args$stochastic <- FALSE; args$error_variance <- 0`. Leave `norm = FALSE`: relative abundances cannot
 be turned back by `crm_unscale()`.
 
 The matrices are measured amounts. miaSim has no uptake rate: a taxon takes up each resource at up to 1 mM
@@ -192,7 +191,7 @@ taxon a simulation cannot use. `as_miasim()` never
 lets miaSim draw starting abundances or Monod constants at random, and refuses pooled media and the
 stationary phase unless allowed. With the phase choice Both, the CRM is built from the exponential phase,
 since a consumer-resource model describes growth; `crm_phase(crm, "stationary")` switches to the other.
-See [r/README.md](r/README.md).
+See [r/README.md](https://github.com/hallucigenia-sparsa/foodnet/blob/main/r/README.md).
 
 ## The command line
 
@@ -209,12 +208,12 @@ foodnet validate network.json
 
 The same as grow**net**'s: no real data in git (only synthetic fixtures under `tests/fixtures/`), no
 runtime dependencies, the network format is a contract checked against its schema, and `make check` runs
-lint, the guardrail gate and the tests, in CI and before every commit. See [AGENTS.md](AGENTS.md) and
-[CONTRIBUTING.md](CONTRIBUTING.md).
+lint, the guardrail gate and the tests, in CI and before every commit. See [AGENTS.md](https://github.com/hallucigenia-sparsa/foodnet/blob/main/AGENTS.md) and
+[CONTRIBUTING.md](https://github.com/hallucigenia-sparsa/foodnet/blob/main/CONTRIBUTING.md).
 
 Every arc cites the studies behind it, so attribution resolves at the arc level; see
-[docs/DATA_GOVERNANCE.md](docs/DATA_GOVERNANCE.md).
+[docs/DATA_GOVERNANCE.md](https://github.com/hallucigenia-sparsa/foodnet/blob/main/docs/DATA_GOVERNANCE.md).
 
 ## License
 
-Apache License 2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Apache License 2.0; see [LICENSE](https://github.com/hallucigenia-sparsa/foodnet/blob/main/LICENSE) and [NOTICE](https://github.com/hallucigenia-sparsa/foodnet/blob/main/NOTICE).

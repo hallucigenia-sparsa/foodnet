@@ -355,7 +355,23 @@ def test_the_values_whose_cautions_change_their_meaning_are_named_first():
              ("t1", "ac", "exponential"): {"n": 2, "state": "produced", "cautions": ["pair_decided"]},
              ("t2", "glc", "exponential"): {"n": 3, "state": "no_change", "cautions": ["growth_rate_boundary"]},
              ("t2", "ac", "exponential"): {"n": 3, "state": "inconclusive", "cautions": ["inconclusive"]}}
-    text = _tier_warning(cells, {"t1": "Alpha", "t2": "Beta"}, {"glc": "glucose", "ac": "acetate"})
-    assert text.startswith("1 of 3 value(s) carry a caution that changes what they mean")
-    assert "Alpha glucose (exponential: still_changing)" in text and "1 more carry only cautions of certainty" in text
-    assert _tier_warning({k: v for k, v in cells.items() if k[0] == "t2"}, {}, {}) == ""
+    cells[("t1", "glc", "exponential")]["mean"] = -3.1
+    cells[("t2", "suc", "exponential")] = {"n": 3, "state": "produced", "mean": 9.0, "cautions": ["boundaries_differ"]}
+    cells[("t2", "pro", "exponential")] = {"n": 3, "state": "no_change", "mean": 0.0, "cautions": ["start_differs"]}
+    text = _tier_warning(cells, {"t1": "Alpha", "t2": "Beta"},
+                         {"glc": "glucose", "ac": "acetate", "suc": "succinate", "pro": "propionate"})
+    # changes first, largest first; the zero counted, not named (Karoline, 2026-10-07: "Changes first, by size")
+    assert text.startswith("2 change(s) span the wrong or an uneven stretch of time")
+    assert text.index("Beta succinate +9.00 mM") < text.index("Alpha glucose -3.10 mM (exponential: still_changing)")
+    assert "1 measured zero(s) carry such a caution too" in text and "Beta propionate" not in text
+    assert "Of 5 value(s), 1 more carry only cautions of certainty" in text
+    assert _tier_warning({k: v for k, v in cells.items() if k[1] in ("glc", "ac") and k[0] == "t2"}, {}, {}) == ""
+
+
+def test_still_changing_looks_at_the_whole_stretch_to_the_ninety_percent_boundary():
+    # a review: the next interval alone missed a slow change spread over 8 to 76 h (E. coli LF82's trehalose);
+    # Karoline, 2026-10-07: "Check the whole stretch"
+    series = [(0, 1.0), (4, 1.0), (8, 1.0), (12, 0.9), (24, 0.8), (48, 0.7), (76, 0.6)]
+    assert derive._next_change(series, 8, 76) == pytest.approx(-0.4)     # 0.1 per interval, 0.4 over the stretch
+    assert derive._next_change(series, 8) == pytest.approx(-0.1)         # without it: the next interval only
+    assert derive._next_change(series, 8, 200) == pytest.approx(-0.4)    # never beyond the last sample

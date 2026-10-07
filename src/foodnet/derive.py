@@ -117,7 +117,9 @@ def boundaries(cultures, fraction: float = phases.FRACTION, factor: float = phas
                         "last": all(b["last"] for b in siblings), "borrowed": True,
                         "coarse": any(b.get("coarse") for b in siblings), "differ": c.experiment in differ,
                         "by": "rate" if any(b.get("by") == "rate" for b in siblings) else "90%",
-                        "moved": any(b.get("moved") for b in siblings)}
+                        "moved": any(b.get("moved") for b in siblings),
+                        "late": statistics.median(b["late"] for b in siblings if b.get("late") is not None)
+                        if any(b.get("late") is not None for b in siblings) else None}
             if c.growth is None:
                 skipped.append((c.label, "no growth curve in this replicate; the median phase boundary of its "
                                 "experiment's other replicates is used"))
@@ -140,17 +142,23 @@ def second_window_matches(met: dict, names) -> bool:
     return any(plain(x) in wanted for x in (met.get("name"), met.get("recorded_name")))
 
 
-def _next_change(series, boundary: float):
-    """The metabolite's change from the end of exponential growth to its next sample, or None. Where the
-    growth-rate rule ended growth, a culture can still be using or making a compound while it slows (E. coli
-    LF82 ferments its glucose between 8 and 12 h, after pyruvate runs out, while its cells grow by 15%;
-    Karoline, 2026-10-06: flag it rather than move the boundary). `pool` judges it per cell (`still_changing`)."""
+def _next_change(series, boundary: float, until: float | None = None):
+    """The metabolite's change from the end of exponential growth to where the 90% rule alone would have ended
+    it (`until`), or to its next sample when that is not later, or None. Where the growth-rate rule ended
+    growth, a culture can still be using or making a compound while it slows (E. coli LF82 ferments its glucose
+    between 8 and 12 h, after pyruvate runs out, while its cells grow by 15%; Karoline, 2026-10-06: flag it
+    rather than move the boundary). The whole stretch counts, so a slow change spread over several samples is
+    caught too (Karoline, 2026-10-07: "Check the whole stretch"). `pool` judges it per cell (`still_changing`)."""
     after = [t for t, _ in series if t > boundary]
     if not after:
         return None
     first, _ = phases.value_at(series, boundary)
-    nxt, _ = phases.value_at(series, after[0])
-    return nxt - first
+    target = until if until is not None and until > boundary else after[0]
+    target = min(target, series[-1][0])
+    if target <= boundary:
+        return None
+    last, _ = phases.value_at(series, target)
+    return last - first
 
 
 def changes(cultures, phase: str = "exponential", window: tuple | None = None,
@@ -220,7 +228,8 @@ def changes(cultures, phase: str = "exponential", window: tuple | None = None,
                     # the change right after growth slowed, on both phases' rows: the stationary value then
                     # holds it, and the exponential value lacks it (and the CRM takes the exponential value)
                     cut = end if name == "exponential" else start
-                    after = _next_change(series, cut) if (cut is not None and boundary.get("moved")) else None
+                    after = (_next_change(series, cut, boundary.get("late"))
+                             if (cut is not None and boundary.get("moved")) else None)
                 if start is None:
                     rows.append({"culture": i, "taxon": c.taxon["id"], "metabolite": mid,
                                  "metabolite_name": met["name"], "chebi_id": met["chebi_id"], "phase": name,
@@ -739,7 +748,8 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
             if _class(moved, lim) and (key[2] == "exponential"
                                        or abs(moved) >= STILL_SHARE * abs(statistics.mean(units))):
                 cautions.add("still_changing")
-                notes.append(f"still changing by {moved:+.2f} mM in the first interval after growth slowed"
+                notes.append(f"still changing by {moved:+.2f} mM between the end of growth by the growth rate and "
+                             "where the 90% rule would have ended it"
                              + (" (that change is in the stationary value, not this one)"
                                 if key[2] == "exponential" else ""))
         mean = statistics.mean(units)

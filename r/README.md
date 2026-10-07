@@ -59,7 +59,6 @@ phase.
 # NA cells are refused unless you say how; here, as 0
 crm_backcheck(crm, monod_constant = 1, na = "zero")
 args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
-set.seed(1)
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse))
 ```
@@ -69,7 +68,7 @@ immigrant at rate `migration_p` (default 0.01) even with `stochastic = FALSE`, s
 `migration_p = 0`; drift, epochs and external events are off unless `stochastic = TRUE`, and measurement
 noise unless `error_variance > 0`. To explore noise, change them in the list before the call, since it already
 holds `migration_p` (`args$migration_p <- 0.01; args$stochastic <- TRUE`); to turn it all off again, set
-`migration_p = 0, stochastic = FALSE, error_variance = 0`. Leave `norm = FALSE`: relative abundances cannot
+`args$migration_p <- 0; args$stochastic <- FALSE; args$error_variance <- 0`. Leave `norm = FALSE`: relative abundances cannot
 be turned back by `crm_unscale()`.
 
 miaSim (1.18, `consumerResourceModel`) grows a taxon by its growth rate times the sum over resources of
