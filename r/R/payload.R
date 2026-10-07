@@ -185,6 +185,7 @@ as_foodnet_crm <- function(payload) {
                             stationary_phase = isTRUE(caveats$stationary_phase),
                             whole_run = chr_vector(caveats$whole_run),
                             biomass_falls = chr_vector(caveats$biomass_falls),
+                            caution_tiers = unlist(caveats$caution_tiers),
                             inconclusive = inconclusive,
                             incomplete = isTRUE(caveats$incomplete),
                             errors = chr_vector(caveats$errors),
@@ -268,7 +269,26 @@ print.foodnet_crm <- function(x, ...) {
                         nrow(moving), paste(utils::head(named, 6), collapse = ", "),
                         if (length(named) > 6) paste0(" and ", length(named) - 6, " more") else ""))
         }
-        cat(sprintf("   * %d value(s) carry cautions: x$caveats$cautions lists them.\n", nrow(flagged)))
+        tiers <- x$caveats$caution_tiers
+        if (length(tiers)) {
+            # the most serious tier of each value's cautions (Karoline, 2026-10-07: rank them)
+            tier_of <- function(words) {
+                found <- tiers[intersect(strsplit(words, " ", fixed = TRUE)[[1]], names(tiers))]
+                if (length(found)) min(found) else NA
+            }
+            tier <- vapply(flagged$cautions, tier_of, numeric(1))
+            first <- flagged[!is.na(tier) & tier == 1, , drop = FALSE]
+            if (nrow(first)) {
+                named <- paste(first$taxon, first$resource)
+                cat(sprintf("   * %d value(s) carry a caution that changes what they mean (tier 1), read them first: %s%s\n",
+                            nrow(first), paste(utils::head(named, 6), collapse = ", "),
+                            if (length(named) > 6) paste0(" and ", length(named) - 6, " more") else ""))
+            }
+            cat(sprintf("   * %d more carry only cautions of certainty (tier 2); x$caveats$cautions lists every caution.\n",
+                        sum(!is.na(tier) & tier == 2)))
+        } else {
+            cat(sprintf("   * %d value(s) carry cautions: x$caveats$cautions lists them.\n", nrow(flagged)))
+        }
     }
     phase <- x$phase_growth_rates
     slow <- if (is.null(phase)) character(0) else

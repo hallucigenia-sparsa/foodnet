@@ -263,6 +263,18 @@ with metabolite data."
     do not vote for the value medium ("No, phase values only"), so naming one never changes the medium. Concentration time courses are not exported. Fitting to community data
     belongs to mGrowthCtrl.
 
+30. **Cautions are ranked.** Karoline, 2026-10-07, after a review found 24 of 31 values on all of mGrowthDB
+    carrying a caution, so the one that matters was easy to miss: "can we rank them somehow?", then the three
+    tiers as proposed, shown on the page, in the README and in R's print. Tier 1 changes what the value means
+    (still_changing, start_differs, amounts_differ, short_record, whole_run, growth_unclear, growth_unknown,
+    window_beyond_data); tier 2 makes it less certain (pair_decided, boundaries_differ, within_scatter,
+    experiment_left_out, no_variance, single_replicate, coarse_sampling, phase_from_other_replicates,
+    within_evaporation); tier 3 says how the phase was found (growth_rate_boundary, stationary_not_reached,
+    not_detected_in_value_medium); conflict, inconclusive and not_grown explain a missing value. The page names
+    the tier 1 values first (on all of mGrowthDB, 20 of 40 values, changes and measured zeros, against 28 with any caution).
+    growth_rate_boundary, the most common caution, is tier 3: where the earlier end of growth matters, the
+    value carries still_changing.
+
 ## Known limits
 
 - **The validation is not independent.** The reproduction of a hand-checked reference matrix (106 of 108

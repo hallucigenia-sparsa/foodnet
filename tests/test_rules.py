@@ -339,3 +339,23 @@ def test_a_cells_interval_counts_each_experiment_once_as_its_value_does():
     cell = derive.pool(rows, cultures, 0.2)[("t1", "x", "exponential")]
     assert (cell["start"], cell["end"]) == (0, 30)
     assert (cell["low"], cell["high"]) == (1.0, 1.0)
+
+
+def test_every_caution_is_ranked_or_explains_a_missing_value():
+    # Karoline, 2026-10-07: "can we rank them somehow?", then the three tiers
+    from foodnet.model import CAUTION_TIERS, CAUTIONS
+    no_value = {"conflict", "inconclusive", "not_grown"}
+    assert set(CAUTIONS) == set(CAUTION_TIERS) | no_value and not set(CAUTION_TIERS) & no_value
+
+
+def test_the_values_whose_cautions_change_their_meaning_are_named_first():
+    from foodnet.search import _tier_warning
+    cells = {("t1", "glc", "exponential"): {"n": 3, "state": "consumed", "cautions": ["growth_rate_boundary",
+                                                                                       "still_changing"]},
+             ("t1", "ac", "exponential"): {"n": 2, "state": "produced", "cautions": ["pair_decided"]},
+             ("t2", "glc", "exponential"): {"n": 3, "state": "no_change", "cautions": ["growth_rate_boundary"]},
+             ("t2", "ac", "exponential"): {"n": 3, "state": "inconclusive", "cautions": ["inconclusive"]}}
+    text = _tier_warning(cells, {"t1": "Alpha", "t2": "Beta"}, {"glc": "glucose", "ac": "acetate"})
+    assert text.startswith("1 of 3 value(s) carry a caution that changes what they mean")
+    assert "Alpha glucose (exponential: still_changing)" in text and "1 more carry only cautions of certainty" in text
+    assert _tier_warning({k: v for k, v in cells.items() if k[0] == "t2"}, {}, {}) == ""

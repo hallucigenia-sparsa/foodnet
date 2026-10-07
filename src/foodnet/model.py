@@ -62,6 +62,28 @@ CAUTIONS = (
     "pair_decided",            # an experiment of two replicates decided it (a change or no change), no interval
 )
 
+# How much a caution matters (Karoline, 2026-10-07: "can we rank them somehow?", then the three tiers as
+# proposed), since most values carry one (24 of 31 on all of mGrowthDB) and the one that matters got lost:
+#   1: the value means something other than it seems (it misses part of the change, spans the whole run, or
+#      rests on records that cover different spans); read it before using the value;
+#   2: the same meaning, less certain;
+#   3: how the phase boundary was found, which changes nothing by itself (where it does, a tier 1 caution says
+#      so: growth_rate_boundary shows its effect as still_changing).
+# conflict and inconclusive (and not_grown) explain why a cell has no value, so they rank no value.
+CAUTION_TIERS = {
+    "still_changing": 1, "start_differs": 1, "amounts_differ": 1, "short_record": 1, "whole_run": 1,
+    "growth_unclear": 1, "growth_unknown": 1, "window_beyond_data": 1,
+    "pair_decided": 2, "boundaries_differ": 2, "within_scatter": 2, "experiment_left_out": 2, "no_variance": 2,
+    "single_replicate": 2, "coarse_sampling": 2, "phase_from_other_replicates": 2, "within_evaporation": 2,
+    "growth_rate_boundary": 3, "stationary_not_reached": 3, "not_detected_in_value_medium": 3,
+}
+
+
+def caution_tier(cautions) -> int | None:
+    """The most serious tier among a value's cautions (1 is the most serious), or None without one."""
+    tiers = [CAUTION_TIERS[c] for c in cautions if c in CAUTION_TIERS]
+    return min(tiers) if tiers else None
+
 # words before a genus that are not a genus (the same rule as grownet)
 GENUS_QUALIFIERS = ("candidatus", "unclassified", "uncultured")
 

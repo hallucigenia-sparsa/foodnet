@@ -38,7 +38,7 @@ import io
 import json
 import zipfile
 
-from .model import FoodNetwork
+from .model import CAUTION_TIERS, FoodNetwork
 
 NA = "NA"
 EVIDENCE_WORDS = ("measured", "below_limit", "whole_run", "single_replicate", "seen_elsewhere", "inconclusive",
@@ -785,6 +785,8 @@ def crm_payload(result: dict) -> dict:
                     "warnings": list(result.get("warnings") or []),
                     # per value: what the evidence matrices cannot hold (cautions.csv in the zip)
                     "cautions": block["cautions"], "inconclusive": block["inconclusive"],
+                    # how much each caution matters (1 most), so R can say which values to read first
+                    "caution_tiers": dict(CAUTION_TIERS),
                     "biomass_falls": block["biomass_falls"]},
         # with "Both", the stationary phase beside the exponential one, with the same taxa and resources
         "phases": crm_phases(result),

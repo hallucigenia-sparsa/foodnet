@@ -14,7 +14,7 @@ from . import media as media_rules
 from . import phase as phases
 from . import selection as selecting
 from .mgrowthdb import MGrowthDBError, data_versions, provenance
-from .model import Edge, FoodNetwork, Node, Study, genus_name, genus_species
+from .model import CAUTION_TIERS, Edge, FoodNetwork, Node, Study, caution_tier, genus_name, genus_species
 from .reading import UNREAD, read_cultures
 from .taxonomy import resolve_species, species_index, split_entries
 
@@ -410,6 +410,10 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     if second_info and second_mids:
         warnings.append(f"{', '.join(metabolites[m][0] for m in second_mids if m in metabolites)}: measured over the "
                         f"second time window, {second_info['label']}, not over the phase or main window.")
+    tiered = _tier_warning(matrix_cells, {tid: n.name for tid, n in node_taxa.items()},
+                           {mid: name for mid, (name, _) in metabolites.items()})
+    if tiered:
+        warnings.insert(0, tiered)
     # a result built on what could not all be read says so in its files, not only on the screen (the command
     # line also exits with an error, unless told to accept it)
     net.meta["incomplete"] = bool(errors)
@@ -482,6 +486,27 @@ def _genus_rates(found, missing, taxa):
            for g, rs in by_genus.items()}
     gone = {d.genus_of(taxa, tid): why for tid, why in missing.items() if d.genus_of(taxa, tid) not in out}
     return out, gone
+
+
+def _tier_warning(cells, taxon_names: dict, metabolite_names: dict, shown: int = 8) -> str:
+    """The values whose cautions change what they mean (tier 1), named, and how many more carry only cautions
+    of certainty (tier 2): the ranking Karoline chose on 2026-10-07, so the caution that matters is not lost
+    among the rest."""
+    values = [(key, c) for key, c in cells.items() if c.get("n") and c.get("state") in ("produced", "consumed",
+                                                                                         "no_change")]
+    first = sorted(((key, c) for key, c in values if caution_tier(c["cautions"]) == 1),
+                   key=lambda kc: (taxon_names.get(kc[0][0], kc[0][0]), metabolite_names.get(kc[0][1], kc[0][1]),
+                                   kc[0][2]))
+    second = sum(1 for _, c in values if caution_tier(c["cautions"]) == 2)
+    if not first:
+        return ""
+    named = [f"{taxon_names.get(t, t)} {metabolite_names.get(m, m)} ({ph}: "
+             + ", ".join(x for x in c["cautions"] if CAUTION_TIERS.get(x) == 1) + ")"
+             for (t, m, ph), c in first[:shown]]
+    more = f" and {len(first) - shown} more" if len(first) > shown else ""
+    return (f"{len(first)} of {len(values)} value(s) carry a caution that changes what they mean (tier 1; read "
+            f"these first): {'; '.join(named)}{more}. {second} more carry only cautions of certainty (tier 2); the "
+            "rest none, or only how the phase was found (tier 3). cautions.csv lists every caution of every value.")
 
 
 def _warnings(value_cells, presence_cells, rule, window, cultures, chosen, grown_in=(), boxed=False) -> list:

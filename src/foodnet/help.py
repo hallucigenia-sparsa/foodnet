@@ -10,7 +10,7 @@ import html
 
 from . import __version__, brand, rbridge
 from .brand import COMMAND, NAME, REPOSITORY
-from .model import CAUTIONS
+from .model import CAUTION_TIERS, CAUTIONS
 
 ISSUES = f"{REPOSITORY}/issues"
 MGROWTHDB = "https://mgrowthdb.gbiomed.kuleuven.be"
@@ -118,7 +118,11 @@ EDGE_FIELDS = {
     "medium": "The medium (or media) the arc rests on.",
     "study_ids": "The studies the arc rests on.",
     "experiments": "The mGrowthDB experiments behind it.",
-    "cautions": ", ".join(CAUTIONS) + " (see the legend).",
+    "cautions": ", ".join(CAUTIONS) + " (see the legend). Ranked: tier 1 changes what the value means ("
+                + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 1) + "), tier 2 makes it less certain ("
+                + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 2) + "), tier 3 says how the phase was "
+                "found (" + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 3) + "); the page names the "
+                "tier 1 values first.",
     "notes": "Remarks in words: what disagreed, what another medium showed.",
     "merged_arcs": "With merged arcs, how many studies the arc joins.",
     "merged_taxa": "With merging to genus, the taxa behind the arc.",
