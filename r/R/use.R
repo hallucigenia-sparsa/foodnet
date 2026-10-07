@@ -294,8 +294,16 @@ crm_unscale <- function(x, abundance, growth = c("measured", "phase_floor"), arg
     scale <- crm_scale(x, match.arg(growth, c("measured", "phase_floor")))
     made <- if (is.null(args)) NULL else attr(args, "foodnet_scale")
     if (!is.null(made) && (!identical(names(made), x$taxa) || !isTRUE(all.equal(unname(scale), unname(made))))) {
-        stop_foodnet("args were made from other CRM parameters than these (their units differ): pass the crm ",
-                     "you gave to as_miasim()")
+        stop_foodnet("args were made from other CRM parameters than these (their taxa or units differ): pass ",
+                     "the crm you gave to as_miasim()")
+    }
+    if (is.matrix(abundance) && !is.null(rownames(abundance))) {
+        # rows by name where they have names, so reordered rows keep their own unit (a review)
+        if (!setequal(rownames(abundance), x$taxa)) {
+            stop_foodnet("the rows of abundance name other taxa than these parameters: ",
+                         paste(utils::head(setdiff(rownames(abundance), x$taxa), 3), collapse = ", "))
+        }
+        return(abundance * scale[rownames(abundance)])
     }
     if (is.matrix(abundance)) {
         if (nrow(abundance) != length(scale)) {

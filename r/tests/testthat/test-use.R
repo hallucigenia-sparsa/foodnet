@@ -216,4 +216,7 @@ test_that("unscaling takes the unit the simulation used", {
     other$biomass_change <- other$biomass_change * 2
     expect_error(crm_unscale(other, args$x0, args = args), "other CRM parameters")
     expect_error(crm_unscale(crm_subset(crm, taxa = c("B", "A")), args$x0, args = args), "other CRM parameters")
+    # rows by name: reordered rows keep their own unit (a review)
+    m <- matrix(args$x0, nrow = 2, dimnames = list(crm$taxa, NULL))
+    expect_equal(crm_unscale(crm, m[2:1, , drop = FALSE], args = args)[crm$taxa, 1], crm$biomass_start)
 })
