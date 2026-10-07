@@ -7,6 +7,9 @@ gate applies.
 
 ## Current state
 
+- 2026-10-07: **0.2.0 release commit** (versions in pyproject.toml, `__version__`, r/DESCRIPTION, CITATION.cff, the
+  dated changelog, and the R install lines pinned to `ref = "v0.2.0"`). The tag v0.2.0 goes on this commit only
+  after Karoline's live test (Windows program, Cytoscape, Send to R); the tag starts the release workflow.
 - 2026-10-06, after 0.1.0: **a seventeen-round adversarial review** (physiology, statistics, consumer-resource
   modeling, software security, and a critic; each round re-attacked the version fixed after the last) led to
   0.2.0.dev0 on main, in commits 6a83eb4 to 950bb61 (seventeen rounds; the last came back with nothing new from all five), **pushed 2026-10-06 (CI green), not released**. After round 9, Karoline's question on unblanked OD led to whole-run values for cultures without a phase boundary, growth judged by fold, OD rise or coherent metabolic activity beyond evaporation, and a scatter test on every value (METHOD_NOTES 28). Karoline's decisions are

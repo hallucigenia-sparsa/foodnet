@@ -3,7 +3,7 @@
 All notable changes to foodnet. The format follows Keep a Changelog, and the version numbers follow
 semantic versioning.
 
-## [Unreleased]
+## [0.2.0] (2026-10-07)
 
 ### Upgrading from 0.1.0 (breaking changes)
 - **Install the R package of the same version as foodnet**: the R listener now needs a secret the page reads

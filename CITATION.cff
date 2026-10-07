@@ -11,8 +11,8 @@ abstract: >-
 repository-code: "https://github.com/hallucigenia-sparsa/foodnet"
 url: "https://github.com/hallucigenia-sparsa/foodnet"
 license: Apache-2.0
-version: 0.1.0
-date-released: "2026-10-06"
+version: 0.2.0
+date-released: "2026-10-07"
 keywords:
   - metabolites
   - cross-feeding

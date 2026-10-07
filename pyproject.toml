@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "foodnet"
-version = "0.2.0.dev0"
+version = "0.2.0"
 description = "Build taxon and metabolite networks (who produces and who consumes what) from mGrowthDB batch monocultures, with the parameters of a consumer-resource model."
 readme = "README.md"
 requires-python = ">=3.10"
