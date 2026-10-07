@@ -16,7 +16,7 @@ test_that("printing names every caveat", {
     expect_match(out, "2 cell\\(s\\) were never assayed")           # A butyrate, both matrices
     expect_match(out, "1 link\\(s\\) were seen only in another medium")
     expect_match(out, "B produced acetate")
-    expect_match(out, "1 taxon\\(s\\) have no growth rate: B")
+    expect_match(out, "a miaSim simulation cannot use B \\(no growth rate\\)")
 })
 
 test_that("an unknown format is read with a warning, a newer major one refused", {

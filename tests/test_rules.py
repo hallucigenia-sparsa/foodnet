@@ -350,22 +350,28 @@ def test_every_caution_is_ranked_or_explains_a_missing_value():
 
 def test_the_values_whose_cautions_change_their_meaning_are_named_first():
     from foodnet.search import _tier_warning
-    cells = {("t1", "glc", "exponential"): {"n": 3, "state": "consumed", "cautions": ["growth_rate_boundary",
-                                                                                       "still_changing"]},
-             ("t1", "ac", "exponential"): {"n": 2, "state": "produced", "cautions": ["pair_decided"]},
+    cells = {("t1", "glc", "exponential"): {"n": 3, "state": "consumed", "mean": -3.08, "missed": -5.15,
+                                             "cautions": ["growth_rate_boundary", "still_changing"]},
+             ("t1", "tre", "exponential"): {"n": 3, "state": "no_change", "mean": -0.07, "missed": -0.26,
+                                             "cautions": ["growth_rate_boundary", "still_changing"]},
+             ("t1", "ac", "exponential"): {"n": 2, "state": "produced", "mean": 4.0, "cautions": ["pair_decided"]},
+             ("t2", "suc", "exponential"): {"n": 3, "state": "produced", "mean": 9.0,
+                                             "cautions": ["boundaries_differ"]},
+             ("t2", "pro", "exponential"): {"n": 3, "state": "no_change", "mean": 0.0, "cautions": ["start_differs"]},
              ("t2", "glc", "exponential"): {"n": 3, "state": "no_change", "cautions": ["growth_rate_boundary"]},
              ("t2", "ac", "exponential"): {"n": 3, "state": "inconclusive", "cautions": ["inconclusive"]}}
-    cells[("t1", "glc", "exponential")]["mean"] = -3.1
-    cells[("t2", "suc", "exponential")] = {"n": 3, "state": "produced", "mean": 9.0, "cautions": ["boundaries_differ"]}
-    cells[("t2", "pro", "exponential")] = {"n": 3, "state": "no_change", "mean": 0.0, "cautions": ["start_differs"]}
-    text = _tier_warning(cells, {"t1": "Alpha", "t2": "Beta"},
-                         {"glc": "glucose", "ac": "acetate", "suc": "succinate", "pro": "propionate"})
-    # changes first, largest first; the zero counted, not named (Karoline, 2026-10-07: "Changes first, by size")
-    assert text.startswith("2 change(s) span the wrong or an uneven stretch of time")
-    assert text.index("Beta succinate +9.00 mM") < text.index("Alpha glucose -3.10 mM (exponential: still_changing)")
-    assert "1 measured zero(s) carry such a caution too" in text and "Beta propionate" not in text
-    assert "Of 5 value(s), 1 more carry only cautions of certainty" in text
-    assert _tier_warning({k: v for k, v in cells.items() if k[1] in ("glc", "ac") and k[0] == "t2"}, {}, {}) == ""
+    text = _tier_warning(cells, {"t1": "Alpha", "t2": "Beta"}, {"glc": "glucose", "ac": "acetate",
+                                                                 "suc": "succinate", "pro": "propionate",
+                                                                 "tre": "trehalose"})
+    # a review: by size alone the value missing the most (here -5.15 mM after -3.08) came last; still-changing
+    # values rank by the share they miss, zeros among them, then the other tier-1 changes by size
+    assert text.startswith("3 value(s) span the wrong or an uneven stretch of time")
+    order = [text.index(x) for x in ("Alpha glucose -3.08 mM (exponential: still_changing, -5.15 mM more",
+                                     "Alpha trehalose -0.07 mM", "Beta succinate +9.00 mM")]
+    assert order == sorted(order)
+    assert "1 measured zero(s) carry another such caution" in text and "Beta propionate" not in text
+    assert "Of 6 value(s), 1 more carry only cautions of certainty" in text
+    assert _tier_warning({k: v for k, v in cells.items() if k[0] == "t2" and k[1] in ("glc", "ac")}, {}, {}) == ""
 
 
 def test_still_changing_looks_at_the_whole_stretch_to_the_ninety_percent_boundary():

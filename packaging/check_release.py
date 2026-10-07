@@ -54,6 +54,12 @@ def check(tag: str, root: Path = ROOT) -> tuple:
         for ref in refs:
             if ref != version:
                 problems.append(f"{readme} installs the R package at v{ref}, not v{version}")
+    # the README is also PyPI's page for this version, which can never be replaced: its links name the release,
+    # so they keep showing what it shipped (a review: links to main would follow later changes)
+    for ref in sorted(set(re.findall(r"foodnet/(?:blob/|tree/)?([^/\s)]+)/(?=[^)\s]*\))",
+                                     (root / "README.md").read_text(encoding="utf-8")))):
+        if ref.startswith("v") and ref != f"v{version}" or ref == "main":
+            problems.append(f"README.md links to {ref}, not v{version}")
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     section = re.search(rf"^## \[{re.escape(version)}\](.*?)$(.*?)(?=^## \[|\Z)", changelog, re.M | re.S)
     if not section:

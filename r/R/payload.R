@@ -320,16 +320,22 @@ print.foodnet_crm <- function(x, ...) {
         cat(sprintf("   * %d value(s) have experiments that disagree (NA): crm_readme(x) names them.\n",
                     length(x$caveats$conflicts)))
     }
-    if (length(x$caveats$without_a_rate)) {
-        cat(sprintf("   * %d taxon(s) have no growth rate: %s\n", length(x$caveats$without_a_rate),
-                    paste(x$caveats$without_a_rate, collapse = ", ")))
-        cat("       a simulation needs one from elsewhere; as_miasim() stops until you give it.\n")
-    }
     # what a miaSim simulation needs of every taxon, said in one place with the line that leaves a taxon out
     # (a review: the growth rate alone was named, so a user went looking for one where more was missing)
     uptake <- rowSums(ifelse(is.na(x$consumed), 0, x$consumed))
     unusable <- x$taxa[is.na(x$growth_rates) | is.na(x$biomass_change) | x$biomass_change <= 0 | uptake <= 0]
-    if (length(unusable) && !x$caveats$stationary_phase) {
+    only_rate <- setdiff(x$caveats$without_a_rate, unusable)
+    if (length(only_rate)) {
+        cat(sprintf("   * %d taxon(s) have no growth rate: %s\n", length(only_rate), paste(only_rate, collapse = ", ")))
+        cat("       a simulation needs one from elsewhere; as_miasim() stops until you give it.\n")
+    }
+    if (length(unusable) && length(unusable) == length(x$taxa)) {
+        # leaving every taxon out is no advice (a review); a payload without biomass is said below
+        if (!all(is.na(x$biomass_change)) && !x$caveats$stationary_phase) {
+            cat("   * no taxon has a growth rate, a biomass gain and a measured uptake, so a miaSim simulation cannot\n")
+            cat("     use these parameters as they are.\n")
+        }
+    } else if (length(unusable) && !x$caveats$stationary_phase) {
         what <- vapply(unusable, function(t) paste0(t, " (no ", paste(c(
             if (is.na(x$growth_rates[[t]])) "growth rate",
             if (is.na(x$biomass_change[[t]])) "biomass change" else if (x$biomass_change[[t]] <= 0) "biomass gain",

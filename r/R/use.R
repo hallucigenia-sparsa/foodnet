@@ -142,10 +142,10 @@ crm_efficiency <- function(x, scale = c("miasim", "shares", "none"), na = c("sto
 #' @noRd
 need_crm <- function(x) {
     if (!inherits(x, "foodnet_crm")) {
-        stop_foodnet("this takes the CRM parameters themselves (crm, from foodnet_listen() or foodnet_crm()), ",
-                     "not ", if (is.matrix(x)) "a matrix such as crm_efficiency()'s E" else class(x)[1],
-                     ": it builds what it needs from them, e.g. crm_backcheck(crm, monod_constant = 1, ",
-                     "na = \"zero\")")
+        called <- tryCatch(deparse(sys.call(-1)[[1]]), error = function(e) "this function")
+        stop_foodnet(called, "() takes the CRM parameters themselves (crm, from foodnet_listen() or ",
+                     "foodnet_crm()), not ", if (is.matrix(x)) "a matrix such as crm_efficiency()'s E" else class(x)[1],
+                     ": it builds what it needs from them, as in ", called, "(crm, ...)")
     }
     invisible(TRUE)
 }
@@ -193,8 +193,9 @@ amounts <- function(x, na = "stop", booleans_ok = FALSE) {
     moving <- x$caveats$cautions
     moving <- if (is.null(moving)) character(0) else
         paste(moving$taxon, moving$resource)[grepl("still_changing", moving$cautions)]
-    if (length(moving)) {
-        # a script that never prints the parameters still hears it
+    if (length(moving) && !isTRUE(x$caveats$stationary_phase)) {
+        # a script that never prints the parameters still hears it; a stationary value holds that change, so it
+        # is not underrated there (a review)
         warning(length(moving), " value(s) miss use that went on after the growth rate fell (still_changing), so E ",
                 "underrates them: ", paste(utils::head(moving, 4), collapse = ", "),
                 if (length(moving) > 4) " and more" else "", ". A time window over both phases gives the whole change.",
@@ -238,6 +239,15 @@ crm_scale <- function(x, growth = c("measured", "phase_floor")) {
     rates <- crm_growth(x, growth)
     dx <- x$biomass_change
     lacking <- names(rates)[is.na(rates) | is.na(dx) | dx <= 0 | total <= 0]
+    if (length(lacking) && isTRUE(x$caveats$stationary_phase)) {
+        # after the end of exponential growth the biomass of most taxa falls, which no growth can scale; leaving
+        # them out would leave a community of one (a review)
+        stop_foodnet("miaSim's scale needs each taxon to gain biomass, and after the end of exponential growth ",
+                     paste(lacking, collapse = ", "), if (length(lacking) == 1) " does" else " do", " not (or ",
+                     "lack a growth rate or uptake). Stationary amounts cannot be scaled this way: use the ",
+                     "exponential phase, or crm_efficiency(crm, scale = \"shares\", allow = \"stationary_phase\") ",
+                     "for a model that reads E as shares.")
+    }
     if (length(lacking)) {
         # name what each lacks, and give the line that leaves them out (Karoline's test, 2026-10-07: "see print(x)"
         # sent her looking)
@@ -571,7 +581,7 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     m <- length(x$resources)
     # a taxon a simulation cannot use is named first, with what it lacks, rather than as an NA in x0 (a review:
     # "x0 needs one number per taxon" sent a user looking at x0)
-    if (is.null(E)) crm_scale(x, growth)
+    if (is.null(E)) suppressWarnings(crm_scale(x, growth))       # crm_efficiency() below says what it warns
     x0 <- if (!is.null(names(x0)) && all(x$taxa %in% names(x0))) x0[x$taxa] else x0
     if (length(x0) != n) stop_foodnet("x0 needs one number per taxon (", n, "), in the order of crm$taxa or named")
     if (anyNA(x0)) stop_foodnet("x0 is NA for ", paste(x$taxa[is.na(x0)], collapse = ", "), ": give a starting ",
@@ -628,9 +638,11 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
 #' @return A data frame: taxon, what (`"biomass"`, `"hours to grow"`, or a resource), direction, measured,
 #'   simulated and their ratio. Biomass is in each growth curve's unit. "biomass" compares what the taxon gains
 #'   over its phase; "hours to grow" compares the time it takes to gain its measured biomass with the length
-#'   of its phase (NA: it never gains it within three phase lengths). Read both: over a time window that runs
-#'   until the uptake stops, the biomass ratio is near 1 whatever the Monod constants, and only the hours say
-#'   whether they are right.
+#'   of its phase (NA: it never gains all of it within three phase lengths, either too slowly or levelling off
+#'   just short; the biomass row says which). Both rows judge the Monod constants only over the exponential
+#'   phase, whose length is the time each taxon grew. Over a time window neither does: the measured hours are
+#'   the window's length, and while the constants lie well below the resource concentrations the biomass
+#'   ratio is near 1 whatever they are, so this warns.
 #' @examples
 #' \dontrun{
 #' crm_backcheck(crm, monod_constant = 1, na = "zero")
@@ -645,8 +657,14 @@ crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop"
         stop_foodnet("crm_backcheck() runs miaSim: install it with BiocManager::install(\"miaSim\")")
     }
     if (missing(monod_constant)) stop_foodnet("give monod_constant, in mM; foodnet measures none")
+    if (identical(x$phase, "window")) {
+        warning("these parameters are over a time window, whose length is not the time each taxon grew: the ",
+                "hours-to-grow ratios do not judge the Monod constants, and neither do the biomass ratios while ",
+                "the constants lie well below the resource concentrations. Search the same taxa with the ",
+                "exponential phase to choose them.", call. = FALSE)
+    }
     E <- crm_efficiency(x, na = na, growth = growth, allow = allow)
-    scale <- crm_scale(x, growth)
+    scale <- suppressWarnings(crm_scale(x, growth))             # crm_efficiency() above has warned once
     mu <- suppressWarnings(crm_growth(x, growth))
     n <- length(x$taxa)
     m <- length(x$resources)

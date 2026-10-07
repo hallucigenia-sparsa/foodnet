@@ -16,8 +16,9 @@ BiocManager::install("miaSim")                          # for the simulations
 Install the version of your food**net** (the page and its help print the line for yours): the package and
 the page talk to each other, and a newer package refuses an older page.
 
-If that fails with "HTTP error 404", a GitHub token stored on this machine is being used and cannot see the
-repository. Installing from a clone needs no GitHub access: `remotes::install_local("<the repository>/r")`.
+If that fails with "HTTP error 404" or "cannot open URL", either the release it names is not published yet, or
+a GitHub token stored on this machine is being used and cannot see the repository. Installing from a clone needs
+no GitHub access: `remotes::install_local("<the repository>/r")`.
 
 The page's **CRM example** button sets up five gut species for which the steps below run as they are; the
 page's help walks through them ("Simulate with miaSim, step by step").

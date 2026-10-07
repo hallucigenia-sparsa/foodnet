@@ -270,7 +270,8 @@ random.</p>
 <p>Press <strong>CRM example</strong> to follow these steps with five gut species in Wilkins-Chalgren (studies 2, 4,
 7 and 9, 0 to 48 h, trehalose over the whole run); with your own taxa, switch CRM mode on instead. The example
 uses a time window, so every taxon has a growth rate, a biomass gain and an uptake and the steps run as they are;
-with the exponential phase (the default) the same taxa run too, and the back-check (step 4) says more.</p>
+with the exponential phase (the default) the same taxa run too, and only there does the back-check (step 4) judge
+the Monod constants.</p>
 <ol>
 <li>Install the R package and <a href="{MIASIM}">miaSim</a> once: <code>install.packages(c("remotes",
 "BiocManager"))</code>, <code>{_e(rbridge.INSTALL_R)}</code>, <code>BiocManager::install("miaSim")</code>
@@ -285,10 +286,13 @@ on).</li>
 <li>Choose Monod constants, which foodnet does not measure, and check them: <code>crm_backcheck(crm, monod_constant
 = 1, na = "zero")</code> simulates each taxon alone and compares it with its monoculture. Read two rows per taxon:
 "biomass" (a ratio near 1: it gains what it gained over the phase) and "hours to grow" (a ratio near 1: it takes
-as long as it did; below 1, faster). Over a time window that runs until the uptake stops, as in the CRM example,
-the biomass ratio is near 1 whatever the Monod constants, so judge them on the hours. It takes <code>crm</code>
-itself and builds the efficiency matrix; <code>na = "zero"</code> counts NA cells as 0 and says how many of each
-kind.</li>
+as long as it did; below 1, faster; NA: it never gains all of it, too slowly or levelling off just short). These
+judge the constants over the exponential phase, whose length is the time each taxon grew. Over a time window, as
+in the CRM example, they do not: the measured hours are the window's length, and the biomass ratio is near 1
+while the constants lie well below the resource concentrations, so <code>crm_backcheck()</code> warns. To choose
+them, search the same taxa with the exponential phase (switch the window off in Advanced settings) and check
+there. It takes <code>crm</code> itself and builds the efficiency matrix; <code>na = "zero"</code> counts NA cells
+as 0 and says how many of each kind.</li>
 <li>Simulate the community: <code>args &lt;- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1,
 missing_resource = 0, na = "zero")</code>, then <code>tse &lt;- do.call(miaSim::simulateConsumerResource, c(args,
 list(t_end = 48, t_store = 480)))</code>.</li>

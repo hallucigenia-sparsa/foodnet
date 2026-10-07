@@ -740,6 +740,7 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
                 cautions.add("inconclusive")
                 notes.append("inconclusive: with the experiments left out included, the mean change is within the "
                              f"{lim:g} mM limit")
+        missed = None
         afters = [r["after"] for r in valued if r.get("after") is not None and cultures[r["culture"]].experiment
                   in used]
         if k is not INCONCLUSIVE and afters and "growth_rate_boundary" in cautions:
@@ -748,6 +749,7 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
             if _class(moved, lim) and (key[2] == "exponential"
                                        or abs(moved) >= STILL_SHARE * abs(statistics.mean(units))):
                 cautions.add("still_changing")
+                missed = moved
                 notes.append(f"still changing by {moved:+.2f} mM between the end of growth by the growth rate and "
                              "where the 90% rule would have ended it"
                              + (" (that change is in the stationary value, not this one)"
@@ -789,6 +791,8 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
                       "notes": notes, "start": start, "end": end,
                       "p_value": test["p"] if test else None,
                       "low": spread[0], "high": spread[1],
+                      # still_changing: the change between the two boundaries, which ranks the warning
+                      "missed": missed,
                       "initial": statistics.mean(r["initial"] for r in valued), "exponential_h": exponential,
                       "limit": lim}
     return cells

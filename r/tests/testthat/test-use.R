@@ -185,3 +185,16 @@ test_that("a novice is told what to type, in the names the help uses", {
     out <- paste(capture.output(print(crm)), collapse = "\n")
     expect_match(out, "a miaSim simulation cannot use B \\(no growth rate\\)")
 })
+
+test_that("the stationary phase is not met with advice to leave most taxa out", {
+    p <- example_payload_both()
+    p$growth_rates <- list(0.4, 0.3)
+    s <- crm_phase(foodnet:::as_foodnet_crm(p), "stationary")         # biomass does not grow there
+    expect_error(crm_scale(s), "Stationary amounts cannot be scaled this way")
+    expect_false(grepl("crm_subset", tryCatch(crm_scale(s), error = conditionMessage)))
+})
+
+test_that("an error names the function that was called", {
+    E <- suppressWarnings(crm_efficiency(foodnet:::as_foodnet_crm(example_payload()), scale = "shares", na = "zero"))
+    expect_error(as_miasim(E, x0 = 1, monod_constant = 1), "as_miasim\\(\\) takes the CRM parameters themselves")
+})

@@ -48,7 +48,9 @@ workflow's short-lived GitHub identity instead ("trusted publishing").
      copy is out of date;
    - adds `ref = "vX.Y.Z"` to the R install lines of `README.md` and `r/README.md` (the page prints the
      matching line by itself), so the R package installed is the one this version talks to; between
-     releases they carry no ref, since the tag does not exist yet.
+     releases they carry no ref, since the tag does not exist yet;
+   - sets the version in README.md's links (`blob/vX.Y.Z/`, and the legend image's raw URL), since the README
+     is also PyPI's page for this version, which can never be replaced.
    `python packaging/check_release.py vX.Y.Z` must say the tag is ready (it checks every item above), and `make check` must pass:
    among other things it refuses texts that describe work in progress rather than the released state (an
    install line pointing at one of our branches, for example).

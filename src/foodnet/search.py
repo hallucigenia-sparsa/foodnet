@@ -424,7 +424,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         warnings.append(f"{', '.join(metabolites[m][0] for m in second_mids if m in metabolites)}: measured over the "
                         f"second time window, {second_info['label']}, not over the phase or main window.")
     tiered = _tier_warning(matrix_cells, {tid: n.name for tid, n in node_taxa.items()},
-                           {mid: name for mid, (name, _) in metabolites.items()})
+                           {mid: name for mid, (name, _) in metabolites.items()}, limit=s["detection_limit"])
     if tiered:
         warnings.insert(0, tiered)
     # a result built on what could not all be read says so in its files, not only on the screen (the command
@@ -501,27 +501,39 @@ def _genus_rates(found, missing, taxa):
     return out, gone
 
 
-def _tier_warning(cells, taxon_names: dict, metabolite_names: dict, shown: int = 8) -> str:
-    """The changes whose cautions say they span the wrong or an uneven stretch of time (tier 1), named largest
-    first, with the measured zeros of that tier counted, and how many more values carry only cautions of
-    certainty (tier 2): the ranking Karoline chose on 2026-10-07 ("Changes first, by size"), so the caution
-    that matters is not lost among the rest."""
+def _tier_warning(cells, taxon_names: dict, metabolite_names: dict, shown: int = 8, limit: float = 0.2) -> str:
+    """The values whose cautions say they span the wrong or an uneven stretch of time (tier 1), named by how
+    much they may be off, with the rest of that tier counted, and how many more values carry only cautions of
+    certainty (tier 2). Karoline, 2026-10-07: "Changes first, by size"; a review then found size alone hid the
+    values that miss the most (E. coli LF82 glucose, -3.08 mM with -5.15 mM more after the boundary), so a
+    value that is still changing ranks by the share it misses, zeros among them (one can be a change), and
+    the other tier-1 changes follow by size."""
     values = [(key, c) for key, c in cells.items() if c.get("n") and c.get("state") in ("produced", "consumed",
                                                                                          "no_change")]
     first = [(key, c) for key, c in values if caution_tier(c["cautions"]) == 1]
-    changes = sorted(((key, c) for key, c in first if c["state"] != "no_change"),
-                     key=lambda kc: -abs(kc[1].get("mean") or 0.0))
-    zeros = len(first) - len(changes)
-    second = sum(1 for _, c in values if caution_tier(c["cautions"]) == 2)
     if not first:
         return ""
-    named = [f"{taxon_names.get(t, t)} {metabolite_names.get(m, m)} {c['mean']:+.2f} mM ({ph}: "
-             + ", ".join(x for x in c["cautions"] if CAUTION_TIERS.get(x) == 1) + ")"
-             for (t, m, ph), c in changes[:shown]]
-    more = f" and {len(changes) - shown} more" if len(changes) > shown else ""
-    head = (f"{len(changes)} change(s) span the wrong or an uneven stretch of time (tier 1; read these first), "
-            f"largest first: {'; '.join(named)}{more}." if changes else "")
-    tail = (f" {zeros} measured zero(s) carry such a caution too." if zeros else "")
+
+    def share(c):
+        return abs(c["missed"]) / max(abs(c.get("mean") or 0.0), c.get("limit") or limit)
+
+    moving = sorted(((k, c) for k, c in first if c.get("missed") is not None), key=lambda kc: -share(kc[1]))
+    others = sorted(((k, c) for k, c in first if c.get("missed") is None and c["state"] != "no_change"),
+                    key=lambda kc: -abs(kc[1].get("mean") or 0.0))
+    ranked = moving + others
+    zeros = len(first) - len(ranked)
+    second = sum(1 for _, c in values if caution_tier(c["cautions"]) == 2)
+
+    def name(key, c):
+        t, m, ph = key
+        missed = f", {c['missed']:+.2f} mM more after the growth rate fell" if c.get("missed") is not None else ""
+        return (f"{taxon_names.get(t, t)} {metabolite_names.get(m, m)} {(c.get('mean') or 0.0):+.2f} mM ({ph}: "
+                + ", ".join(x for x in c["cautions"] if CAUTION_TIERS.get(x) == 1) + missed + ")")
+    named = [name(k, c) for k, c in ranked[:shown]]
+    more = f" and {len(ranked) - shown} more" if len(ranked) > shown else ""
+    head = (f"{len(ranked)} value(s) span the wrong or an uneven stretch of time (tier 1; read these first), those "
+            f"missing the most first: {'; '.join(named)}{more}." if ranked else "")
+    tail = f" {zeros} measured zero(s) carry another such caution." if zeros else ""
     return ((head + tail).strip() + f" Of {len(values)} value(s), {second} more carry only cautions of certainty "
             "(tier 2); the rest none, or only how the phase was found (tier 3). cautions.csv lists every caution "
             "of every value.")

@@ -10,13 +10,14 @@ from check_release import check, main, release_notes  # noqa: E402
 
 
 def _repo(tmp_path, version="0.1.0", code="0.1.0", heading="## [0.1.0] (2026-10-01)", cited=None,
-          described=None, ref=None, released="2026-10-01"):
+          described=None, ref=None, released="2026-10-01", link=None):
     (tmp_path / "src" / "foodnet").mkdir(parents=True)
     (tmp_path / "r").mkdir()
     (tmp_path / "r" / "DESCRIPTION").write_text(f"Package: foodnet\nVersion: {described or version}\n")
     install = (f'remotes::install_github("x/foodnet", subdir = "r", ref = "v{ref or version}")\n'
                if ref != "none" else 'remotes::install_github("x/foodnet", subdir = "r")\n')
-    (tmp_path / "README.md").write_text(install)
+    (tmp_path / "README.md").write_text(install + f"[the legend](https://raw.githubusercontent.com/x/foodnet/"
+                                                  f"{link or 'v' + version}/docs/legend.svg)\n")
     (tmp_path / "r" / "README.md").write_text(install)
     (tmp_path / "pyproject.toml").write_text(f'[project]\nname = "foodnet"\nversion = "{version}"\n')
     (tmp_path / "src" / "foodnet" / "__init__.py").write_text(f'__version__ = "{code}"\n')
@@ -44,6 +45,7 @@ def test_a_consistent_release_is_ready_and_its_notes_are_its_changelog_section(t
     ({"ref": "0.0.9"}, "v0.1.0", "README.md installs the R package at v0.0.9"),
     ({"released": "2026-09-01"}, "v0.1.0", "CITATION.cff says date-released 2026-09-01"),
     ({"ref": "none"}, "v0.1.0", "README.md does not install the R package at its release"),
+    ({"link": "main"}, "v0.1.0", "README.md links to main, not v0.1.0"),
 ])
 def test_an_inconsistent_release_is_refused(tmp_path, repo, tag, says):
     problems, _ = check(tag, _repo(tmp_path, **repo))
