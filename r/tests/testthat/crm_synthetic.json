@@ -1,0 +1,930 @@
+{
+ "format": "foodnet.crm/v1",
+ "tool": "foodnet",
+ "source_db": "mGrowthDB (live)",
+ "phase": "exponential",
+ "window": null,
+ "values": "mM",
+ "detection_limit_mM": 0.2,
+ "taxa": [
+  "Alpha alpha A1",
+  "Beta beta B1",
+  "Gamma gamma C1"
+ ],
+ "taxon_ids": [
+  "ncbi:1",
+  "ncbi:2",
+  "ncbi:3"
+ ],
+ "resources": [
+  "acetate",
+  "butyrate",
+  "formate",
+  "glucose"
+ ],
+ "resource_ids": [
+  "chebi:30089",
+  "chebi:17968",
+  "chebi:15740",
+  "chebi:17234"
+ ],
+ "resource_phases": [
+  "exponential",
+  "exponential",
+  "window",
+  "exponential"
+ ],
+ "consumed": [
+  [
+   0,
+   null,
+   null,
+   7.999999999999999
+  ],
+  [
+   null,
+   0,
+   null,
+   6.0
+  ],
+  [
+   null,
+   null,
+   null,
+   null
+  ]
+ ],
+ "produced": [
+  [
+   4.0,
+   null,
+   null,
+   0
+  ],
+  [
+   null,
+   3.0,
+   null,
+   0
+  ],
+  [
+   null,
+   null,
+   null,
+   null
+  ]
+ ],
+ "evidence_consumed": [
+  [
+   "below_limit",
+   "not_assayed",
+   "not_assayed",
+   "measured"
+  ],
+  [
+   "not_assayed",
+   "below_limit",
+   "not_assayed",
+   "measured"
+  ],
+  [
+   "not_assayed",
+   "not_assayed",
+   "not_assayed",
+   "presence_only"
+  ]
+ ],
+ "evidence_produced": [
+  [
+   "measured",
+   "not_assayed",
+   "not_assayed",
+   "below_limit"
+  ],
+  [
+   "not_assayed",
+   "measured",
+   "presence_only",
+   "below_limit"
+  ],
+  [
+   "not_assayed",
+   "not_assayed",
+   "not_assayed",
+   "not_assayed"
+  ]
+ ],
+ "growth_rates": [
+  null,
+  null,
+  null
+ ],
+ "growth_rate_unit": "1/h",
+ "growth_rate_detail": {},
+ "initial_concentrations": [
+  0.0,
+  0.0,
+  null,
+  10.0
+ ],
+ "initial_unit": "mM",
+ "resource_chemistry": [
+  {
+   "chebi_id": "30089",
+   "formula": "C2H3O2",
+   "charge": -1,
+   "carbon": 2,
+   "degree_of_reduction": 8,
+   "per_cmol": 4.0,
+   "formula_from": "",
+   "note": ""
+  },
+  {
+   "chebi_id": "17968",
+   "formula": "",
+   "charge": null,
+   "carbon": null,
+   "degree_of_reduction": null,
+   "per_cmol": null,
+   "formula_from": "",
+   "note": "ChEBI gives no formula for butyrate"
+  },
+  {
+   "chebi_id": "15740",
+   "formula": "CHO2",
+   "charge": -1,
+   "carbon": 1,
+   "degree_of_reduction": 2,
+   "per_cmol": 2.0,
+   "formula_from": "",
+   "note": ""
+  },
+  {
+   "chebi_id": "17234",
+   "formula": "C6H12O6",
+   "charge": 0,
+   "carbon": 6,
+   "degree_of_reduction": 24,
+   "per_cmol": 4.0,
+   "formula_from": "",
+   "note": ""
+  }
+ ],
+ "chemistry_source": {
+  "source": "ChEBI (www.ebi.ac.uk/chebi)",
+  "api": "https://www.ebi.ac.uk/chebi/backend/api/public/compound/<id>/",
+  "retrieved_at": "",
+  "reference": "degree of reduction per molecule relative to CO2, H2O, NH3, H2SO4, H3PO4 and H+: 4C + H - 2O - 3N + 6S + 5P - charge (Roels 1983)",
+  "licence": "CC BY 4.0",
+  "problem": null
+ },
+ "detection_limits_mM": [
+  0.2,
+  0.2,
+  0.2,
+  0.2
+ ],
+ "second_window_resources": [
+  "formate"
+ ],
+ "electron_balance": [
+  {
+   "consumed_electrons_mM": 191.99999999999997,
+   "produced_electrons_mM": 32.0,
+   "share": 0.16666666666666669,
+   "share_lower": 0.16455696202531644,
+   "share_upper": 0.16872427983539098,
+   "share_at_least": null,
+   "cultures": 3,
+   "cultures_left_out": 0,
+   "withheld": null,
+   "incomplete": [],
+   "not_counted": [
+    "butyrate: no number",
+    "formate: measured over the second time window"
+   ]
+  },
+  {
+   "consumed_electrons_mM": 144.0,
+   "produced_electrons_mM": 0.0,
+   "share": null,
+   "share_lower": null,
+   "share_upper": null,
+   "share_at_least": null,
+   "cultures": 0,
+   "cultures_left_out": 0,
+   "withheld": "no degree of reduction for a resource it consumed or produced, so the share would leave it out (see not_counted)",
+   "incomplete": [],
+   "not_counted": [
+    "acetate: no number",
+    "butyrate: no degree of reduction",
+    "formate: measured over the second time window"
+   ]
+  },
+  {
+   "consumed_electrons_mM": 0.0,
+   "produced_electrons_mM": 0.0,
+   "share": null,
+   "share_lower": null,
+   "share_upper": null,
+   "share_at_least": null,
+   "cultures": 0,
+   "cultures_left_out": 0,
+   "withheld": null,
+   "incomplete": [
+    "glucose"
+   ],
+   "not_counted": [
+    "acetate: no number",
+    "butyrate: no number",
+    "formate: measured over the second time window",
+    "glucose: no number"
+   ]
+  }
+ ],
+ "culture_changes": [
+  [
+   {
+    "culture": "EMGDB000000001 (SMGDB00000001), replicate a1",
+    "changes": [
+     4.1,
+     null,
+     null,
+     -8.099999999999998
+    ]
+   },
+   {
+    "culture": "EMGDB000000001 (SMGDB00000001), replicate a2",
+    "changes": [
+     3.9,
+     null,
+     null,
+     -7.9
+    ]
+   },
+   {
+    "culture": "EMGDB000000001 (SMGDB00000001), replicate a3",
+    "changes": [
+     4.0,
+     null,
+     null,
+     -8.0
+    ]
+   }
+  ],
+  [
+   {
+    "culture": "EMGDB000000002 (SMGDB00000001), replicate b1",
+    "changes": [
+     null,
+     3.1,
+     null,
+     -6.1
+    ]
+   },
+   {
+    "culture": "EMGDB000000002 (SMGDB00000001), replicate b1b",
+    "changes": [
+     null,
+     2.9,
+     null,
+     -5.9
+    ]
+   }
+  ],
+  []
+ ],
+ "phase_start_mM": [
+  [
+   0.0,
+   0.0,
+   null,
+   10.0
+  ],
+  [
+   0.0,
+   0.0,
+   null,
+   10.0
+  ],
+  [
+   0.0,
+   0.0,
+   null,
+   10.0
+  ]
+ ],
+ "interval_start_h": [
+  [
+   0.0,
+   null,
+   null,
+   0.0
+  ],
+  [
+   null,
+   0.0,
+   null,
+   0.0
+  ],
+  [
+   null,
+   null,
+   null,
+   null
+  ]
+ ],
+ "interval_end_h": [
+  [
+   12.0,
+   null,
+   null,
+   12.0
+  ],
+  [
+   null,
+   16.0,
+   null,
+   16.0
+  ],
+  [
+   null,
+   null,
+   null,
+   null
+  ]
+ ],
+ "bounds": "lowest and highest replicate, as amounts; a 0 from 0 to the detection limit at least",
+ "consumed_lower": [
+  [
+   0.0,
+   null,
+   null,
+   7.9
+  ],
+  [
+   null,
+   0.0,
+   null,
+   5.9
+  ],
+  [
+   null,
+   null,
+   null,
+   null
+  ]
+ ],
+ "consumed_upper": [
+  [
+   0.2,
+   null,
+   null,
+   8.099999999999998
+  ],
+  [
+   null,
+   0.2,
+   null,
+   6.1
+  ],
+  [
+   null,
+   null,
+   null,
+   null
+  ]
+ ],
+ "produced_lower": [
+  [
+   3.9,
+   null,
+   null,
+   0.0
+  ],
+  [
+   null,
+   2.9,
+   null,
+   0.0
+  ],
+  [
+   null,
+   null,
+   null,
+   null
+  ]
+ ],
+ "produced_upper": [
+  [
+   4.1,
+   null,
+   null,
+   0.2
+  ],
+  [
+   null,
+   3.1,
+   null,
+   0.2
+  ],
+  [
+   null,
+   null,
+   null,
+   null
+  ]
+ ],
+ "biomass_change": [
+  999.0,
+  0.49,
+  null
+ ],
+ "biomass_start": [
+  1.0,
+  0.01,
+  null
+ ],
+ "biomass_unit": [
+  "fc",
+  "od",
+  null
+ ],
+ "phase_hours": [
+  12.0,
+  16.0,
+  null
+ ],
+ "phase_growth_rates": [
+  0.5756462732485114,
+  0.24450143783925912,
+  null
+ ],
+ "caveats": {
+  "presence_only": [
+   {
+    "taxon": "Beta beta B1",
+    "resource": "formate",
+    "direction": "produced",
+    "media": [
+     "mMCB"
+    ]
+   },
+   {
+    "taxon": "Gamma gamma C1",
+    "resource": "glucose",
+    "direction": "consumed",
+    "media": [
+     "mMCB"
+    ]
+   }
+  ],
+  "conflicts": [],
+  "duplicates": [],
+  "without_a_rate": [
+   "Alpha alpha A1",
+   "Beta beta B1",
+   "Gamma gamma C1"
+  ],
+  "media": [
+   "Wilkins-Chalgren Anaerobe Broth (WC)"
+  ],
+  "value_rule": "majority",
+  "searched_both_phases": true,
+  "mixed_media": false,
+  "stationary_phase": false,
+  "whole_run": [],
+  "incomplete": false,
+  "errors": [],
+  "warnings": [],
+  "cautions": [
+   {
+    "taxon": "Beta beta B1",
+    "resource": "glucose",
+    "cautions": [
+     "pair_decided"
+    ],
+    "notes": []
+   },
+   {
+    "taxon": "Beta beta B1",
+    "resource": "butyrate",
+    "cautions": [
+     "pair_decided"
+    ],
+    "notes": []
+   }
+  ],
+  "inconclusive": [],
+  "caution_tiers": {
+   "still_changing": 1,
+   "whole_run": 1,
+   "growth_unclear": 1,
+   "growth_unknown": 1,
+   "short_record": 1,
+   "window_beyond_data": 1,
+   "start_differs": 1,
+   "boundaries_differ": 1,
+   "pair_decided": 2,
+   "single_replicate": 2,
+   "no_variance": 2,
+   "amounts_differ": 2,
+   "within_scatter": 2,
+   "within_evaporation": 2,
+   "experiment_left_out": 2,
+   "coarse_sampling": 2,
+   "phase_from_other_replicates": 2,
+   "growth_rate_boundary": 3,
+   "stationary_not_reached": 3,
+   "not_detected_in_value_medium": 3
+  },
+  "biomass_falls": []
+ },
+ "phases": [
+  "exponential",
+  "stationary"
+ ],
+ "other_phases": {
+  "stationary": {
+   "phase": "stationary",
+   "consumed": [
+    [
+     0,
+     null,
+     null,
+     1.0000000000000002
+    ],
+    [
+     null,
+     0,
+     null,
+     0
+    ],
+    [
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "produced": [
+    [
+     0.9000000000000002,
+     null,
+     null,
+     0
+    ],
+    [
+     null,
+     0,
+     null,
+     0
+    ],
+    [
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "evidence_consumed": [
+    [
+     "below_limit",
+     "not_assayed",
+     "second_window",
+     "measured"
+    ],
+    [
+     "not_assayed",
+     "below_limit",
+     "second_window",
+     "below_limit"
+    ],
+    [
+     "not_assayed",
+     "not_assayed",
+     "second_window",
+     "not_assayed"
+    ]
+   ],
+   "evidence_produced": [
+    [
+     "measured",
+     "not_assayed",
+     "second_window",
+     "below_limit"
+    ],
+    [
+     "not_assayed",
+     "below_limit",
+     "second_window",
+     "below_limit"
+    ],
+    [
+     "not_assayed",
+     "not_assayed",
+     "second_window",
+     "not_assayed"
+    ]
+   ],
+   "interval_start_h": [
+    [
+     12.0,
+     null,
+     null,
+     12.0
+    ],
+    [
+     null,
+     16.0,
+     null,
+     16.0
+    ],
+    [
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "interval_end_h": [
+    [
+     24.0,
+     null,
+     null,
+     24.0
+    ],
+    [
+     null,
+     24.0,
+     null,
+     24.0
+    ],
+    [
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "consumed_lower": [
+    [
+     0.0,
+     null,
+     null,
+     0.8999999999999999
+    ],
+    [
+     null,
+     0.0,
+     null,
+     0.0
+    ],
+    [
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "consumed_upper": [
+    [
+     0.2,
+     null,
+     null,
+     1.0999999999999996
+    ],
+    [
+     null,
+     0.2,
+     null,
+     0.2
+    ],
+    [
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "produced_lower": [
+    [
+     0.7999999999999998,
+     null,
+     null,
+     0.0
+    ],
+    [
+     null,
+     0.0,
+     null,
+     0.0
+    ],
+    [
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "produced_upper": [
+    [
+     1.0000000000000004,
+     null,
+     null,
+     0.2
+    ],
+    [
+     null,
+     0.2,
+     null,
+     0.2
+    ],
+    [
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "biomass_change": [
+    0.0,
+    0.0,
+    null
+   ],
+   "biomass_start": [
+    1000.0,
+    0.5,
+    null
+   ],
+   "biomass_unit": [
+    "fc",
+    "od",
+    null
+   ],
+   "phase_hours": [
+    12.0,
+    8.0,
+    null
+   ],
+   "phase_growth_rates": [
+    0.0,
+    0.0,
+    null
+   ],
+   "electron_balance": [
+    {
+     "consumed_electrons_mM": 24.000000000000007,
+     "produced_electrons_mM": 7.200000000000002,
+     "share": 0.3,
+     "share_lower": 0.2962962962962963,
+     "share_upper": 0.30303030303030326,
+     "share_at_least": null,
+     "cultures": 3,
+     "cultures_left_out": 0,
+     "withheld": null,
+     "incomplete": [],
+     "not_counted": [
+      "butyrate: no number",
+      "formate: measured over the second time window"
+     ]
+    },
+    {
+     "consumed_electrons_mM": 0.0,
+     "produced_electrons_mM": 0.0,
+     "share": null,
+     "share_lower": null,
+     "share_upper": null,
+     "share_at_least": null,
+     "cultures": 0,
+     "cultures_left_out": 0,
+     "withheld": null,
+     "incomplete": [],
+     "not_counted": [
+      "acetate: no number",
+      "formate: measured over the second time window"
+     ]
+    },
+    {
+     "consumed_electrons_mM": 0.0,
+     "produced_electrons_mM": 0.0,
+     "share": null,
+     "share_lower": null,
+     "share_upper": null,
+     "share_at_least": null,
+     "cultures": 0,
+     "cultures_left_out": 0,
+     "withheld": null,
+     "incomplete": [
+      "glucose"
+     ],
+     "not_counted": [
+      "acetate: no number",
+      "butyrate: no number",
+      "formate: measured over the second time window",
+      "glucose: no number"
+     ]
+    }
+   ],
+   "culture_changes": [
+    [
+     {
+      "culture": "EMGDB000000001 (SMGDB00000001), replicate a1",
+      "changes": [
+       0.9000000000000004,
+       null,
+       null,
+       -1.0000000000000013
+      ]
+     },
+     {
+      "culture": "EMGDB000000001 (SMGDB00000001), replicate a2",
+      "changes": [
+       1.0000000000000004,
+       null,
+       null,
+       -1.0999999999999996
+      ]
+     },
+     {
+      "culture": "EMGDB000000001 (SMGDB00000001), replicate a3",
+      "changes": [
+       0.7999999999999998,
+       null,
+       null,
+       -0.8999999999999999
+      ]
+     }
+    ],
+    [
+     {
+      "culture": "EMGDB000000002 (SMGDB00000001), replicate b1",
+      "changes": [
+       null,
+       0.0,
+       null,
+       0.0
+      ]
+     },
+     {
+      "culture": "EMGDB000000002 (SMGDB00000001), replicate b1b",
+      "changes": [
+       null,
+       0.0,
+       null,
+       0.0
+      ]
+     }
+    ],
+    []
+   ],
+   "phase_start_mM": [
+    [
+     4.0,
+     0.0,
+     null,
+     2.0000000000000004
+    ],
+    [
+     0.0,
+     3.0,
+     null,
+     4.0
+    ],
+    [
+     0.0,
+     0.0,
+     null,
+     10.0
+    ]
+   ],
+   "presence_only": [],
+   "whole_run": [],
+   "biomass_falls": [],
+   "cautions": [
+    {
+     "taxon": "Beta beta B1",
+     "resource": "glucose",
+     "cautions": [
+      "pair_decided"
+     ],
+     "notes": []
+    },
+    {
+     "taxon": "Beta beta B1",
+     "resource": "butyrate",
+     "cautions": [
+      "no_variance",
+      "pair_decided"
+     ],
+     "notes": []
+    }
+   ],
+   "inconclusive": []
+  }
+ },
+ "studies": [
+  "SMGDB00000001",
+  "SMGDB00000002"
+ ]
+}

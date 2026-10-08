@@ -282,7 +282,7 @@ with metabolite data."
     physiology easier to parameterize: the degree of reduction of each resource, and an electron balance per
     taxon "as a check"; no yield ("No yield": a yield in grams needs a cells or OD to biomass factor the
     studies do not share), no maintenance (batch growth curves do not identify it). Formula and charge come
-    from ChEBI, by the id foodnet keys the compound under, read in CRM mode only and never stored: mGrowthDB
+    from ChEBI, by the id foodnet keys the compound under, read only with growth rates on (CRM mode) and never stored: mGrowthDB
     imports its metabolites from ChEBI but keeps neither formula nor charge (asked: "can you get them from
     mGrowthDB?"; answered "go ahead with ChEBI for now", with formula and charge on the mGrowthDB list). The
     degree of reduction is Roels's, per molecule, relative to CO2, H2O, NH3, H2SO4, H3PO4 and H+:
@@ -291,9 +291,41 @@ with metabolite data."
     succinic acid's (its joined form), fructose and fucose a named form's (chemistry.FORMULA_FROM); every
     other formula that cannot be evaluated is NA with the reason. The electron balance is `sum(produced x
     gamma) / sum(consumed x gamma)` over the CRM's matrices, leaving out second-window compounds (another
-    window) and naming every resource left out; its range takes the replicates' bounds, the fewest electrons
-    out over the most in and the reverse. It changes no value. Checking every id of foodnet.compounds against
-    ChEBI on the way found isovalerate keyed under CHEBI:50128, which is biflavonoid; it is 48942, as
+    window) and naming every resource left out. It changes no value, and sees one part of each side of the
+    balance (unmeasured substrates, unmeasured products and biomass lie outside it), so it has no expected
+    side of 1. A review the same day found two flaws, and Karoline chose: "Own gaps + name the rest": no share
+    when a resource the taxon consumed has no degree of reduction (a ChEBI failure, a polysaccharide, or, in
+    R, a resource left out with crm_subset()), since leaving out a substrate pushes the share up and reads as
+    unmeasured substrates (one failed lookup for glucose turned 0.74 to 1.10 into 2.4 to 4.3); a resource of
+    the medium without a number for the taxon keeps the share and is named (incomplete). "Per-culture shares":
+    the range is the lowest and highest culture's own share, each culture a closed balance, over the cultures
+    that measured every resource counted; the first range combined each cell's extreme replicates and was 3
+    to 7 times wider than the cultures differ (E. coli 0.78 to 2.13 against 0.96 to 1.41); a culture's change
+    inside the detection limit is 0 there, as in the matrices. A second review round found a missing product
+    pushing the share down unmarked (one failed lookup for acetate: B. hydrogenotrophica 0.79 to 0.09), and
+    Karoline chose "Withhold for products too", and "At the phase's start": a resource is of the medium when
+    the taxon's cultures held it above the detection limit when the phase began (else at the medium's first
+    sample), so a substrate used up in the exponential phase is not named missing from the stationary one.
+    A third round found stationary shares resting on uptake as small as the assays resolve (R. intestinalis:
+    9.5 mM of electrons taken up, share 6.67, cultures up to 14), and Karoline chose "Withhold, say why": no
+    share when the electrons taken up are within the detection limits of the resources counted and of those
+    the medium held without a number for the taxon (each limit, a compound's own where it has one, times its
+    degree of reduction, summed), and a culture that took up no more is left out of the range and counted
+    (cultures_left_out); and "Pooled resources": each culture's share counts the resources the share counts,
+    while resources inconclusive across cultures stay named as incomplete. A fourth round found the pooled
+    share outside its own range where cultures were left out (B. fragilis, stationary: 1.71 against 1.07 to
+    1.32 from the three cultures kept; BF_A took up 8.5 mM of electrons and made 130), and a withheld share
+    that still had a firm floor; Karoline chose "Withhold when outside" (the share pools every culture, the
+    range only those that took up enough to judge) and "Report 'at least X'": a share withheld for small
+    uptake gives electrons out over electrons in plus the most the resources could hide (share_at_least).
+    A fifth round showed the first floor false (R. intestinalis, stationary: "at least 2.01", while its own
+    cultures allowed about 1): a resource without a number can hide what the medium held when the phase
+    began, not only its detection limit, and the pooled means hid cultures below them. The floor now charges
+    a counted resource its limit and one without a number its phase-start amount, and takes the lowest of
+    the pooled amounts' and each culture's (R. intestinalis: at least 0.45, which says little); a sixth round
+    had a culture's floor use its own changes (the pooled phase-start amount bounds no one culture) and the
+    reason say that it leaves out the second time window's compounds, measured over their own window.
+    Checking every id of foodnet.compounds against ChEBI on the way found isovalerate keyed under CHEBI:50128, which is biflavonoid; it is 48942, as
     mGrowthDB records it, so isovaleric acid now joins it.
 
 ## Known limits

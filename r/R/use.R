@@ -362,6 +362,52 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     keep_t <- if (is.character(taxa)) match(taxa, x$taxa) else taxa
     keep_r <- if (is.character(resources)) match(resources, x$resources) else resources
     if (anyNA(keep_t) || anyNA(keep_r)) stop_foodnet("unknown taxon or resource")
+    # what a left-out resource was consumed or produced, so crm_electron_balance() withholds a share that would
+    # miss it (a second-window compound is never counted, so leaving it out changes nothing)
+    drop_r <- setdiff(seq_along(x$resources), keep_r)
+    drop_r <- drop_r[!x$resources[drop_r] %in% x$second_window_resources]
+    # (NA: no number for the taxon, though the medium held it when the phase began, so the balance still names it)
+    limits <- if (length(x$detection_limits)) x$detection_limits else rep(x$detection_limit, length(x$resources))
+    dropped <- function(b) {
+        amount <- function(m) ifelse(is.na(m), 0, abs(m))
+        gone <- amount(b$consumed[keep_t, drop_r, drop = FALSE]) + amount(b$produced[keep_t, drop_r, drop = FALSE])
+        start <- if (is.null(b$phase_start)) matrix(NA_real_, length(x$taxa), length(x$resources)) else b$phase_start
+        start <- ifelse(is.na(start), matrix(x$initial, length(x$taxa), length(x$resources), byrow = TRUE), start)
+        held <- !is.na(start) & start > matrix(limits, length(x$taxa), length(x$resources), byrow = TRUE)
+        unmeasured <- (is.na(b$consumed) & is.na(b$produced))[keep_t, drop_r, drop = FALSE]
+        none <- unmeasured & held[keep_t, drop_r, drop = FALSE]
+        gone[none] <- NA
+        # no number and not held above the limit: it counted for nothing in the share (a review)
+        gone[unmeasured & !none] <- -1
+        if (!is.null(b$dropped)) gone <- cbind(b$dropped[keep_t, , drop = FALSE], gone)
+        gone
+    }
+    # what such a resource could still hide in the floor: what the medium held below the limit, or NA where
+    # nobody measured it in the medium (taken as absent, and named) (a review: dropping it raised the floor)
+    gamma_all <- crm_chemistry(x)$degree_of_reduction
+    below <- function(b) {
+        start <- if (is.null(b$phase_start)) matrix(NA_real_, length(x$taxa), length(x$resources)) else b$phase_start
+        start <- ifelse(is.na(start), matrix(x$initial, length(x$taxa), length(x$resources), byrow = TRUE), start)
+        lim <- matrix(limits, length(x$taxa), length(x$resources), byrow = TRUE)
+        g <- matrix(ifelse(!is.na(gamma_all) & gamma_all > 0, gamma_all, 0), length(x$taxa), length(x$resources),
+                    byrow = TRUE)
+        unmeasured <- is.na(b$consumed) & is.na(b$produced)
+        held <- !is.na(start) & start > lim
+        out <- ifelse(unmeasured & !held, pmin(start, lim) * g, 0)
+        out <- out[keep_t, drop_r, drop = FALSE]
+        if (!is.null(b$dropped_below)) out <- cbind(b$dropped_below[keep_t, , drop = FALSE], out)
+        out
+    }
+    cultures_kept <- function(cm) if (is.null(cm)) NULL else lapply(cm[keep_t], function(m) m[, keep_r, drop = FALSE])
+    x["dropped"] <- list(dropped(x))
+    x["dropped_below"] <- list(below(x))
+    # what each left-out resource could hide below its detection limit, in electrons (limit x degree of
+    # reduction), for a balance that names it as incomplete
+    gamma <- crm_chemistry(x)$degree_of_reduction
+    hide <- ifelse(!is.na(gamma) & gamma > 0, limits * gamma, 0)[drop_r]
+    names(hide) <- x$resources[drop_r]
+    x$dropped_hidden <- c(x$dropped_hidden, hide)
+    x["culture_changes"] <- list(cultures_kept(x$culture_changes))
     for (name in PHASE_MATRICES) {
         if (!is.null(x[[name]])) x[[name]] <- x[[name]][keep_t, keep_r, drop = FALSE]
     }
@@ -370,6 +416,9 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     }
     for (ph in names(x$other_phases)) {
         b <- x$other_phases[[ph]]
+        b["dropped"] <- list(dropped(b))
+        b["dropped_below"] <- list(below(b))
+        b["culture_changes"] <- list(cultures_kept(b$culture_changes))
         for (name in PHASE_MATRICES) b[[name]] <- b[[name]][keep_t, keep_r, drop = FALSE]
         for (name in PHASE_VECTORS) b[[name]] <- b[[name]][keep_t]
         keep_rows <- function(rows) {
@@ -384,7 +433,11 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
         x$other_phases[[ph]] <- b
     }
     x$initial <- x$initial[keep_r]
+    if (length(x$detection_limits)) x$detection_limits <- x$detection_limits[keep_r]
     if (!is.null(x$chemistry)) x$chemistry <- x$chemistry[keep_r, , drop = FALSE]
+    # one left out still qualifies the floor, which never counted it (a review)
+    x$second_window_left_out <- union(x$second_window_left_out,
+                                      setdiff(x$second_window_resources, x$resources[keep_r]))
     x$second_window_resources <- intersect(x$second_window_resources, x$resources[keep_r])
     if (!is.null(x$resource_phases)) x$resource_phases <- x$resource_phases[keep_r]
     kept <- x$taxa[keep_t]
@@ -428,7 +481,8 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
 # The fields that belong to one phase: what crm_phase() swaps and crm_subset() subsets, in the order a phase
 # block holds them.
 PHASE_MATRICES <- c("consumed", "produced", "evidence_consumed", "evidence_produced", "interval_start",
-                    "interval_end", "consumed_lower", "consumed_upper", "produced_lower", "produced_upper")
+                    "interval_end", "consumed_lower", "consumed_upper", "produced_lower", "produced_upper",
+                    "phase_start")
 PHASE_VECTORS <- c("biomass_change", "biomass_start", "biomass_unit", "phase_hours", "phase_growth_rates")
 PHASE_CAVEATS <- c("cautions", "inconclusive", "presence_only", "whole_run", "biomass_falls")
 
@@ -458,9 +512,11 @@ crm_phase <- function(x, phase) {
                      " phase only; search for both phases in foodnet to have the stationary one too")
     }
     current <- list(phase = x$phase)
-    for (name in c(PHASE_MATRICES, PHASE_VECTORS)) {
-        current[[name]] <- x[[name]]
-        x[[name]] <- b[[name]]
+    # the culture changes travel with their phase, and so does what crm_subset() left out, once it has
+    for (name in intersect(c(PHASE_MATRICES, PHASE_VECTORS, "culture_changes", "dropped", "dropped_below"),
+                           union(names(x), names(b)))) {
+        current[name] <- list(x[[name]])
+        x[name] <- list(b[[name]])
     }
     for (name in PHASE_CAVEATS) {
         current[[name]] <- x$caveats[[name]]
@@ -495,7 +551,8 @@ crm_readme <- function(x, print = TRUE) {
 #' The files of foodnet's download, for the phase `x` holds: `consumed.csv`, `produced.csv` and their
 #' `evidence_*.csv`, `growth_rates.csv`, `initial_concentrations.csv`, `biomass.csv`, `intervals.csv` (the
 #' hours each value was measured over) and `bounds.csv` (each amount's lowest and highest replicate), one row
-#' per cell with a phase column, and `README.txt`, which opens with the phase. After [crm_phase()] the
+#' per cell with a phase column, `chemistry.csv` and `electron_balance.csv` (from foodnet 0.3.0, [crm_chemistry()]
+#' and [crm_electron_balance()], the latter with a phase column), and `README.txt`, which opens with the phase. After [crm_phase()] the
 #' phase's files are named for it (`consumed_stationary.csv`, `intervals_stationary.csv`,
 #' `README_stationary.txt`, ...), so both phases can be written to one folder; the growth rates and the
 #' medium are the same in both. The tables hold what the parameters in R hold, so some have fewer columns than the download's
@@ -555,9 +612,13 @@ crm_write <- function(x, dir) {
                    stringsAsFactors = FALSE)
     }))
     put(bounds, "bounds.csv")
-    if (!is.null(x$chemistry)) put(x$chemistry, "chemistry.csv")
-    if (!is.null(x$chemistry) && any(!is.na(x$chemistry$degree_of_reduction))) {
-        put(crm_electron_balance(x), "electron_balance.csv")
+    if (!is.null(x$chemistry_source)) {
+        # as foodnet's download: every resource, and the taxa with something counted or a share withheld
+        put(crm_chemistry(x), "chemistry.csv")
+        b <- crm_electron_balance(x)
+        b <- b[!is.na(b$withheld) | (!is.na(b$consumed_electrons_mM) &
+                                     (b$consumed_electrons_mM != 0 | b$produced_electrons_mM != 0)), , drop = FALSE]
+        put(cbind(b[, 1, drop = FALSE], phase = rep(x$phase, nrow(b)), b[, -1, drop = FALSE]), "electron_balance.csv")
     }
     readme <- file.path(dir, if (own) "README.txt" else paste0("README", suffix, ".txt"))
     writeLines(c(sprintf("These files hold the %s phase%s.", x$phase,
@@ -790,69 +851,210 @@ crm_chemistry <- function(x) {
 #'
 #' The electrons in a taxon's measured by-products over the electrons in what it consumed of the measured
 #' resources, `sum(produced * degree of reduction) / sum(consumed * degree of reduction)`, over the phase of
-#' `x` ([crm_phase()] switches). It is a check and changes no value. The electrons a culture takes up go to its
-#' biomass, its by-products and compounds nobody measured (dihydrogen often), so a share below 1 is expected;
-#' above 1, more electrons came out than went in, from substrates nobody measured (peptides and amino acids of
-#' a rich medium) or a measurement problem.
+#' `x` ([crm_phase()] switches). It is a check and changes no value, and it sees one part of each side of the
+#' balance: electrons also come from substrates nobody measured (peptides and amino acids of a rich medium,
+#' dihydrogen or formate taken up by hydrogen-using taxa) and go to biomass and to by-products nobody
+#' measured. So it has no expected side of 1: above 1, unmeasured substrates (or a measurement problem) gave
+#' more than biomass and unmeasured products took; near 1 is no proof the balance closes; and 1 minus the
+#' share is not a biomass yield.
+#'
+#' The share is withheld when a resource the taxon consumed or produced has no degree of reduction, or was left
+#' out with [crm_subset()], since leaving out a substrate makes the share too high and a product too low.
+#' It is also withheld when the electrons taken up are within the detection limits of the resources counted and
+#' of those of the medium it has no number for (each limit times its degree of reduction, summed), since the
+#' share would then be undetermined; `share_at_least` then holds what it is at least (electrons out over electrons
+#' in plus the most the resources could hide: for the pooled amounts, a counted one its detection limit and one
+#' without a number what the medium held when the phase began; for a culture that measured all of them, its own
+#' changes, each hiding its limit; the lowest of these). And it is withheld when it lies outside its own cultures' range, which the
+#' cultures left out of the range then drive. Compounds of
+#' the second time window are not counted (measured over another window). The range is the lowest and highest
+#' culture's own share over the same resources as the share, from the cultures that measured all of them and
+#' took up more than those limits; a culture's change inside the detection limit is 0, as in the matrices. What
+#' [crm_subset()] left out is kept in `x$dropped`.
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
-#' @return A data frame with a row per taxon: the electrons consumed and produced (`consumed_e_mM`,
-#'   `produced_e_mM`, mM of electrons), the `share`, its range over the replicates' bounds (`lower`, `upper`;
-#'   NA unless every number counted has bounds), and `not_counted`, the resources left out and why (no
-#'   number, no degree of reduction, or measured over the second time window). All NA without degrees of
-#'   reduction.
+#' @return A data frame with a row per taxon: `consumed_electrons_mM` and `produced_electrons_mM` (mM of
+#'   electrons; 0 where nothing was counted), `share`, `share_lower` and `share_upper` (the lowest and highest
+#'   culture's share; NA with fewer than two such cultures, without them in parameters from before 0.3.0, or
+#'   with an electron acceptor, a negative degree of reduction, counted), `cultures` (how many),
+#'   `cultures_left_out` (cultures that measured those resources but took up no more electrons than the
+#'   detection limits hide), `withheld` (why
+#'   there is no share although there are numbers), `incomplete` (resources of the medium without a number for
+#'   the taxon when the phase began, which the share leaves out) and `not_counted` (every resource left out, and
+#'   why). All NA
+#'   without degrees of reduction, or when the values are booleans.
 #' @export
 crm_electron_balance <- function(x) {
     need_crm(x)
+    columns <- data.frame(taxon = character(0), consumed_electrons_mM = numeric(0),
+                          produced_electrons_mM = numeric(0), share = numeric(0), share_lower = numeric(0),
+                          share_upper = numeric(0), share_at_least = numeric(0), cultures = integer(0),
+                          cultures_left_out = integer(0),
+                          withheld = character(0),
+                          incomplete = character(0), not_counted = character(0), stringsAsFactors = FALSE)
+    if (!length(x$taxa)) return(columns)
     gamma <- crm_chemistry(x)$degree_of_reduction
+    if (all(is.na(gamma)) || identical(x$values, "booleans")) {
+        out <- columns[rep(NA_integer_, length(x$taxa)), , drop = FALSE]
+        out$taxon <- x$taxa
+        out$cultures <- 0L
+        out$cultures_left_out <- 0L
+        rownames(out) <- NULL
+        return(out)
+    }
     counted <- !x$resources %in% x$second_window_resources
+    # a resource is of the medium when the taxon's cultures held it above the limit when the phase began, or,
+    # where they did not measure it, the medium did at its first sample (Karoline, 2026-10-08)
+    start <- if (is.null(x$phase_start)) matrix(NA_real_, length(x$taxa), length(x$resources)) else x$phase_start
+    medium <- matrix(x$initial, nrow = length(x$taxa), ncol = length(x$resources), byrow = TRUE)
+    start <- ifelse(is.na(start), medium, start)
+    limits <- if (length(x$detection_limits)) x$detection_limits else rep(x$detection_limit, length(x$resources))
+    in_medium_of <- function(i) !is.na(start[i, ]) & start[i, ] > limits
     rows <- lapply(seq_along(x$taxa), function(i) {
-        sums <- c(c = 0, p = 0, c_lo = 0, c_hi = 0, p_lo = 0, p_hi = 0)
-        bounded <- TRUE
+        e_in <- 0
+        e_out <- 0
+        used <- integer(0)
         skipped <- character(0)
+        incomplete <- character(0)
+        missing <- FALSE
         for (j in seq_along(x$resources)) {
-            values <- c(consumed = x$consumed[i, j], produced = x$produced[i, j])
+            c_v <- x$consumed[i, j]
+            p_v <- x$produced[i, j]
             if (!counted[j]) {
                 skipped <- c(skipped, paste0(x$resources[j], ": measured over the second time window"))
                 next
             }
-            if (all(is.na(values))) {
+            if (is.na(c_v) && is.na(p_v)) {
                 skipped <- c(skipped, paste0(x$resources[j], ": no number"))
+                if (in_medium_of(i)[j]) incomplete <- c(incomplete, x$resources[j])
                 next
             }
             if (is.na(gamma[j])) {
-                if (any(!is.na(values) & values != 0)) {
+                if (any(!is.na(c(c_v, p_v)) & c(c_v, p_v) != 0)) {
                     skipped <- c(skipped, paste0(x$resources[j], ": no degree of reduction"))
+                    missing <- TRUE
                 }
                 next
             }
-            for (d in c("consumed", "produced")) {
-                v <- values[[d]]
-                if (is.na(v)) {
-                    skipped <- c(skipped, paste0(x$resources[j], ": ", d, ": no number"))
-                    next
-                }
-                k <- substr(d, 1, 1)
-                sums[[k]] <- sums[[k]] + v * gamma[j]
-                lo <- x[[paste0(d, "_lower")]][i, j]
-                hi <- x[[paste0(d, "_upper")]][i, j]
-                if (is.na(lo) || is.na(hi) || gamma[j] < 0) {
-                    bounded <- FALSE
-                    next
-                }
-                sums[[paste0(k, "_lo")]] <- sums[[paste0(k, "_lo")]] + lo * gamma[j]
-                sums[[paste0(k, "_hi")]] <- sums[[paste0(k, "_hi")]] + hi * gamma[j]
+            if (is.na(c_v)) {
+                skipped <- c(skipped, paste0(x$resources[j], ": consumed: no number"))
+                if (in_medium_of(i)[j]) incomplete <- c(incomplete, x$resources[j])
+            }
+            if (is.na(p_v)) skipped <- c(skipped, paste0(x$resources[j], ": produced: no number"))
+            e_in <- e_in + (if (is.na(c_v)) 0 else c_v) * gamma[j]
+            e_out <- e_out + (if (is.na(p_v)) 0 else p_v) * gamma[j]
+            used <- c(used, j)
+        }
+        withheld <- NA_character_
+        if (missing) {
+            withheld <- paste("no degree of reduction for a resource it consumed or produced, so the share would",
+                              "leave it out (see not_counted)")
+        }
+        gone <- x$dropped
+        missing_left <- if (is.null(gone)) character(0) else colnames(gone)[is.na(gone[i, ])]
+        if (length(missing_left)) {
+            # a resource left out that the medium held when the phase began, without a number for the taxon
+            incomplete <- c(incomplete, paste0(missing_left, " (left out with crm_subset())"))
+        }
+        if (is.na(withheld) && !is.null(gone) && any(!is.na(gone[i, ]) & gone[i, ] > 0)) {
+            withheld <- paste0("left out with crm_subset() although consumed or produced: ",
+                               paste(colnames(gone)[!is.na(gone[i, ]) & gone[i, ] > 0], collapse = ", "))
+        }
+        # the uptake every counted resource could hide below its detection limit, in electrons (Karoline,
+        # 2026-10-08: "Withhold, say why")
+        # (every resource counted, and every one the medium held without a number for the taxon)
+        hidden <- union(used, match(intersect(incomplete, x$resources), x$resources))
+        # and those crm_subset() left out without a number or measured as 0, which still hide as much (reviews:
+        # leaving them out brought back a share withheld for it)
+        zero_left <- if (is.null(gone)) character(0) else colnames(gone)[!is.na(gone[i, ]) & gone[i, ] == 0]
+        noise <- sum((limits * gamma)[hidden][!is.na(gamma[hidden]) & gamma[hidden] > 0]) +
+            sum(x$dropped_hidden[c(missing_left, zero_left)], na.rm = TRUE)
+        small <- FALSE
+        floor <- NA_real_
+        if (is.na(withheld) && e_in > 0 && e_in <= noise) {
+            small <- TRUE
+            withheld <- paste0("the electrons taken up (", sprintf("%.3g", e_in), " mM) are ",
+                               "within the detection limits of the resources counted or missing (",
+                               sprintf("%.3g", noise), " mM), so the share would be undetermined")
+        }
+        share <- if (e_in > 0 && is.na(withheld)) e_out / e_in else NA_real_
+        # each culture's own share, over the resources the share counts, from those that measured all of them
+        measured <- matrix(numeric(0), ncol = 2)
+        cm <- x$culture_changes[[i]]
+        if ((!is.na(share) || small) && !is.null(cm) && nrow(cm) && all(gamma[used] >= 0)) {
+            for (k in seq_len(nrow(cm))) {
+                v <- cm[k, used]
+                if (anyNA(v)) next
+                measured <- rbind(measured, c(sum(pmax(0, -v) * gamma[used]), sum(pmax(0, v) * gamma[used])))
             }
         }
-        share <- if (sums[["c"]] > 0) sums[["p"]] / sums[["c"]] else NA_real_
-        ok <- bounded && !is.na(share)
-        data.frame(taxon = x$taxa[i], consumed_e_mM = sums[["c"]], produced_e_mM = sums[["p"]], share = share,
-                   lower = if (ok && sums[["c_hi"]] > 0) sums[["p_lo"]] / sums[["c_hi"]] else NA_real_,
-                   upper = if (ok && sums[["c_lo"]] > 0) sums[["p_hi"]] / sums[["c_lo"]] else NA_real_,
+        judged <- measured[, 1] > noise & measured[, 1] > 0
+        shares <- measured[judged, 2] / measured[judged, 1]
+        left_out <- as.integer(sum(!judged))
+        ranged <- length(shares) >= 2
+        low <- if (ranged) min(shares) else NA_real_
+        high <- if (ranged) max(shares) else NA_real_
+        if (!is.na(share) && ranged && !(share >= low - 1e-9 && share <= high + 1e-9)) {
+            # outside its cultures' own range, the others drive it (Karoline, 2026-10-08)
+            withheld <- paste0("the share (", sprintf("%.3g", share), ") lies outside its cultures' own (",
+                               sprintf("%.3g", low), " to ", sprintf("%.3g", high),
+                               "), so cultures outside the range (too little uptake to judge, or not every ",
+                               "resource counted) drive it")
+            share <- NA_real_
+        }
+        if (small) {
+            # what the measured numbers still say (Karoline, 2026-10-08: "Report 'at least X'"): a counted
+            # resource hides at most its detection limit, one without a number at most what the medium held when
+            # the phase began; the lowest of the pooled amounts' and each culture's own
+            inc <- match(intersect(incomplete, x$resources), x$resources)
+            miss <- inc[!is.na(gamma[inc]) & gamma[inc] > 0]
+            if (!length(missing_left) && !anyNA(gamma[inc]) && all(gamma[inc] >= 0) && !anyNA(start[i, miss])) {
+                limit_e <- function(j) sum((limits * gamma)[j][gamma[j] > 0])
+                # a resource without a number that the medium held below the limit hides at most what it held; one
+                # nobody measured in the medium is taken as absent, and the reason says so (a review)
+                unseen <- which(counted & is.na(x$consumed[i, ]) & is.na(x$produced[i, ]) &
+                                    !x$resources %in% incomplete & !is.na(gamma) & gamma > 0)
+                absent <- unseen[is.na(start[i, unseen])]
+                seen <- setdiff(unseen, absent)
+                # (named, also with one column: a single element would lose its name)
+                gone_below <- if (is.null(x$dropped_below)) numeric(0) else
+                    stats::setNames(x$dropped_below[i, ], colnames(x$dropped_below))
+                below <- sum(pmin(start[i, seen], limits[seen]) * gamma[seen]) + sum(gone_below, na.rm = TRUE)
+                most <- limit_e(used) + sum(start[i, miss] * gamma[miss]) + below +
+                    sum(x$dropped_hidden[zero_left], na.rm = TRUE)
+                floors <- e_out / (e_in + most)
+                # a culture by its own numbers, where it measured every resource counted and every one the pooled
+                # values lack, each hiding at most its limit (a review)
+                every <- sort(union(used, miss))
+                if (!is.null(cm) && nrow(cm)) {
+                    for (k in seq_len(nrow(cm))) {
+                        v <- cm[k, every]
+                        if (anyNA(v)) next
+                        floors <- c(floors, sum(pmax(0, v) * gamma[every]) /
+                                        (sum(pmax(0, -v) * gamma[every]) + limit_e(every) + below +
+                                             sum(x$dropped_hidden[zero_left], na.rm = TRUE)))
+                    }
+                }
+                floor <- min(floors)
+                notes <- c(if (any(!counted) || length(x$second_window_left_out))
+                               "leaving out the second time window's compounds",
+                           if (length(absent) || any(is.na(gone_below)))
+                               paste0("taking ", paste(c(x$resources[absent], names(gone_below)[is.na(gone_below)]),
+                                                       collapse = ", "),
+                                                      ", which nobody measured in this medium, as absent"))
+                withheld <- paste0(withheld, "; it is at least ", sprintf("%.3g", floor),
+                                   if (length(notes)) paste0(" (", paste(notes, collapse = ", and "), ")") else "")
+            } else {
+                withheld <- paste0(withheld, "; a resource without a number has no bound, so no floor either")
+            }
+        }
+        data.frame(taxon = x$taxa[i], consumed_electrons_mM = e_in, produced_electrons_mM = e_out, share = share,
+                   share_lower = low, share_upper = high, share_at_least = floor,
+                   cultures = length(shares), cultures_left_out = left_out, withheld = withheld,
+                   incomplete = paste(incomplete, collapse = "; "),
                    not_counted = paste(skipped, collapse = "; "), stringsAsFactors = FALSE)
     })
     out <- do.call(rbind, rows)
-    if (all(is.na(gamma))) out[, c("consumed_e_mM", "produced_e_mM", "share", "lower", "upper")] <- NA_real_
-    rownames(out) <- x$taxa
+    rownames(out) <- NULL
     out
 }

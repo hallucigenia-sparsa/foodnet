@@ -9,7 +9,7 @@ simulator: everything it returns is a plain matrix, vector or list.
 
 ```r
 install.packages(c("remotes", "BiocManager"))
-remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r", ref = "v0.2.0")
+remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r", ref = "v0.3.0")
 BiocManager::install("miaSim")                          # for the simulations
 ```
 
@@ -50,10 +50,11 @@ phase.
 | `crm_scale(crm)`, `crm_unscale(crm, abundance, args = args)` | that unit, in the growth curve's unit, and simulated abundances back in the curve's unit |
 | `crm_subset(crm, taxa, resources)` | the same parameters for fewer taxa or resources |
 | `crm_chemistry(crm)` | each resource's formula and charge (ChEBI), carbon atoms and degree of reduction |
-| `crm_electron_balance(crm)` | each taxon's electrons out over electrons in, with its range over the replicates: a check, which changes no value |
+| `crm_electron_balance(crm)` | each taxon's electrons out over electrons in, with the lowest and highest culture's: a check, which changes no value and has no expected side of 1; withheld when a resource it consumed or produced has no degree of reduction or was left out with `crm_subset()` |
 | `crm_phase(crm, "stationary")` | the stationary phase, when the search asked for both phases |
 | `crm$interval_start`, `crm$interval_end` | taxa by resources, the hours each value was measured over |
 | `crm$consumed_lower`, `crm$consumed_upper`, `crm$produced_lower`, `crm$produced_upper` | each amount's lowest and highest replicate (mM); a 0 from 0 to the detection limit at least |
+| `crm$phase_start`, `crm$culture_changes`, `crm$dropped` | each resource's concentration when the phase began (taxa by resources, mM), each culture's own changes (per taxon, cultures by resources), and what `crm_subset()` left out that the taxa consumed or produced: what `crm_electron_balance()` reads |
 | `crm_backcheck(crm, monod_constant)` | each taxon simulated alone, against its own monoculture |
 | `as_miasim(crm, x0, monod_constant)` | the arguments of `miaSim::simulateConsumerResource` |
 | `crm_readme(crm)`, `crm_write(crm, dir)` | the README food**net** wrote, and the parameters as files |

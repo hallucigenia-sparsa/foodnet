@@ -14,7 +14,8 @@ crm_write(x, dir)
 The files of foodnet's download, for the phase \code{x} holds: \code{consumed.csv}, \code{produced.csv} and their
 \code{evidence_*.csv}, \code{growth_rates.csv}, \code{initial_concentrations.csv}, \code{biomass.csv}, \code{intervals.csv} (the
 hours each value was measured over) and \code{bounds.csv} (each amount's lowest and highest replicate), one row
-per cell with a phase column, and \code{README.txt}, which opens with the phase. After \code{\link{crm_phase}} the
+per cell with a phase column, \code{chemistry.csv} and \code{electron_balance.csv} (from foodnet 0.3.0, \code{\link{crm_chemistry}}
+and \code{\link{crm_electron_balance}}, the latter with a phase column), and \code{README.txt}, which opens with the phase. After \code{\link{crm_phase}} the
 phase's files are named for it (\code{consumed_stationary.csv}, \code{intervals_stationary.csv},
 \code{README_stationary.txt}, ...), so both phases can be written to one folder; the growth rates and the
 medium are the same in both. The tables hold what the parameters in R hold, so some have fewer columns than the download's

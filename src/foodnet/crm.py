@@ -155,3 +155,25 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
                       "phase_rate": (math.log((start + change) / start) / hours
                                      if start > 0 and start + change > 0 and hours > 0 else None)}
     return out
+
+
+def culture_changes(rows, cultures, limit: float, limits: dict | None = None) -> dict:
+    """{(taxon, phase): {culture label: {metabolite: change in mM}}}: each value-medium culture's own changes,
+    from which the electron balance takes its range (foodnet.chemistry.electron_balance: each culture's share
+    over the resources the pooled share counts; Karoline, 2026-10-08, "Per-culture shares", "Pooled
+    resources"). As in the values
+    (foodnet.derive.pool), a whole-run change is left out where another culture of the taxon has a phase value
+    for the compound; second-window changes are left out, since the balance does not count them. A change inside
+    the detection limit (`limits` per compound, else `limit`) is 0, as in the matrices ("zeros are zeros")."""
+    groups = defaultdict(list)
+    for r in rows:
+        if r["change"] is not None and not r.get("second"):
+            groups[(r["taxon"], r["metabolite"], r["phase"])].append(r)
+    out = defaultdict(dict)
+    for (taxon, met, phase), members in groups.items():
+        if any("whole_run" not in r["cautions"] for r in members):
+            members = [r for r in members if "whole_run" not in r["cautions"]]
+        for r in members:
+            change = r["change"] if abs(r["change"]) >= (limits or {}).get(met, limit) else 0.0
+            out[(taxon, phase)].setdefault(cultures[r["culture"]].label, {})[met] = change
+    return dict(out)

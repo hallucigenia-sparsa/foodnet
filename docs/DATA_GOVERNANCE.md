@@ -6,6 +6,10 @@ mGrowthDB is open. foodnet reads batch monocultures (growth curves and metabolit
 through its public API and derives production and consumption itself; mGrowthDB holds no such network.
 See https://mgrowthdb.readthedocs.io/en/latest/api.html .
 
+ChEBI (https://www.ebi.ac.uk/chebi, CC BY 4.0) gives each metabolite's formula and charge when growth rates
+are on (CRM mode): foodnet asks its public API for the ChEBI ids mGrowthDB records, keeps the answers for the
+run only, and names ChEBI and the retrieval date in the CRM parameters (`chemistry_source` in crm.json).
+
 ## Attribution at the arc level
 
 Per-study licenses are respected by citing every study that supports a network at the arc level: each arc

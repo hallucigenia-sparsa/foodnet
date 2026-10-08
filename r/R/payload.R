@@ -81,11 +81,16 @@ as_phase_block <- function(b, taxa, resources) {
          consumed_upper = hours_matrix(b$consumed_upper, taxa, resources),
          produced_lower = hours_matrix(b$produced_lower, taxa, resources),
          produced_upper = hours_matrix(b$produced_upper, taxa, resources),
+         phase_start = hours_matrix(b$phase_start_mM, taxa, resources),
          biomass_change = taxon_numbers(b, "biomass_change", taxa),
          biomass_start = taxon_numbers(b, "biomass_start", taxa),
          biomass_unit = units,
          phase_hours = taxon_numbers(b, "phase_hours", taxa),
          phase_growth_rates = taxon_numbers(b, "phase_growth_rates", taxa),
+         # in the order crm_phase() builds a phase in, so switching there and back gives the same object
+         culture_changes = culture_matrices(b$culture_changes, taxa, resources),
+         dropped = NULL,
+         dropped_below = NULL,
          cautions = cautions_rows(b$cautions),
          inconclusive = caveats_rows(b$inconclusive),
          presence_only = presence_rows(b$presence_only),
@@ -111,7 +116,20 @@ chemistry_frame <- function(rows, resources) {
                per_cmol = field("per_cmol", NA_real_, as_number),
                formula_from = field("formula_from", NA_character_, text),
                note = field("note", NA_character_, text),
-               row.names = resources, stringsAsFactors = FALSE)
+               stringsAsFactors = FALSE)
+}
+
+# Each culture's own changes, per taxon a matrix of cultures by resources (mM, NA where it measured none), for
+# the range of the electron balance; NULL for a payload from foodnet before 0.3.0.
+#' @noRd
+culture_matrices <- function(rows, taxa, resources) {
+    if (is.null(rows)) return(NULL)
+    out <- lapply(rows, function(cultures) {
+        labels <- vapply(cultures, function(c) chr(c$culture), character(1))
+        as_matrix(lapply(cultures, function(c) c$changes), labels, resources)
+    })
+    names(out) <- taxa
+    out
 }
 
 # The links seen only in another medium, as a data frame (taxon, resource, direction, media).
@@ -178,6 +196,7 @@ as_foodnet_crm <- function(payload) {
              consumed_upper = hours_matrix(payload$consumed_upper, taxa, resources),
              produced_lower = hours_matrix(payload$produced_lower, taxa, resources),
              produced_upper = hours_matrix(payload$produced_upper, taxa, resources),
+             phase_start = hours_matrix(payload$phase_start_mM, taxa, resources),
              bounds = chr(payload$bounds),
              resource_phases = named(if (length(payload$resource_phases))
                  vapply(payload$resource_phases, chr, character(1)) else rep(chr(payload$phase), length(resources)),
@@ -185,6 +204,13 @@ as_foodnet_crm <- function(payload) {
              chemistry = chemistry_frame(payload$resource_chemistry, resources),
              chemistry_source = payload$chemistry_source,
              second_window_resources = chr_vector(payload$second_window_resources),
+             detection_limits = named(if (length(payload$detection_limits_mM))
+                 vapply(payload$detection_limits_mM, as_number, numeric(1)) else numeric(0),
+                 if (length(payload$detection_limits_mM)) resources else character(0)),
+             culture_changes = culture_matrices(payload$culture_changes, taxa, resources),
+             # what crm_subset() left out that the taxa consumed or produced (mM, taxa by resources left out)
+             dropped = NULL,
+             dropped_below = NULL,
              growth_rates = rates,
              growth_rate_unit = chr(payload$growth_rate_unit, "1/h"),
              growth_rate_detail = payload$growth_rate_detail,
@@ -384,7 +410,7 @@ print.foodnet_crm <- function(x, ...) {
     cat("     into miaSim's E (yields per mM taken up, by-products per unit of growth); crm_backcheck()\n")
     cat("     simulates each taxon alone and says how close it comes to its own monoculture.\n")
     known <- sum(!is.na(x$chemistry$degree_of_reduction))
-    if (known) {
+    if (known && !identical(x$values, "booleans")) {
         cat(sprintf("   * degrees of reduction for %d of %d resources, from %s: crm_chemistry(x); each taxon's\n",
                     known, length(x$resources), chr(x$chemistry_source$source, "ChEBI")))
         cat("     electrons out over electrons in, a check: crm_electron_balance(x).\n")

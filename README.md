@@ -1,8 +1,8 @@
 # foodnet: who produces and who consumes which metabolite
 
 [![ci](https://github.com/hallucigenia-sparsa/foodnet/actions/workflows/ci.yml/badge.svg)](https://github.com/hallucigenia-sparsa/foodnet/actions/workflows/ci.yml)
-[![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/LICENSE)
-[![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/pyproject.toml)
+[![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/LICENSE)
+[![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/pyproject.toml)
 
 food**net** builds bipartite taxon and metabolite networks from the batch monocultures in
 [mGrowthDB](https://mgrowthdb.gbiomed.kuleuven.be/): which taxon produces which compound, and which consumes
@@ -12,7 +12,8 @@ matrix formats, and to R as the parameters of a consumer-resource model (CRM), w
 
 It is the sister tool of [grow**net**](https://github.com/crossfeed-bio/crossfeed), which builds
 interaction networks from co-cultures, and is built the same way: a thin client with no runtime
-dependencies, a local page and a command line, nothing hosted and nothing uploaded.
+dependencies, a local page and a command line, nothing hosted and nothing uploaded. It reads mGrowthDB, and
+in CRM mode ChEBI for the metabolites' formulas.
 
 ## Contents
 
@@ -49,7 +50,7 @@ id, one per line), or press Example, and press Get taxon-metabolite network. The
 buttons (downloads, Send to Cytoscape, the report, the CRM parameters) and an index of its sections; then
 come the consumed and produced matrices as an image, the taxa, the arcs and the sources.
 
-![the legend](https://raw.githubusercontent.com/hallucigenia-sparsa/foodnet/v0.2.0/docs/legend.svg)
+![the legend](https://raw.githubusercontent.com/hallucigenia-sparsa/foodnet/v0.3.0/docs/legend.svg)
 
 ## What it does
 
@@ -101,11 +102,11 @@ and a consumer-resource model built from it is a hypothesis to check against the
 hand-checked matrix with settings chosen for it, and compared directions with a published figure. A net change
 hides a compound made and used again within a phase, and one failed sample at a phase end becomes the value.
 Growth on an unblanked optical density that starts high can read as no growth; such cultures give their
-change over the whole run (whole_run), not a phase. See [docs/METHOD_NOTES.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/docs/METHOD_NOTES.md).
+change over the whole run (whole_run), not a phase. See [docs/METHOD_NOTES.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/docs/METHOD_NOTES.md).
 
 Acid and base forms of one compound are one metabolite (acetic acid and acetate), since mGrowthDB records
 both and an HPLC measures one pool. A compound that was never assayed for a taxon is never written as zero.
-Every decision and its reason is in [docs/METHOD_NOTES.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/docs/METHOD_NOTES.md).
+Every decision and its reason is in [docs/METHOD_NOTES.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/docs/METHOD_NOTES.md).
 
 ## The outputs
 
@@ -116,7 +117,7 @@ Every decision and its reason is in [docs/METHOD_NOTES.md](https://github.com/ha
   dashed frame for a change over the whole run.
   Downloadable as SVG, and in the matrices zip. Hovering over a cell shows its value, its replicates and the
   studies, experiments and medium behind it (also in the downloaded SVG, opened in a browser).
-- **Network**: JSON (the canonical format, [schema](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/schema/metabolite_network.schema.json)) or GraphML.
+- **Network**: JSON (the canonical format, [schema](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/schema/metabolite_network.schema.json)) or GraphML.
 - **Taxa x metabolites matrix** (CSV): one cell per taxon and metabolite, the mean change in mM, positive
   when produced and negative when consumed. miaSim's efficiency matrix has the opposite signs (positive for
   a resource taken up), so this matrix is not an `E`: the R package builds `E` from the consumed and produced
@@ -145,15 +146,20 @@ CRM mode collects growth rates: from the replicates whose metabolites gave the v
 monoculture in the same medium. Get CRM parameters then downloads the matrices, the growth rates, the
 initial medium concentrations, each taxon's biomass change over the phase, the hours each value was measured
 over (`intervals.csv`), each amount's lowest and highest replicate (`bounds.csv`), each resource's formula
-and degree of reduction from ChEBI (`chemistry.csv`) and each taxon's electron balance, a check of electrons
-out over electrons in (`electron_balance.csv`), or sends them to R.
+and degree of reduction (`chemistry.csv`, from [ChEBI](https://www.ebi.ac.uk/chebi), CC BY 4.0, whose public
+API foodnet asks in CRM mode) and each taxon's electron balance, a check of electrons out over electrons in
+with the lowest and highest culture's (`electron_balance.csv`), or sends them to R. The balance changes no
+value and has no expected side of 1: unmeasured substrates, unmeasured products and biomass lie outside it,
+so 1 minus it is no biomass yield; it is withheld when a resource the taxon consumed or produced has no
+degree of reduction, when what it took up is within the assays' detection limits (it then says what the
+share is at least), or when it lies outside its own cultures' range.
 With the phase choice Both, the stationary phase (what changed after the end of exponential growth) comes
 too, beside the exponential one. Install the companion package once, at the version of your foodnet (the
 page and the help print the line for yours, which names the release), and miaSim for the simulations:
 
 ```r
 install.packages(c("remotes", "BiocManager"))
-remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r", ref = "v0.2.0")
+remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r", ref = "v0.3.0")
 BiocManager::install("miaSim")
 ```
 
@@ -193,7 +199,7 @@ taxon a simulation cannot use. `as_miasim()` never
 lets miaSim draw starting abundances or Monod constants at random, and refuses pooled media and the
 stationary phase unless allowed. With the phase choice Both, the CRM is built from the exponential phase,
 since a consumer-resource model describes growth; `crm_phase(crm, "stationary")` switches to the other.
-See [r/README.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/r/README.md).
+See [r/README.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/r/README.md).
 
 ## The command line
 
@@ -210,12 +216,12 @@ foodnet validate network.json
 
 The same as grow**net**'s: no real data in git (only synthetic fixtures under `tests/fixtures/`), no
 runtime dependencies, the network format is a contract checked against its schema, and `make check` runs
-lint, the guardrail gate and the tests, in CI and before every commit. See [AGENTS.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/AGENTS.md) and
-[CONTRIBUTING.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/CONTRIBUTING.md).
+lint, the guardrail gate and the tests, in CI and before every commit. See [AGENTS.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/AGENTS.md) and
+[CONTRIBUTING.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/CONTRIBUTING.md).
 
 Every arc cites the studies behind it, so attribution resolves at the arc level; see
-[docs/DATA_GOVERNANCE.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/docs/DATA_GOVERNANCE.md).
+[docs/DATA_GOVERNANCE.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/docs/DATA_GOVERNANCE.md).
 
 ## License
 
-Apache License 2.0; see [LICENSE](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/LICENSE) and [NOTICE](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.2.0/NOTICE).
+Apache License 2.0; see [LICENSE](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/LICENSE) and [NOTICE](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.3.0/NOTICE).

@@ -8,12 +8,28 @@ crm_electron_balance(x)
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
 }
-\value{A data frame with a row per taxon: the electrons consumed and produced (\code{consumed_e_mM}, \code{produced_e_mM}, mM of electrons), the \code{share}, its range over the replicates' bounds (\code{lower}, \code{upper}; NA unless every number counted has bounds), and \code{not_counted}, the resources left out and why (no number, no degree of reduction, or measured over the second time window). All NA without degrees of reduction.}
+\value{A data frame with a row per taxon: \code{consumed_electrons_mM} and \code{produced_electrons_mM} (mM of electrons; 0 where nothing was counted), \code{share}, \code{share_lower} and \code{share_upper} (the lowest and highest culture's share; NA with fewer than two such cultures, without them in parameters from before 0.3.0, or with an electron acceptor, a negative degree of reduction, counted), \code{cultures} (how many), \code{cultures_left_out} (cultures that measured those resources but took up no more electrons than the detection limits hide), \code{withheld} (why there is no share although there are numbers), \code{incomplete} (resources of the medium without a number for the taxon when the phase began, which the share leaves out) and \code{not_counted} (every resource left out, and why). All NA without degrees of reduction, or when the values are booleans.}
 \description{
 The electrons in a taxon's measured by-products over the electrons in what it consumed of the measured
 resources, \code{sum(produced * degree of reduction) / sum(consumed * degree of reduction)}, over the phase of
-\code{x} (\code{\link{crm_phase}} switches). It is a check and changes no value. The electrons a culture takes up go to its
-biomass, its by-products and compounds nobody measured (dihydrogen often), so a share below 1 is expected;
-above 1, more electrons came out than went in, from substrates nobody measured (peptides and amino acids of
-a rich medium) or a measurement problem.
+\code{x} (\code{\link{crm_phase}} switches). It is a check and changes no value, and it sees one part of each side of the
+balance: electrons also come from substrates nobody measured (peptides and amino acids of a rich medium,
+dihydrogen or formate taken up by hydrogen-using taxa) and go to biomass and to by-products nobody
+measured. So it has no expected side of 1: above 1, unmeasured substrates (or a measurement problem) gave
+more than biomass and unmeasured products took; near 1 is no proof the balance closes; and 1 minus the
+share is not a biomass yield.
+
+The share is withheld when a resource the taxon consumed or produced has no degree of reduction, or was left
+out with \code{\link{crm_subset}}, since leaving out a substrate makes the share too high and a product too low.
+It is also withheld when the electrons taken up are within the detection limits of the resources counted and
+of those of the medium it has no number for (each limit times its degree of reduction, summed), since the
+share would then be undetermined; \code{share_at_least} then holds what it is at least (electrons out over electrons
+in plus the most the resources could hide: for the pooled amounts, a counted one its detection limit and one
+without a number what the medium held when the phase began; for a culture that measured all of them, its own
+changes, each hiding its limit; the lowest of these). And it is withheld when it lies outside its own cultures' range, which the
+cultures left out of the range then drive. Compounds of
+the second time window are not counted (measured over another window). The range is the lowest and highest
+culture's own share over the same resources as the share, from the cultures that measured all of them and
+took up more than those limits; a culture's change inside the detection limit is 0, as in the matrices. What
+\code{\link{crm_subset}} left out is kept in \code{x$dropped}.
 }

@@ -112,13 +112,24 @@ def report_text(result: dict) -> str:
             lines.append(f"  {names.get(mid, mid)}: {value}" + (f"; {c['note']}" if c["note"] else ""))
         balances = balance_rows(result)
         if balances:
-            lines += ["", "Electron balance (electrons in the measured by-products over those in what was consumed; "
-                      "a check, below 1 expected):"]
+            lines += ["", "Electron balance (electrons in the measured by-products over those in what was consumed, "
+                      "the lowest and highest culture's in brackets; a check: unmeasured substrates and products "
+                      "and biomass lie outside it, so 1 is no target):"]
             for name, ph, b in balances:
-                share = "none (nothing with electrons consumed)" if b["share"] is None else f"{b['share']:.2f}"
-                spread = (f", replicates {b['lower']:.2f} to {b['upper']:.2f}"
-                          if b["lower"] is not None and b["upper"] is not None else "")
-                lines.append(f"  {name} ({ph} phase): {share}{spread}")
+                if b["withheld"]:
+                    share = "withheld, " + b["withheld"]
+                    if b["cultures_left_out"]:
+                        share += f" ({b['cultures_left_out']} culture(s) left out of the range, n {b['cultures']} kept)"
+                elif b["share"] is None:
+                    share = "none (nothing with electrons consumed)"
+                else:
+                    share = f"{b['share']:.2f}" + (f" (cultures {b['share_lower']:.2f} to {b['share_upper']:.2f}, "
+                                                   f"n {b['cultures']})" if b["share_lower"] is not None else "")
+                    if b["cultures_left_out"]:
+                        share += (f"; {b['cultures_left_out']} culture(s) took up no more than the detection limits "
+                                  "hide, left out of the range")
+                lines.append(f"  {name} ({ph} phase): {share}"
+                             + (f"; incomplete: {', '.join(b['incomplete'])}" if b["incomplete"] else ""))
     if result["skipped"]:
         lines += ["", f"Left out or noted ({len(result['skipped'])}):"]
         reasons = Counter(r for _, r in result["skipped"])

@@ -44,8 +44,11 @@ from .model import CAUTION_TIERS, FoodNetwork
 NA = "NA"
 EVIDENCE_WORDS = ("measured", "below_limit", "whole_run", "single_replicate", "seen_elsewhere", "inconclusive",
                   "no_phase", "not_grown", "presence_only", "not_assayed")
-# v1 (0.2.0): adds each taxon's biomass change over the phase, which miaSim's yields need, and the caveats
-# that make a CRM refuse to build without being told (mixed media, the stationary phase)
+# v1 (0.2.0): adds each taxon's biomass change over the phase, which miaSim's yields need, the caveats that
+# make a CRM refuse to build without being told (mixed media, the stationary phase), the intervals, the bounds
+# and the stationary block. 0.3.0 keeps v1 and adds fields a 0.2.0 reader leaves alone: the resources'
+# chemistry, each taxon's electron balance, each culture's own changes, the concentrations at each phase's
+# start and the second-window resources
 CRM_FORMAT = "foodnet.crm/v1"
 
 
@@ -612,18 +615,37 @@ def readme(result: dict, which: str = "matrices") -> str:
                   "Chemistry: each resource's formula and charge from ChEBI, by the id foodnet keys it under, "
                   "and its degree of reduction, the electrons per molecule relative to CO2, H2O, NH3, H2SO4, "
                   "H3PO4 and H+: 4C + H - 2O - 3N + 6S + 5P - charge (chemistry.csv; in crm.json "
-                  "resource_chemistry). The charge term makes an acid and its conjugate base, which foodnet joins, "
+                  "resource_chemistry; ChEBI's data are CC BY 4.0, read on the date chemistry_source gives). The "
+                  "charge term makes an acid and its conjugate base, which foodnet joins, "
                   "the same. A ChEBI class without a formula (succinate, fructose) takes the formula of a named "
                   "form, which formula_from gives; a formula that cannot be evaluated (another element, a "
                   "variable part) is NA, with the reason.",
                   "Electron balance: each taxon's electrons in its measured by-products over the electrons in what "
                   "it consumed of the measured resources, sum(produced x degree of reduction) / sum(consumed x "
-                  "degree of reduction), in mM of electrons (electron_balance.csv; in crm.json electron_balance), "
-                  "with its range over the replicates' bounds. It is a check, and changes no value. Electrons go "
-                  "to biomass and to compounds nobody measured (dihydrogen often), so a share below 1 is "
-                  "expected; above 1, more electrons came out than went in, from substrates nobody measured "
-                  "(peptides and amino acids of a rich medium) or a measurement problem. not_counted names the "
-                  "resources left out and why.",
+                  "degree of reduction), in mM of electrons (electron_balance.csv; in crm.json electron_balance). It "
+                  "is a check, and changes no value. It sees one part of each side: electrons also come from "
+                  "substrates nobody measured (peptides and amino acids of a rich medium; dihydrogen or formate "
+                  "taken up by hydrogen-using taxa) and go to biomass and to by-products nobody measured "
+                  "(dihydrogen, ethanol). So it has no expected side of 1: above 1, unmeasured substrates (or a "
+                  "measurement problem) gave more than biomass and unmeasured products took; near 1 is no proof the "
+                  "balance closes; and 1 minus the share is not a biomass yield. share_lower and share_upper are the "
+                  "lowest and highest culture's own share, over the resources the share counts, from the cultures "
+                  "that measured all of them (cultures says how many), with changes inside the detection limit as 0, "
+                  "as in the matrices; a culture whose uptake is within the detection limits is left out "
+                  "(cultures_left_out). The share is withheld when a resource the taxon consumed or produced has no "
+                  "degree of reduction (withheld says so), since leaving out a substrate would make it too high and "
+                  "a product too low; and when the electrons taken up are within the detection limits of the "
+                  "resources it counts or has no number for (each limit times its degree of reduction, summed), "
+                  "since the share would then be undetermined (share_at_least then holds what it is at least: "
+                  "electrons out over electrons in plus the most the resources could hide, a counted one its "
+                  "detection limit, one without a number what the medium held when the phase began, the lowest of "
+                  "the pooled amounts' and each culture's); and when it lies outside its own cultures' range, which "
+                  "the cultures left out of the range then drive; incomplete names the resources the medium held "
+                  "when the phase began without a number for the taxon (not assayed, inconclusive, seen only "
+                  "elsewhere), which the share leaves out; not_counted names every resource left out and why. "
+                  "Compounds of the second time window are not counted (measured over another window), which raises "
+                  "the share of a taxon that consumed one. A negative degree of reduction (an electron acceptor such "
+                  "as nitrate) makes the share no ratio of electrons out over in, and gives no range.",
                   *(["Stationary phase: the search asked for both phases, so the stationary phase comes too, in "
                      "consumed_stationary.csv, produced_stationary.csv, their evidence files and "
                      "biomass_stationary.csv (in crm.json under other_phases): what changed after the end of "
@@ -682,7 +704,45 @@ def chemistry_of(result: dict, mets) -> list:
     return [chem.get(m.id) for m in mets]
 
 
-def electron_balances(result: dict, taxa, cols, pair, bound_grids) -> list:
+def _culture_rows(result: dict, taxa, cols) -> list:
+    """Per taxon, [{"culture", "changes"}]: each value-medium culture's own changes over the resources of `cols`
+    (mM, None where it measured none), for the electron balance's range."""
+    by_culture = result.get("culture_changes") or {}
+    second = second_window_metabolites(result)
+    out = []
+    for t in taxa:
+        labels = sorted({label for m, ph, _ in cols for label in by_culture.get((t.id, ph), {})})
+        out.append([{"culture": label,
+                     "changes": [None if (ph == "window" and m.id in second) else
+                                 by_culture.get((t.id, ph), {}).get(label, {}).get(m.id) for m, ph, _ in cols]}
+                    for label in labels])
+    return out
+
+
+def detection_limits(result: dict, mets) -> list:
+    """Each resource's detection limit (mM): its own (compound_limits), else the search's."""
+    own = result.get("limits") or {}
+    return [own.get(m.id, result["settings"]["detection_limit"]) for m in mets]
+
+
+def phase_start(result: dict, taxa, cols) -> list:
+    """Per taxon, each resource's concentration when the phase began (mM): the mean over the taxon's cultures
+    that measured it, or else the medium's at its first sample (Karoline, 2026-10-08: "At the phase's start", so
+    a substrate used up in the exponential phase is not missing from the stationary one)."""
+    out = []
+    for t in taxa:
+        row = []
+        for m, ph, _ in cols:
+            cell = result["cells"].get((t.id, m.id, ph)) or {}
+            value = cell.get("initial")
+            if value is None:
+                value = (result["initial"].get(m.id) or {}).get("mean")
+            row.append(value)
+        out.append(row)
+    return out
+
+
+def electron_balances(result: dict, taxa, cols, pair, cultures) -> list:
     """Each taxon's electron balance over the phase of `cols` (foodnet.chemistry.electron_balance), or None
     when values are booleans or no resource has a degree of reduction."""
     gammas = [None if c is None else c["degree_of_reduction"] for c in chemistry_of(result, [m for m, _, _ in cols])]
@@ -690,48 +750,59 @@ def electron_balances(result: dict, taxa, cols, pair, bound_grids) -> list:
         return [None] * len(taxa)
     second = second_window_metabolites(result)
     counted = [not (ph == "window" and m.id in second) for m, ph, _ in cols]
+    starts = phase_start(result, taxa, cols)
+    limits = detection_limits(result, [m for m, _, _ in cols])
     names = [m.name for m, _, _ in cols]
     consumed, produced = _numbers(pair["consumed"]), _numbers(pair["produced"])
     out = []
     for i, _ in enumerate(taxa):
-        b = chemistry.electron_balance(
-            consumed[i], produced[i], gammas, counted,
-            {d: (bound_grids[d][0][i], bound_grids[d][1][i]) for d in ("consumed", "produced")})
+        in_medium = [v is not None and v > lim for v, lim in zip(starts[i], limits, strict=True)]
+        b = chemistry.electron_balance(consumed[i], produced[i], gammas, counted,
+                                       [c["changes"] for c in cultures[i]], in_medium, limits, starts[i], names)
         b["not_counted"] = [f"{names[j]}: {why}" for j, why in b["not_counted"]]
+        b["incomplete"] = [names[j] for j in b["incomplete"]]
         out.append(b)
     return out
 
 
 def chemistry_csv(result: dict) -> str:
-    """One row per resource of the CRM: what ChEBI gives, and its degree of reduction."""
+    """One row per resource of the CRM: what ChEBI gives, and its degree of reduction (the columns are
+    crm.json's resource_chemistry fields, and the R package's crm_chemistry())."""
     net = result["network"]
     mets = [m for m, _, _ in columns(net, result, [crm_phase(result)])]
     rows = []
     for m, c in zip(mets, chemistry_of(result, mets), strict=True):
-        c = c or chemistry._blank(m.chebi_id, "not read (CRM mode was off)")
-        rows.append([m.name, c["chebi_id"], c["formula"], "" if c["charge"] is None else c["charge"],
-                     "" if c["carbon"] is None else c["carbon"],
+        c = c or chemistry._blank(m.chebi_id, "not read (growth rates were off)")
+        rows.append([m.name, c["chebi_id"], c["formula"], NA if c["charge"] is None else c["charge"],
+                     NA if c["carbon"] is None else c["carbon"],
                      NA if c["degree_of_reduction"] is None else c["degree_of_reduction"],
                      NA if c["per_cmol"] is None else f"{c['per_cmol']:.6g}", c["formula_from"], c["note"]])
-    return _csv(["resource", "chebi_id", "formula", "charge", "carbon_atoms", "degree_of_reduction",
-                 "degree_of_reduction_per_cmol", "formula_from", "note"], rows)
+    return _csv(["resource", "chebi_id", "formula", "charge", "carbon", "degree_of_reduction", "per_cmol",
+                 "formula_from", "note"], rows)
+
+
+BALANCE_COLUMNS = ("consumed_electrons_mM", "produced_electrons_mM", "share", "share_lower", "share_upper",
+                   "share_at_least", "cultures", "cultures_left_out", "withheld", "incomplete", "not_counted")
 
 
 def balance_rows(result: dict) -> list:
-    """[(taxon name, phase, electron balance)] over the CRM's phases, for the taxa with a balance."""
+    """[(taxon name, phase, electron balance)] over the CRM's phases, for the taxa with a number counted."""
     taxa = [t.name for t in taxa_rows(result["network"], result)]
     return [(name, ph, b) for ph in crm_phases(result)
-            for name, b in zip(taxa, _phase_block(result, ph)["electron_balance"], strict=True) if b is not None]
+            for name, b in zip(taxa, _phase_block(result, ph)["electron_balance"], strict=True)
+            if b is not None and (b["consumed_electrons_mM"] or b["produced_electrons_mM"] or b["withheld"])]
 
 
 def electron_balance_csv(result: dict) -> str:
     """One row per taxon and phase of the CRM: the electrons in what it consumed and in what it produced (mM of
-    electrons), their ratio and its range over the replicates, and what was not counted."""
-    rows = [[name, ph, f"{b['consumed_e_mM']:.6g}", f"{b['produced_e_mM']:.6g}", _number(b["share"]),
-             _number(b["lower"]), _number(b["upper"]), "; ".join(b["not_counted"])]
+    electrons), their ratio and the lowest and highest culture's, and what was left out (the columns are
+    crm.json's electron_balance fields, and the R package's crm_electron_balance())."""
+    rows = [[name, ph, f"{b['consumed_electrons_mM']:.6g}", f"{b['produced_electrons_mM']:.6g}",
+             _number(b["share"]), _number(b["share_lower"]), _number(b["share_upper"]),
+             _number(b["share_at_least"]), b["cultures"],
+             b["cultures_left_out"], b["withheld"] or "", "; ".join(b["incomplete"]), "; ".join(b["not_counted"])]
             for name, ph, b in balance_rows(result)]
-    return _csv(["taxon", "phase", "consumed_electrons_mM", "produced_electrons_mM", "share", "share_lower",
-                 "share_upper", "not_counted"], rows)
+    return _csv(["taxon", "phase", *BALANCE_COLUMNS], rows)
 
 
 def _numbers(rows) -> list:
@@ -760,8 +831,8 @@ def _phase_block(result: dict, phase: str) -> dict:
                     grid[i][j] = None
                 pair["evidence_consumed"][i][j] = pair["evidence_produced"][i][j] = SECOND_WINDOW
     biomass = [_biomass(result, phase).get(t.id) for t in taxa]
-    balance = electron_balances(result, taxa, cols, pair, {"consumed": (consumed_lower, consumed_upper),
-                                                          "produced": (produced_lower, produced_upper)})
+    cultures = _culture_rows(result, taxa, cols)
+    balance = electron_balances(result, taxa, cols, pair, cultures)
     names = result.get("names") or {}
     presence = []
     for i, t in enumerate(taxa):
@@ -787,6 +858,9 @@ def _phase_block(result: dict, phase: str) -> dict:
         "phase_growth_rates": [None if b is None else b.get("phase_rate") for b in biomass],
         # each taxon's electrons out over electrons in (foodnet.chemistry): a check, which changes no value
         "electron_balance": balance,
+        # each value-medium culture's own changes, so the R package can recompute the range after crm_subset(),
+        # and each resource's concentration when the phase began, for the balance's incomplete
+        "culture_changes": cultures, "phase_start_mM": phase_start(result, taxa, cols),
         # taxa whose biomass fell by more than half over the phase: lysis and death release and take up compounds,
         # so its amounts need not be the living cells' (Karoline, 2026-10-07: "Describe it, flag decline")
         # what the caveats say of this phase: links seen only in another medium, and taxa whose values span the
@@ -838,10 +912,13 @@ def crm_payload(result: dict) -> dict:
         "initial_concentrations": initial, "initial_unit": "mM",
         # each resource's formula, charge, carbon atoms and degree of reduction, from ChEBI (None: not in CRM mode)
         "resource_chemistry": chemistry_of(result, mets), "chemistry_source": result.get("chemistry_source"),
+        # each resource's detection limit (its own, else the search's), which the balance's checks use
+        "detection_limits_mM": detection_limits(result, mets),
         # the compounds of the second time window, which an electron balance leaves out (measured over another
         # window); resource_phases cannot say which when the CRM's own phase is a window too
         "second_window_resources": [m.name for m in mets if m.id in second_window_metabolites(result)],
-        "electron_balance": block["electron_balance"],
+        "electron_balance": block["electron_balance"], "culture_changes": block["culture_changes"],
+        "phase_start_mM": block["phase_start_mM"],
         # the hours each value was measured over, cell by cell (None: nothing measured)
         "interval_start_h": block["interval_start_h"], "interval_end_h": block["interval_end_h"],
         # bounds on each amount (None: one unit, or no number)

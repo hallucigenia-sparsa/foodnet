@@ -3,24 +3,35 @@
 All notable changes to foodnet. The format follows Keep a Changelog, and the version numbers follow
 semantic versioning.
 
-## [Unreleased]
+## [0.3.0] (2026-10-08)
 
 ### Added
 
 - CRM mode reads each resource's formula and charge from ChEBI and gives its carbon atoms and degree of
   reduction (`chemistry.csv`; `resource_chemistry` in `crm.json`), and each taxon's electron balance: the
-  electrons in its measured by-products over those in what it consumed, with a range over the replicates
-  (`electron_balance.csv`; `electron_balance` in `crm.json` and in each of `other_phases`). The report lists
-  both. It is a check and changes no value. If ChEBI cannot be reached, the parameters still come, with a
-  warning and these fields blank.
-- R: `crm_chemistry()` and `crm_electron_balance()`, which follow `crm_subset()` and `crm_phase()`;
-  `crm_write()` writes both files, and `print()` points to them.
+  electrons in its measured by-products over those in what it consumed, with the lowest and highest culture's
+  own share (`electron_balance.csv`; `electron_balance` in `crm.json` and in each of `other_phases`, with each
+  culture's changes in `culture_changes`). The report lists both. It is a check and changes no value. It is
+  withheld when a resource the taxon consumed or produced has no degree of reduction, when the share lies
+  outside its own cultures' range, or when the electrons taken up are within the detection limits of the
+  resources counted or missing (then it says what the share is at least, `share_at_least`). It names the resources the medium
+  held when the phase began that the taxon has no number for (`phase_start_mM` in `crm.json`, with each
+  resource's detection limit in `detection_limits_mM`), and `cultures_left_out` counts the cultures that took
+  up no more than those limits hide. `chemistry_source` names ChEBI and the retrieval date. With growth rates
+  on, foodnet now also contacts ChEBI's public API; if ChEBI cannot be reached (each lookup is tried twice,
+  then ChEBI is left alone for the rest of that search), the parameters still come, with a warning and these
+  fields blank.
+- R: `crm_chemistry()` and `crm_electron_balance()`, which follow `crm_subset()` (a resource left out that the
+  taxon consumed or produced withholds the share) and `crm_phase()`; `crm_write()` writes both files with the
+  download's columns, and `print()` points to them.
 - `crm.json` names the compounds of the second time window (`second_window_resources`).
 
 ### Fixed
 
 - Isovalerate was keyed under CHEBI:50128, which is biflavonoid; it is CHEBI:48942, as mGrowthDB records it.
-  Isovaleric acid (CHEBI:28484) now joins isovalerate instead of standing apart.
+  Isovaleric acid (CHEBI:28484) now joins isovalerate instead of standing apart. The metabolite's id in the
+  network files, matrices and `initial_concentrations.csv` changes from `chebi:50128` to `chebi:48942`; no
+  value changes with today's mGrowthDB, where isovalerate (48942) is recorded only in a community.
 
 ## [0.2.0] (2026-10-07)
 

@@ -78,7 +78,8 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--booleans", action="store_true", help="report 1, 0 or NA instead of amounts")
     d.add_argument("--presence-entries", choices=["na", "true", "value"], default=DEFAULTS["presence_entries"],
                    help="how a cell seen only in another medium is written in the matrices (default na)")
-    d.add_argument("--report-rates", action="store_true", help="collect growth rates")
+    d.add_argument("--report-rates", action="store_true",
+                   help="collect growth rates (and read the metabolites' formulas from ChEBI)")
     d.add_argument("--crm-mode", action="store_true", help="what a consumer-resource model needs (growth rates on)")
     d.add_argument("--rate-method", choices=list(rates.METHODS), default=DEFAULTS["rate_method"],
                    help="how the maximum specific growth rate is fitted")

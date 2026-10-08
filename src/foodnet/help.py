@@ -253,8 +253,13 @@ concentrations, each taxon's biomass change over the phase, the hours each value
 (intervals.csv) and bounds on each amount (bounds.csv: its lowest and highest replicate; a 0 from 0 to the
 detection limit at least), each resource's formula, charge and degree of reduction from ChEBI (chemistry.csv)
 and each taxon's electron balance (electron_balance.csv: the electrons in its measured by-products over those in
-what it consumed; a check, below 1 expected, since electrons also go to biomass and to compounds nobody
-measured) with a README, or sends them to R. With Both, the CRM uses the exponential phase and carries the
+what it consumed, with the lowest and highest culture's; a check that changes no value: unmeasured substrates,
+unmeasured products and biomass lie outside it, so it has no expected side of 1, and 1 minus it is no biomass
+yield; it is withheld when a resource the taxon consumed or produced has no degree of reduction, or when what
+it took up is within the assays' detection limits, or when it lies outside its own cultures' range) with a
+README, or sends
+them to R. For the formulas, foodnet asks ChEBI's public API (www.ebi.ac.uk) in CRM mode.
+With Both, the CRM uses the exponential phase and carries the
 stationary phase beside it: what changed after the end of exponential growth, where cells may still grow, stop
 or die (its biomass change says which); in R,
 <code>crm_phase(crm, "stationary")</code> switches to it.</p>
@@ -339,5 +344,6 @@ def render_about() -> str:
 tool of grownet and shares its structure: a thin client, no runtime dependencies, nothing hosted, nothing
 uploaded. It is developed at the KU Leuven Laboratory of Molecular Bacteriology.</p>
 <p>Source and issues: <a href="{REPOSITORY}">{_e(REPOSITORY)}</a>. Data: <a href="{MGROWTHDB}">mGrowthDB</a>, cited
-per arc.</p>
+per arc; in CRM mode, the metabolites' formulas and charges from <a href="https://www.ebi.ac.uk/chebi">ChEBI</a>
+(CC BY 4.0), which foodnet then contacts as well.</p>
 <p class="muted">{_e(brand.NAME)} is released under the Apache License 2.0.</p>"""

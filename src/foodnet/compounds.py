@@ -31,8 +31,8 @@ EQUIVALENT = {
     28484: (48942, "isovaleric acid is the conjugate acid of isovalerate"),
     422: (24996, "(S)-lactic acid is a form of lactate; mGrowthDB's lactate carries no stereo-descriptor"),
     15361: (15361, ""),        # pyruvate is recorded as the base already (listed so the name below applies)
-    # ids checked against ChEBI (OLS, 2026-10-06), added after a review: none is in mGrowthDB yet, and an
-    # acid recorded beside its base would otherwise be two metabolites
+    # ids checked against ChEBI (OLS, 2026-10-06), added after a review: an acid recorded beside its base would
+    # otherwise be two metabolites (valeric acid and valerate are both in mGrowthDB, 2026-10-08)
     15741: (26806, "succinic acid is the conjugate acid of succinate"),
     30031: (26806, "succinate(2-) is the dianion of succinate"),
     17418: (31011, "valeric acid is the conjugate acid of valerate"),
@@ -76,7 +76,9 @@ def canonical(chebi_id, name: str) -> dict:
     `id` is "chebi:<id>" after joining equivalent forms, or "metabolite:<name>" when mGrowthDB gives no
     ChEBI id. `joined` is the reason the record's own id was replaced, or ""."""
     try:
-        chebi = int(chebi_id) if chebi_id not in (None, "") else None
+        # ChEBI writes its ids with a "CHEBI:" prefix, which mGrowthDB leaves off
+        chebi = (int(str(chebi_id).strip().upper().removeprefix("CHEBI:"))
+                 if chebi_id not in (None, "") else None)
     except (TypeError, ValueError):
         chebi = None
     if chebi is None:

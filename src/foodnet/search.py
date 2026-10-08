@@ -392,6 +392,9 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     if crm_ph == "exponential" and s["phase"] == "both":
         biomass_by_phase["stationary"] = crm.biomass_changes([(i, cultures[i]) for i in sorted(chosen)], value_rows,
                                                              "stationary")
+    # each culture's own changes, for the range of the electron balance (none for merged genera, whose strains
+    # are no one culture's)
+    by_culture = {} if s["merge_genera"] else crm.culture_changes(value_rows, cultures, limit, limits)
     if s["merge_genera"]:
         biomass = {}            # strains of one genus grow in units and to densities that do not average
         biomass_by_phase = {ph: {} for ph in biomass_by_phase}
@@ -421,8 +424,9 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                         "would grow it too slowly. In R, as_miasim(growth = \"phase_floor\") uses the phase's mean "
                         "rate where it is higher.")
     if chem_problem:
-        warnings.append(f"{chem_problem}: the formulas, degrees of reduction and electron balances it would give "
-                        "are missing from the CRM parameters; run the search again to read them.")
+        warnings.append(f"{chem_problem}: those resources have no formula or degree of reduction, and a taxon that "
+                        "consumed or produced one has no electron share (withheld); run the search again to read "
+                        "them.")
     if unknown_limits:
         warnings.append("Detection limits of their own name " + ", ".join(unknown_limits) + ", which no culture of "
                         "these taxa measured; check the spelling (the report lists every metabolite read).")
@@ -452,6 +456,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
             "presence": matrix_presence, "value_rule": rule, "duplicates": duplicate_lines,
             "rates": organism_rates, "without_a_rate": without_rate, "initial": initial, "biomass": biomass,
             "biomass_by_phase": biomass_by_phase,
+            "culture_changes": by_culture, "limits": limits,
             "chemistry": chem, "chemistry_source": chemistry.provenance(chem_problem) if s["report_rates"] else None,
             "cultures": len(cultures), "value_cultures": len(chosen), "warnings": warnings,
             "skipped": skipped, "errors": errors}
