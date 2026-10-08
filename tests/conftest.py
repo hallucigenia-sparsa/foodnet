@@ -45,6 +45,11 @@ STUDIES = {
 }
 STRAINS = {1: "Alpha alpha A1", 2: "Beta beta B1", 3: "Gamma gamma C1"}
 CHEBI = {"glucose": 17234, "acetic acid": 15366, "butyric acid": 30772, "formate": 15740}
+# what ChEBI gives for them (foodnet keys the acids under their conjugate bases), as read on 2026-10-08
+CHEBI_RECORDS = {17234: {"name": "glucose", "formula": "C6H12O6", "charge": 0, "mass": "180.156"},
+                 30089: {"name": "acetate", "formula": "C2H3O2", "charge": -1, "mass": "59.044"},
+                 17968: {"name": "butyrate", "formula": "C4H7O2", "charge": -1, "mass": "87.098"},
+                 15740: {"name": "formate", "formula": "CHO2", "charge": -1, "mass": "45.017"}}
 
 
 def _experiment(eid, study, taxon, medium, replicates):
@@ -125,6 +130,9 @@ class FakeClient:
 
     def study_experiments(self, sid):
         return [EXPERIMENTS[e["id"]] for e in self.get_study(sid)["experiments"]]
+
+    def chebi_compound(self, chebi_id):
+        return CHEBI_RECORDS.get(int(chebi_id))
 
     def search(self, **_):
         return {"studies": list(STUDIES)}

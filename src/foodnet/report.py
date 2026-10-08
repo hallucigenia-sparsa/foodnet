@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import Counter
 
 from .attribution import render_attribution
-from .matrix import conflicts, counts, presence_lines
+from .matrix import balance_rows, conflicts, counts, presence_lines
 
 
 def _value(value) -> str:
@@ -102,6 +102,23 @@ def report_text(result: dict) -> str:
         lines += ["", "Initial concentrations in the value medium (mM, mean of the first samples):"]
         for _, v in sorted(result["initial"].items(), key=lambda kv: kv[1]["name"]):
             lines.append(f"  {v['name']}: {v['mean']:.3g} (range {v['min']:.3g} to {v['max']:.3g}, n {v['n']})")
+    chem = result.get("chemistry") or {}
+    if s.get("report_rates") and chem:
+        names = result.get("names", {})
+        lines += ["", "Degree of reduction (electrons per molecule; ChEBI formula and charge):"]
+        for mid, c in sorted(chem.items(), key=lambda kv: names.get(kv[0], kv[0])):
+            value = (f"{c['degree_of_reduction']} ({c['formula']}, charge {c['charge']})"
+                     if c["degree_of_reduction"] is not None else "none")
+            lines.append(f"  {names.get(mid, mid)}: {value}" + (f"; {c['note']}" if c["note"] else ""))
+        balances = balance_rows(result)
+        if balances:
+            lines += ["", "Electron balance (electrons in the measured by-products over those in what was consumed; "
+                      "a check, below 1 expected):"]
+            for name, ph, b in balances:
+                share = "none (nothing with electrons consumed)" if b["share"] is None else f"{b['share']:.2f}"
+                spread = (f", replicates {b['lower']:.2f} to {b['upper']:.2f}"
+                          if b["lower"] is not None and b["upper"] is not None else "")
+                lines.append(f"  {name} ({ph} phase): {share}{spread}")
     if result["skipped"]:
         lines += ["", f"Left out or noted ({len(result['skipped'])}):"]
         reasons = Counter(r for _, r in result["skipped"])

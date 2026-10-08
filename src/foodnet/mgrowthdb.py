@@ -86,6 +86,7 @@ class MGrowthDBClient:
         # one kept-open connection per thread: a new HTTPS connection per request cost about 120 ms against
         # 55 ms on an open one, and the parallel prefetch (foodnet.fetch) gives each worker its own
         self._local = threading.local()
+        self._chebi = None
         parsed = urllib.parse.urlsplit(self.base_url)
         self._scheme, self._host, self._prefix = parsed.scheme, parsed.netloc, parsed.path
         if cache_dir:
@@ -234,6 +235,13 @@ class MGrowthDBClient:
         return self._get("search.json", {
             "strainNcbiIds": strain_ncbi_ids, "metaboliteChebiIds": metabolite_chebi_ids,
         })
+
+    def chebi_compound(self, chebi_id) -> dict | None:
+        """ChEBI's formula, charge and mass of one compound (foodnet.chemistry), each id read once per client."""
+        if self._chebi is None:
+            from .chemistry import Memo
+            self._chebi = Memo()
+        return self._chebi(chebi_id)
 
     def study_experiments(self, study_id: str) -> list:
         """Full experiment records for a study (study metadata lists experiment ids only)."""

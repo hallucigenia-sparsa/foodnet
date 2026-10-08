@@ -49,6 +49,8 @@ phase.
 | `crm_efficiency(crm)` | miaSim's efficiency matrix E, in each taxon's own unit of abundance: positive for a resource taken up, negative for a by-product, the opposite of foodnet's signed matrix (built from the consumed and produced matrices, never from that one) |
 | `crm_scale(crm)`, `crm_unscale(crm, abundance, args = args)` | that unit, in the growth curve's unit, and simulated abundances back in the curve's unit |
 | `crm_subset(crm, taxa, resources)` | the same parameters for fewer taxa or resources |
+| `crm_chemistry(crm)` | each resource's formula and charge (ChEBI), carbon atoms and degree of reduction |
+| `crm_electron_balance(crm)` | each taxon's electrons out over electrons in, with its range over the replicates: a check, which changes no value |
 | `crm_phase(crm, "stationary")` | the stationary phase, when the search asked for both phases |
 | `crm$interval_start`, `crm$interval_end` | taxa by resources, the hours each value was measured over |
 | `crm$consumed_lower`, `crm$consumed_upper`, `crm$produced_lower`, `crm$produced_upper` | each amount's lowest and highest replicate (mM); a 0 from 0 to the detection limit at least |

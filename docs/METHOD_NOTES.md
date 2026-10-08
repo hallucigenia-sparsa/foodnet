@@ -278,6 +278,24 @@ with metabolite data."
     unflagged). The page's first warning names the tier 1 changes, largest first, counts the measured zeros of
     that tier, and says how many values carry only tier 2 cautions; R's print carries that warning.
 
+31. **Each resource's chemistry and each taxon's electron balance.** Karoline, 2026-10-08, to make a CRM's
+    physiology easier to parameterize: the degree of reduction of each resource, and an electron balance per
+    taxon "as a check"; no yield ("No yield": a yield in grams needs a cells or OD to biomass factor the
+    studies do not share), no maintenance (batch growth curves do not identify it). Formula and charge come
+    from ChEBI, by the id foodnet keys the compound under, read in CRM mode only and never stored: mGrowthDB
+    imports its metabolites from ChEBI but keeps neither formula nor charge (asked: "can you get them from
+    mGrowthDB?"; answered "go ahead with ChEBI for now", with formula and charge on the mGrowthDB list). The
+    degree of reduction is Roels's, per molecule, relative to CO2, H2O, NH3, H2SO4, H3PO4 and H+:
+    `4C + H - 2O - 3N + 6S + 5P - charge`. Without the charge term, acetate (C2H3O2 with charge -1, under which foodnet
+    keys acetic acid) would have 7 electrons and acetic acid 8. A ChEBI class has no formula: succinate takes
+    succinic acid's (its joined form), fructose and fucose a named form's (chemistry.FORMULA_FROM); every
+    other formula that cannot be evaluated is NA with the reason. The electron balance is `sum(produced x
+    gamma) / sum(consumed x gamma)` over the CRM's matrices, leaving out second-window compounds (another
+    window) and naming every resource left out; its range takes the replicates' bounds, the fewest electrons
+    out over the most in and the reverse. It changes no value. Checking every id of foodnet.compounds against
+    ChEBI on the way found isovalerate keyed under CHEBI:50128, which is biflavonoid; it is 48942, as
+    mGrowthDB records it, so isovaleric acid now joins it.
+
 ## Known limits
 
 - **The validation is not independent.** The reproduction of a hand-checked reference matrix (106 of 108

@@ -93,6 +93,27 @@ as_phase_block <- function(b, taxa, resources) {
          biomass_falls = chr_vector(b$biomass_falls))
 }
 
+# Each resource's chemistry (formula, charge, carbon atoms, degree of reduction from ChEBI), as a data frame
+# with a row per resource; all NA for a payload from foodnet before 0.3.0 or a search outside CRM mode.
+#' @noRd
+chemistry_frame <- function(rows, resources) {
+    field <- function(name, template, convert) {
+        if (!length(rows)) return(rep(template, length(resources)))
+        vapply(rows, function(r) if (is.null(r) || is.null(r[[name]])) template else convert(r[[name]]), template)
+    }
+    text <- function(v) chr(v, NA_character_)
+    data.frame(resource = resources,
+               chebi_id = field("chebi_id", NA_character_, text),
+               formula = field("formula", NA_character_, text),
+               charge = field("charge", NA_real_, as_number),
+               carbon = field("carbon", NA_real_, as_number),
+               degree_of_reduction = field("degree_of_reduction", NA_real_, as_number),
+               per_cmol = field("per_cmol", NA_real_, as_number),
+               formula_from = field("formula_from", NA_character_, text),
+               note = field("note", NA_character_, text),
+               row.names = resources, stringsAsFactors = FALSE)
+}
+
 # The links seen only in another medium, as a data frame (taxon, resource, direction, media).
 #' @noRd
 presence_rows <- function(presence) {
@@ -161,6 +182,9 @@ as_foodnet_crm <- function(payload) {
              resource_phases = named(if (length(payload$resource_phases))
                  vapply(payload$resource_phases, chr, character(1)) else rep(chr(payload$phase), length(resources)),
                  resources),
+             chemistry = chemistry_frame(payload$resource_chemistry, resources),
+             chemistry_source = payload$chemistry_source,
+             second_window_resources = chr_vector(payload$second_window_resources),
              growth_rates = rates,
              growth_rate_unit = chr(payload$growth_rate_unit, "1/h"),
              growth_rate_detail = payload$growth_rate_detail,
@@ -359,6 +383,12 @@ print.foodnet_crm <- function(x, ...) {
     cat("   * the cells are measured amounts (net changes), not efficiencies: crm_efficiency(x) turns them\n")
     cat("     into miaSim's E (yields per mM taken up, by-products per unit of growth); crm_backcheck()\n")
     cat("     simulates each taxon alone and says how close it comes to its own monoculture.\n")
+    known <- sum(!is.na(x$chemistry$degree_of_reduction))
+    if (known) {
+        cat(sprintf("   * degrees of reduction for %d of %d resources, from %s: crm_chemistry(x); each taxon's\n",
+                    known, length(x$resources), chr(x$chemistry_source$source, "ChEBI")))
+        cat("     electrons out over electrons in, a check: crm_electron_balance(x).\n")
+    }
     cat("  crm_consumed(x), crm_produced(x), crm_rates(x), crm_resources(x); x$interval_start and x$interval_end\n")
     cat("  hold the hours each value was measured over, x$consumed_lower, x$consumed_upper, x$produced_lower and\n")
     cat("  x$produced_upper its bounds in mM; crm_readme(x) for the full text.\n")

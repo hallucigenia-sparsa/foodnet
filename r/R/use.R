@@ -384,6 +384,8 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
         x$other_phases[[ph]] <- b
     }
     x$initial <- x$initial[keep_r]
+    if (!is.null(x$chemistry)) x$chemistry <- x$chemistry[keep_r, , drop = FALSE]
+    x$second_window_resources <- intersect(x$second_window_resources, x$resources[keep_r])
     if (!is.null(x$resource_phases)) x$resource_phases <- x$resource_phases[keep_r]
     kept <- x$taxa[keep_t]
     removed <- setdiff(x$taxa, kept)
@@ -514,7 +516,7 @@ crm_write <- function(x, dir) {
     # (a review: the second write replaced the first's intervals, bounds and README); the growth rates and the
     # medium are the taxa's, whatever the phase
     phased <- c("consumed.csv", "produced.csv", "evidence_consumed.csv", "evidence_produced.csv", "biomass.csv",
-                "intervals.csv", "bounds.csv")
+                "intervals.csv", "bounds.csv", "electron_balance.csv")
     path <- function(name) file.path(dir, if (name %in% phased) sub("\\.csv$", paste0(suffix, ".csv"), name) else name)
     paths <- character(0)
     put <- function(table, name, row.names = FALSE) {
@@ -553,6 +555,10 @@ crm_write <- function(x, dir) {
                    stringsAsFactors = FALSE)
     }))
     put(bounds, "bounds.csv")
+    if (!is.null(x$chemistry)) put(x$chemistry, "chemistry.csv")
+    if (!is.null(x$chemistry) && any(!is.na(x$chemistry$degree_of_reduction))) {
+        put(crm_electron_balance(x), "electron_balance.csv")
+    }
     readme <- file.path(dir, if (own) "README.txt" else paste0("README", suffix, ".txt"))
     writeLines(c(sprintf("These files hold the %s phase%s.", x$phase,
                          if (own) "" else " (switched to with crm_phase(); the README below describes the search)"),
@@ -759,5 +765,94 @@ crm_backcheck <- function(x, monod_constant, missing_resource = 0, na = c("stop"
     if (is.null(out)) stop_foodnet("no taxon has a starting abundance and a phase length")
     out$ratio <- out$simulated / out$measured
     rownames(out) <- NULL
+    out
+}
+
+#' The resources' chemistry
+#'
+#' Each resource's formula and charge from ChEBI, by the ChEBI id foodnet keys it under, its carbon atoms and
+#' its degree of reduction: the electrons per molecule relative to CO2, H2O, NH3, H2SO4, H3PO4 and H+,
+#' `4C + H - 2O - 3N + 6S + 5P - charge` (Roels 1983). The charge term makes an acid and its conjugate base,
+#' which foodnet joins, the same. A ChEBI class without a formula (succinate, fructose) takes the formula of a
+#' named form (`formula_from`); a formula that cannot be evaluated is NA, and `note` says why.
+#'
+#' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
+#' @return A data frame with a row per resource: `resource`, `chebi_id`, `formula`, `charge`, `carbon`,
+#'   `degree_of_reduction`, `per_cmol` (per carbon atom), `formula_from` and `note`. All NA for parameters
+#'   from foodnet before 0.3.0.
+#' @export
+crm_chemistry <- function(x) {
+    need_crm(x)
+    if (is.null(x$chemistry)) chemistry_frame(NULL, x$resources) else x$chemistry
+}
+
+#' Each taxon's electron balance
+#'
+#' The electrons in a taxon's measured by-products over the electrons in what it consumed of the measured
+#' resources, `sum(produced * degree of reduction) / sum(consumed * degree of reduction)`, over the phase of
+#' `x` ([crm_phase()] switches). It is a check and changes no value. The electrons a culture takes up go to its
+#' biomass, its by-products and compounds nobody measured (dihydrogen often), so a share below 1 is expected;
+#' above 1, more electrons came out than went in, from substrates nobody measured (peptides and amino acids of
+#' a rich medium) or a measurement problem.
+#'
+#' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
+#' @return A data frame with a row per taxon: the electrons consumed and produced (`consumed_e_mM`,
+#'   `produced_e_mM`, mM of electrons), the `share`, its range over the replicates' bounds (`lower`, `upper`;
+#'   NA unless every number counted has bounds), and `not_counted`, the resources left out and why (no
+#'   number, no degree of reduction, or measured over the second time window). All NA without degrees of
+#'   reduction.
+#' @export
+crm_electron_balance <- function(x) {
+    need_crm(x)
+    gamma <- crm_chemistry(x)$degree_of_reduction
+    counted <- !x$resources %in% x$second_window_resources
+    rows <- lapply(seq_along(x$taxa), function(i) {
+        sums <- c(c = 0, p = 0, c_lo = 0, c_hi = 0, p_lo = 0, p_hi = 0)
+        bounded <- TRUE
+        skipped <- character(0)
+        for (j in seq_along(x$resources)) {
+            values <- c(consumed = x$consumed[i, j], produced = x$produced[i, j])
+            if (!counted[j]) {
+                skipped <- c(skipped, paste0(x$resources[j], ": measured over the second time window"))
+                next
+            }
+            if (all(is.na(values))) {
+                skipped <- c(skipped, paste0(x$resources[j], ": no number"))
+                next
+            }
+            if (is.na(gamma[j])) {
+                if (any(!is.na(values) & values != 0)) {
+                    skipped <- c(skipped, paste0(x$resources[j], ": no degree of reduction"))
+                }
+                next
+            }
+            for (d in c("consumed", "produced")) {
+                v <- values[[d]]
+                if (is.na(v)) {
+                    skipped <- c(skipped, paste0(x$resources[j], ": ", d, ": no number"))
+                    next
+                }
+                k <- substr(d, 1, 1)
+                sums[[k]] <- sums[[k]] + v * gamma[j]
+                lo <- x[[paste0(d, "_lower")]][i, j]
+                hi <- x[[paste0(d, "_upper")]][i, j]
+                if (is.na(lo) || is.na(hi) || gamma[j] < 0) {
+                    bounded <- FALSE
+                    next
+                }
+                sums[[paste0(k, "_lo")]] <- sums[[paste0(k, "_lo")]] + lo * gamma[j]
+                sums[[paste0(k, "_hi")]] <- sums[[paste0(k, "_hi")]] + hi * gamma[j]
+            }
+        }
+        share <- if (sums[["c"]] > 0) sums[["p"]] / sums[["c"]] else NA_real_
+        ok <- bounded && !is.na(share)
+        data.frame(taxon = x$taxa[i], consumed_e_mM = sums[["c"]], produced_e_mM = sums[["p"]], share = share,
+                   lower = if (ok && sums[["c_hi"]] > 0) sums[["p_lo"]] / sums[["c_hi"]] else NA_real_,
+                   upper = if (ok && sums[["c_lo"]] > 0) sums[["p_hi"]] / sums[["c_lo"]] else NA_real_,
+                   not_counted = paste(skipped, collapse = "; "), stringsAsFactors = FALSE)
+    })
+    out <- do.call(rbind, rows)
+    if (all(is.na(gamma))) out[, c("consumed_e_mM", "produced_e_mM", "share", "lower", "upper")] <- NA_real_
+    rownames(out) <- x$taxa
     out
 }

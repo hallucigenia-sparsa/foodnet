@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from . import crm, rates
+from . import chemistry, crm, rates
 from . import derive as d
 from . import media as media_rules
 from . import phase as phases
@@ -398,6 +398,12 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     slow = sorted(taxa[t]["name"] for t, b in biomass.items() if t in organism_rates and t in taxa
                   and b.get("phase_rate") and b["phase_rate"] > 1.1 * organism_rates[t]["rate"])
     net.meta["initial_concentrations_mM"] = {k: round(v["mean"], 6) for k, v in initial.items()}
+    # each resource's formula, charge and degree of reduction, from ChEBI, for the CRM (Karoline, 2026-10-08)
+    chem, chem_problem = {}, None
+    if s["report_rates"]:
+        say(len(studies), len(studies), "Reading the resources' formulas from ChEBI")
+        chem, chem_problem = chemistry.resolve({mid: chebi for mid, (_, chebi) in metabolites.items()},
+                                               getattr(client, "chebi_compound", None))
 
     second_info = None if not second else {**second, "metabolites": second_mids, "label": second_window_label(second),
                                            "unmatched": unmatched}
@@ -414,6 +420,9 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                         "the phase: the fitted window took in its plateau (fast growth, sparse samples), so a model "
                         "would grow it too slowly. In R, as_miasim(growth = \"phase_floor\") uses the phase's mean "
                         "rate where it is higher.")
+    if chem_problem:
+        warnings.append(f"{chem_problem}: the formulas, degrees of reduction and electron balances it would give "
+                        "are missing from the CRM parameters; run the search again to read them.")
     if unknown_limits:
         warnings.append("Detection limits of their own name " + ", ".join(unknown_limits) + ", which no culture of "
                         "these taxa measured; check the spelling (the report lists every metabolite read).")
@@ -443,6 +452,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
             "presence": matrix_presence, "value_rule": rule, "duplicates": duplicate_lines,
             "rates": organism_rates, "without_a_rate": without_rate, "initial": initial, "biomass": biomass,
             "biomass_by_phase": biomass_by_phase,
+            "chemistry": chem, "chemistry_source": chemistry.provenance(chem_problem) if s["report_rates"] else None,
             "cultures": len(cultures), "value_cultures": len(chosen), "warnings": warnings,
             "skipped": skipped, "errors": errors}
 

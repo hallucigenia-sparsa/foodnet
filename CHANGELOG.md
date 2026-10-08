@@ -3,6 +3,25 @@
 All notable changes to foodnet. The format follows Keep a Changelog, and the version numbers follow
 semantic versioning.
 
+## [Unreleased]
+
+### Added
+
+- CRM mode reads each resource's formula and charge from ChEBI and gives its carbon atoms and degree of
+  reduction (`chemistry.csv`; `resource_chemistry` in `crm.json`), and each taxon's electron balance: the
+  electrons in its measured by-products over those in what it consumed, with a range over the replicates
+  (`electron_balance.csv`; `electron_balance` in `crm.json` and in each of `other_phases`). The report lists
+  both. It is a check and changes no value. If ChEBI cannot be reached, the parameters still come, with a
+  warning and these fields blank.
+- R: `crm_chemistry()` and `crm_electron_balance()`, which follow `crm_subset()` and `crm_phase()`;
+  `crm_write()` writes both files, and `print()` points to them.
+- `crm.json` names the compounds of the second time window (`second_window_resources`).
+
+### Fixed
+
+- Isovalerate was keyed under CHEBI:50128, which is biflavonoid; it is CHEBI:48942, as mGrowthDB records it.
+  Isovaleric acid (CHEBI:28484) now joins isovalerate instead of standing apart.
+
 ## [0.2.0] (2026-10-07)
 
 ### Upgrading from 0.1.0 (breaking changes)

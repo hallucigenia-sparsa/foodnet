@@ -144,7 +144,9 @@ it `presence_only` either way. With Both, each metabolite has a column per phase
 CRM mode collects growth rates: from the replicates whose metabolites gave the values, else from another
 monoculture in the same medium. Get CRM parameters then downloads the matrices, the growth rates, the
 initial medium concentrations, each taxon's biomass change over the phase, the hours each value was measured
-over (`intervals.csv`) and each amount's lowest and highest replicate (`bounds.csv`), or sends them to R.
+over (`intervals.csv`), each amount's lowest and highest replicate (`bounds.csv`), each resource's formula
+and degree of reduction from ChEBI (`chemistry.csv`) and each taxon's electron balance, a check of electrons
+out over electrons in (`electron_balance.csv`), or sends them to R.
 With the phase choice Both, the stationary phase (what changed after the end of exponential growth) comes
 too, beside the exponential one. Install the companion package once, at the version of your foodnet (the
 page and the help print the line for yours, which names the release), and miaSim for the simulations:

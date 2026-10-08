@@ -26,7 +26,9 @@ EQUIVALENT = {
     30772: (17968, "butyric acid is the conjugate acid of butyrate"),
     30768: (17272, "propionic acid is the conjugate acid of propionate"),
     16135: (48944, "isobutyric acid is the conjugate acid of isobutyrate"),
-    28484: (50128, "isovaleric acid is the conjugate acid of isovalerate"),
+    # isovalerate is CHEBI:48942, as mGrowthDB records it (foodnet 0.2.0 joined it to 50128, biflavonoid, so
+    # isovaleric acid and isovalerate stayed apart; found checking every id here against ChEBI, 2026-10-08)
+    28484: (48942, "isovaleric acid is the conjugate acid of isovalerate"),
     422: (24996, "(S)-lactic acid is a form of lactate; mGrowthDB's lactate carries no stereo-descriptor"),
     15361: (15361, ""),        # pyruvate is recorded as the base already (listed so the name below applies)
     # ids checked against ChEBI (OLS, 2026-10-06), added after a review: none is in mGrowthDB yet, and an
@@ -54,7 +56,7 @@ def volatile(name: str, chebi_id: str = "") -> bool:
 
 # the name a joined compound is shown under
 NAMES = {30089: "acetate", 15740: "formate", 17968: "butyrate", 17272: "propionate", 48944: "isobutyrate",
-         50128: "isovalerate", 24996: "lactate", 15361: "pyruvate", 26806: "succinate", 31011: "valerate"}
+         48942: "isovalerate", 24996: "lactate", 15361: "pyruvate", 26806: "succinate", 31011: "valerate"}
 
 # concentration units to mM
 SCALE_TO_MM = {"mm": 1.0, "mmol/l": 1.0, "mmol l-1": 1.0, "mmol/litre": 1.0,
@@ -64,7 +66,7 @@ SCALE_TO_MM = {"mm": 1.0, "mmol/l": 1.0, "mmol l-1": 1.0, "mmol/litre": 1.0,
 MASS_TO_G_PER_L = {"g/l": 1.0, "mg/l": 1e-3, "mg/ml": 1.0, "ug/ml": 1e-3, "µg/ml": 1e-3}
 # g/mol, by the ChEBI id foodnet keys the compound under (after EQUIVALENT)
 MOLAR_MASS = {17234: 180.156, 15361: 88.06, 27082: 342.296, 30089: 60.052, 15740: 46.025, 17968: 88.106,
-              17272: 74.079, 48944: 88.106, 50128: 102.133, 24996: 90.078, 26806: 118.088, 28757: 180.156,
+              17272: 74.079, 48944: 88.106, 48942: 102.133, 24996: 90.078, 26806: 118.088, 28757: 180.156,
               28260: 180.156, 37684: 180.156, 18222: 150.13, 17057: 342.297, 33984: 164.16, 31011: 102.133}
 
 

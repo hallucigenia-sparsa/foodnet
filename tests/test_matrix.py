@@ -105,8 +105,8 @@ def test_with_both_phases_the_crm_takes_the_exponential_one(client):
 def test_the_crm_package_holds_every_file(client):
     r = run(client, report_rates=True)
     z = zipfile.ZipFile(io.BytesIO(matrix.crm_package(r)))
-    assert sorted(z.namelist()) == ["README.txt", "biomass.csv", "bounds.csv", "cautions.csv", "consumed.csv",
-                                    "crm.json", "evidence_consumed.csv",
+    assert sorted(z.namelist()) == ["README.txt", "biomass.csv", "bounds.csv", "cautions.csv", "chemistry.csv",
+                                    "consumed.csv", "crm.json", "electron_balance.csv", "evidence_consumed.csv",
                                     "evidence_produced.csv", "growth_rates.csv", "initial_concentrations.csv",
                                     "intervals.csv", "produced.csv"]
 
