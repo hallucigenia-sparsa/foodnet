@@ -60,6 +60,9 @@ def check(tag: str, root: Path = ROOT) -> tuple:
                                      (root / "README.md").read_text(encoding="utf-8")))):
         if ref.startswith("v") and ref != f"v{version}" or ref == "main":
             problems.append(f"README.md links to {ref}, not v{version}")
+    about = (root / "src" / "foodnet" / "help.py").read_text(encoding="utf-8")
+    if not re.search(rf'\(\s*"{re.escape(version)}",', about):
+        problems.append(f"the About page's release history (RELEASES in src/foodnet/help.py) has no {version}")
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     section = re.search(rf"^## \[{re.escape(version)}\](.*?)$(.*?)(?=^## \[|\Z)", changelog, re.M | re.S)
     if not section:

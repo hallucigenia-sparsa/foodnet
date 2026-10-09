@@ -6,6 +6,7 @@ the batch monocultures of those taxa (foodnet.reading), and the derivation (food
 """
 from __future__ import annotations
 
+import datetime
 from collections import defaultdict
 
 from . import chemistry, crm, rates
@@ -13,10 +14,10 @@ from . import derive as d
 from . import media as media_rules
 from . import phase as phases
 from . import selection as selecting
-from .mgrowthdb import MGrowthDBError, data_versions, provenance
+from .mgrowthdb import MGrowthDBError, data_versions, noting_slowness, provenance
 from .model import CAUTION_TIERS, Edge, FoodNetwork, Node, Study, caution_tier, genus_name, genus_species
 from .reading import UNREAD, read_cultures
-from .taxonomy import resolve_species, species_index, split_entries
+from .taxonomy import kept_species_index, resolve_species, split_entries
 
 PHASE_LABELS = {"exponential": "Exponential phase", "stationary": "Stationary phase", "both": "Both"}
 DEFAULTS = {
@@ -39,6 +40,8 @@ DEFAULTS = {
     "evaporation": phases.EVAPORATION,
     "ignore_media": False, "booleans": False,
     # off by default: a rate costs a fit per growth curve; CRM mode turns it on
+    # read everything from mGrowthDB again, not the copies kept on this machine (foodnet.store, the species list)
+    "refresh": False,
     "report_rates": False, "rate_method": rates.DEFAULT_METHOD, "rate_window": rates.DEFAULT_WINDOW,
     "merge_arcs": False, "min_studies": 1, "merge_genera": False,
     "conditions": "", "exclude_studies": "", "exclude_experiments": "",
@@ -142,6 +145,8 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     """Taxa (names or NCBI taxon ids) to a network, with everything the page, the downloads and the R side
     need. Failures that concern one study are collected in "errors", so one bad study does not lose the rest.
     `all_studies` ignores the entries and reads every batch monoculture with metabolites in mGrowthDB."""
+    progress = noting_slowness(progress, client)
+
     def say(done, total, message):
         if progress:
             progress(done, total, message)
@@ -149,8 +154,18 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     s = {**DEFAULTS, **(settings or {})}
     names = [] if all_studies else split_entries(entries)
     say(0, None, "Looking up the taxa in mGrowthDB")
-    index = species_index(client) if index is None else index
+    if hasattr(client, "refresh"):
+        client.refresh = bool(s["refresh"])         # set for this search only: the page reuses its client
+    if hasattr(client, "searches"):
+        client.searches += 1
+    index = kept_species_index(client, progress=progress, refresh=s["refresh"]) if index is None else index
     resolved = resolve_species(names, index)
+    if getattr(index, "kept", False):
+        # absence is a fact about the list, which was read up to a day ago (a review: a study published today
+        # was reported as not in mGrowthDB)
+        when = datetime.datetime.fromtimestamp(index.built_at).strftime("%Y-%m-%d %H:%M")
+        resolved["reasons"] = {e: f"{why} (mGrowthDB's species list as read at {when}; a newer study needs "
+                                  "Read everything again, or --refresh)" for e, why in resolved["reasons"].items()}
     current = getattr(index, "current", {})
     resolved["resolved"] = [(entry, {t: current.get(t, n) for t, n in matches.items()})
                             for entry, matches in resolved["resolved"]]
@@ -333,7 +348,10 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     arc_list, below_min = d.min_studies_filter(arc_list, s["min_studies"])
 
     used_studies = sorted({sid for c in cultures for sid in [c.study]})
-    meta = {**provenance(), "source_db": "mGrowthDB (live)", "query": "all" if all_studies else "taxa",
+    # this search's studies only: the page's client serves an hour of searches (a review)
+    kept = bool(set(getattr(client, "kept_studies", None) or {}) & set(studies))
+    meta = {**provenance(), "source_db": "mGrowthDB (live; unchanged studies from foodnet's copy, see data)" if kept
+            else "mGrowthDB (live)", "query": "all" if all_studies else "taxa",
             "taxa": names, "studies": studies, "settings": dict(s), "selection": selection,
             "phase": "window" if window else s["phase"], "window": list(window) if window else None,
             "detection_limit_mM": limit, "value_rule": {k: v for k, v in rule.items() if k != "chosen"},
@@ -357,7 +375,8 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         net.add_study(Study(id=sid, citation=st.get("name", sid), url=st.get("url", "")))
     for arc in arc_list:
         net.add_edge(_arc_edge(arc))
-    net.meta["data"] = data_versions(client, studies, net.meta["derived_at"])
+    net.meta["data"] = data_versions(client, studies, net.meta["derived_at"], index if hasattr(index, "built_at")
+                                     else None)
 
     organism_rates, without_rate = {}, {}
     if s["report_rates"]:

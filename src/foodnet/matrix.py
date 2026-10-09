@@ -955,6 +955,9 @@ def crm_payload(result: dict) -> dict:
         "other_phases": {p: _phase_block(result, p) for p in crm_phases(result)[1:]},
         "readme": readme(result, "crm"),
         "studies": sorted(net.studies), "settings": result["settings"],
+        # what the data were and when they were read: each study's uploadedAt, the copies kept on this machine
+        # and the species list (foodnet.mgrowthdb.data_versions)
+        "data": net.meta.get("data"),
     }
 
 

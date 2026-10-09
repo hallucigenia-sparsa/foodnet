@@ -9,12 +9,20 @@ which are the only ones with data to find.
 returns genus and species keys mapped to the taxon ids seen under them. `resolve_species` turns what a
 person typed, names or numeric taxon ids, into ids, and reports what mGrowthDB does not hold.
 
-Nothing pulled here is written into the repository (see docs/DATA_GOVERNANCE.md).
+The species list is kept on this machine for a day (Karoline, 2026-10-09: "you can keep the species list for
+a day", after a search spent three of its minutes crawling a slow mGrowthDB): names, taxon ids and the studies
+holding them, in the user's cache folder, never in the repository, and never a list the crawl could not read
+whole. What was read of a study is kept beside it while the study is unchanged (foodnet.store;
+docs/DATA_GOVERNANCE.md).
 """
 from __future__ import annotations
 
 import difflib
+import json
+import os
 import re
+import sys
+import time
 
 from .model import genus_name, genus_species
 
@@ -23,6 +31,11 @@ STUDY_ID = "SMGDB{:08d}"
 # (withdrawn or unpublished studies) would have hidden every later study from name lookups at 5, and now that
 # the crawl runs in parallel, looking 25 ids further costs well under a second
 MISS_RUN = 25
+# past the last study a previous crawl found, this many absent ids in a row end it; before it, absent ids end
+# nothing, since a later study is known to exist. It was 10 (to query mGrowthDB less); a review found that a
+# study after a longer gap would then be missed for good, on machines with a kept list only, for 15 requests a
+# day, so it is MISS_RUN again
+MISS_AFTER_KNOWN = MISS_RUN
 MAX_STUDIES = 500     # a hard stop, so a crawl can never run away
 
 
@@ -51,6 +64,10 @@ class SpeciesIndex(dict):
         # mGrowthDB's search, which matches per-strain measurements only and so misses a monoculture measured
         # at the culture level (study SMGDB00000009, found 2026-10-04)
         self.where = {t: list(s) for t, s in (where or {}).items()}
+        # when the crawl ran (seconds since the epoch), so a kept list can be told its age, and whether this one
+        # came from the cache folder
+        self.built_at = time.time()
+        self.kept = False
 
     def studies_of(self, taxon_ids) -> list:
         """The studies holding any of these taxon ids, in id order."""
@@ -58,7 +75,7 @@ class SpeciesIndex(dict):
         return [sid for sid in self.studies if sid in found]
 
 
-def species_index(client, max_studies: int = MAX_STUDIES, progress=None) -> dict:
+def species_index(client, max_studies: int = MAX_STUDIES, progress=None, known_last: int = 0) -> dict:
     """Map a genus and species key to {taxon id: a name seen for it}, crawled from mGrowthDB.
 
     Study ids are consecutive, so the crawl walks them and stops after MISS_RUN absent ids in a row. The
@@ -71,17 +88,24 @@ def species_index(client, max_studies: int = MAX_STUDIES, progress=None) -> dict
 
     if not (hasattr(client, "get_study") and hasattr(client, "get_experiment")):
         return _species_index_one_by_one(client, max_studies)
-    ids = study_ids_in_order(client, STUDY_ID, max_studies, MISS_RUN)
+    from . import store
+    ids = study_ids_in_order(client, STUDY_ID, max_studies, MISS_RUN, known_last)
     failed = []
     experiment_ids = []
+    read = {}
     for sid in ids:
         try:
-            experiment_ids += [e["id"] for e in (client.get_study(sid) or {}).get("experiments", [])]
+            study = client.get_study(sid) or {}
+            store.load(client, study, sid)             # the experiments of an unchanged study, kept before
+            experiment_ids += [e["id"] for e in study.get("experiments", [])]
+            read[sid] = study
         except Exception as e:  # noqa: BLE001 - recorded, and the study is skipped below
             failed.append((sid, str(e)))
     failures = []
     _each(client.get_experiment, experiment_ids, progress, "Reading the species list of mGrowthDB",
           failures=failures)
+    for sid, study in read.items():                       # a study that could not be read is not asked again
+        store.save(client, study, sid)
     failed += [(eid, str(e)) for eid, e in failures]
     index, published, where = {}, [], {}
     for order, sid in enumerate(ids):
@@ -102,6 +126,80 @@ def species_index(client, max_studies: int = MAX_STUDIES, progress=None) -> dict
             for name, taxon in _strain_entries(exp):
                 current[taxon] = name
     return SpeciesIndex(index, current=current, studies=ids, where=where, failed=failed)
+
+
+# how long a species list is kept (seconds), and the format of the kept file
+KEEP_FOR = 24 * 3600
+KEPT_FORMAT = "foodnet.species_list/v1"
+
+
+def cache_folder() -> str:
+    """Where foodnet keeps its species list and what it read of each study: FOODNET_CACHE_DIR, or the system's
+    cache folder for programs."""
+    if os.environ.get("FOODNET_CACHE_DIR"):
+        return os.environ["FOODNET_CACHE_DIR"]
+    if sys.platform == "darwin":
+        return os.path.expanduser("~/Library/Caches/foodnet")
+    if sys.platform.startswith("win"):
+        return os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "foodnet", "Cache")
+    return os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "foodnet")
+
+
+def _kept_path() -> str:
+    return os.path.join(cache_folder(), "species_list.json")
+
+
+def _load_kept(source: str, keep_for: float):
+    """The kept species list for this mGrowthDB, or None when there is none, it is older than `keep_for`, or
+    it cannot be read."""
+    try:
+        with open(_kept_path(), encoding="utf-8") as f:
+            kept = json.load(f)
+        if kept.get("format") != KEPT_FORMAT or kept.get("source") != source:
+            return None
+        if not 0 <= time.time() - float(kept["built_at"]) < keep_for:
+            return None
+        index = SpeciesIndex({key: {int(t): n for t, n in ids.items()} for key, ids in kept["index"].items()},
+                             current={int(t): n for t, n in kept["current"].items()}, studies=kept["studies"],
+                             where={int(t): s for t, s in kept["where"].items()})
+        index.built_at = float(kept["built_at"])
+        index.kept = True
+        return index
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def _keep(index, source: str) -> None:
+    """Write the species list to the cache folder; a list the crawl could not read whole is never kept."""
+    if index.failed:
+        return
+    kept = {"format": KEPT_FORMAT, "source": source, "built_at": index.built_at,
+            "index": {key: {str(t): n for t, n in ids.items()} for key, ids in index.items()},
+            "current": {str(t): n for t, n in index.current.items()}, "studies": index.studies,
+            "where": {str(t): s for t, s in index.where.items()}}
+    from .store import write_whole
+    write_whole(_kept_path(), kept)           # a list that cannot be kept is crawled again next time
+
+
+def kept_species_index(client, progress=None, refresh: bool = False, keep_for: float = KEEP_FOR):
+    """The species list, from the cache folder when one younger than `keep_for` is there for this mGrowthDB,
+    else crawled (`species_index`) and kept. `refresh` crawls whatever is kept. A client without a base url
+    (a test double) is always crawled and never kept."""
+    source = getattr(client, "base_url", None)
+    if refresh and hasattr(client, "refresh"):
+        client.refresh = True             # before the crawl, which would otherwise load the kept studies (a review)
+    if source is None:
+        return species_index(client, progress=progress)
+    if not refresh:
+        kept = _load_kept(source, keep_for)
+        if kept is not None:
+            return kept
+    # the last study the previous list found, however old: past it, fewer absent ids end the crawl
+    before = _load_kept(source, float("inf"))
+    known_last = max((int(s[5:]) for s in (before.studies if before else []) if s[5:].isdigit()), default=0)
+    index = species_index(client, progress=progress, known_last=known_last)
+    _keep(index, source)
+    return index
 
 
 def _species_index_one_by_one(client, max_studies: int) -> dict:

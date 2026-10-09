@@ -21,6 +21,7 @@ def _repo(tmp_path, version="0.1.0", code="0.1.0", heading="## [0.1.0] (2026-10-
     (tmp_path / "r" / "README.md").write_text(install)
     (tmp_path / "pyproject.toml").write_text(f'[project]\nname = "foodnet"\nversion = "{version}"\n')
     (tmp_path / "src" / "foodnet" / "__init__.py").write_text(f'__version__ = "{code}"\n')
+    (tmp_path / "src" / "foodnet" / "help.py").write_text(f'RELEASES = (\n    ("{version}", "2026-10-01", "x"),\n)\n')
     # the citation names the version too: 0.1.0 shipped while CITATION.cff still said 0.0.2
     (tmp_path / "CITATION.cff").write_text(f'cff-version: 1.2.0\ntitle: foodnet\n'
                                            f'version: {cited or version}\ndate-released: "{released}"\n')

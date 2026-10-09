@@ -49,6 +49,9 @@ SETTINGS = {
                         "TRUE, or the amount measured there (shown on its own background in the image; not "
                         "comparable with the value medium's amounts). CRM parameters take numbers, so TRUE "
                         "cells reach them as missing.",
+    "refresh": "Read everything from mGrowthDB again instead of the copies kept on this machine (the species list, "
+               "kept a day; what was read of each study, kept while it is unchanged and at most 30 days); "
+               "command line: --refresh.",
     "booleans": "Report 1, 0 or NA instead of amounts; presence in another medium counts as 1.",
     "report_rates": "Collect each taxon's maximum specific growth rate, which a consumer-resource model needs. "
                     "CRM mode switches it on.",
@@ -331,11 +334,30 @@ and why.</li>
 <h2 id="fields">Every field</h2><p>Arcs:</p>{_dl(EDGE_FIELDS)}<p>Nodes:</p>{_dl(NODE_FIELDS)}
 <h2 id="cli">The command line</h2>
 <pre>{_e(COMMAND)} derive --taxa "Escherichia coli LF82" "Bacteroides fragilis" --out network.json
+{_e(COMMAND)} derive --taxa Escherichia coli LF82, Bacteroides fragilis --out network.json
 {_e(COMMAND)} derive --taxa Roseburia --phase both --format matrices --out roseburia.zip
 {_e(COMMAND)} derive --taxa Blautia --conditions "Wilkins-Chalgren" --crm-mode --crm crm.zip
 {_e(COMMAND)} gui</pre>
+<p>The first search of a day reads mGrowthDB's species list from every study, which takes a few minutes when
+mGrowthDB is slow (the progress text then says how many requests were slow or retried); the list is kept for a
+day in your cache folder, and what foodnet read of a study is kept there too, used again while mGrowthDB shows
+the study unchanged (the same <code>uploadedAt</code>) and at most 30 days. Read everything from mGrowthDB again
+(Advanced settings), or <code>{_e(COMMAND)} derive --refresh</code>, uses neither. The folder:
+<code>~/Library/Caches/foodnet</code> on macOS, <code>%LOCALAPPDATA%\\foodnet\\Cache</code> on Windows,
+<code>$XDG_CACHE_HOME/foodnet</code> or <code>~/.cache/foodnet</code> elsewhere, or <code>FOODNET_CACHE_DIR</code>;
+deleting it reads everything
+again.</p>
 <p>Run <code>{_e(COMMAND)} derive --help</code> for every option. Problems and questions:
 <a href="{ISSUES}">{_e(ISSUES)}</a>.</p>"""
+
+
+# the released versions, newest first (Karoline, 2026-10-09: "include the release history in the About page");
+# tests/test_help.py checks them against CHANGELOG.md
+RELEASES = (
+    ("0.3.0", "2026-10-08", "chemistry and electron balance in CRM mode"),
+    ("0.2.0", "2026-10-07", "intervals, bounds, stationary phase and ranked cautions in the CRM parameters"),
+    ("0.1.0", "2026-10-06", "first release"),
+)
 
 
 def render_about() -> str:
@@ -346,4 +368,7 @@ uploaded. It is developed at the KU Leuven Laboratory of Molecular Bacteriology.
 <p>Source and issues: <a href="{REPOSITORY}">{_e(REPOSITORY)}</a>. Data: <a href="{MGROWTHDB}">mGrowthDB</a>, cited
 per arc; in CRM mode, the metabolites' formulas and charges from <a href="https://www.ebi.ac.uk/chebi">ChEBI</a>
 (CC BY 4.0), which foodnet then contacts as well.</p>
+<h3>Release history</h3>
+<ul>{"".join(f"<li><b>{_e(v)}</b> ({_e(d)}): {_e(what)}</li>" for v, d, what in RELEASES)}</ul>
+<p>Every change, version by version: <a href="{REPOSITORY}/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
 <p class="muted">{_e(brand.NAME)} is released under the Apache License 2.0.</p>"""

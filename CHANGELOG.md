@@ -5,6 +5,36 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- foodnet keeps two things in the user's cache folder: mGrowthDB's species list, for a day, and what it read of
+  each study (experiments, replicates, their series), while the study's `uploadedAt` is unchanged and for at
+  most 30 days. A repeated search reads only the study records (4 requests for the CRM example instead of 734).
+  `foodnet derive --refresh`, or Read everything from mGrowthDB again in Advanced settings, uses neither.
+- The data versions of a result (`data` in the network JSON and `crm.json`, and the report) say when the species
+  list was read and which studies came from the copy on this machine, since when; a name not found says the
+  date of the species list it was looked up in.
+- When mGrowthDB answers slowly, the progress text says so: how many requests took over 10 s or were retried.
+- The About page lists the releases.
+- `foodnet derive --taxa` takes names separated by commas or semicolons, so strain names need no quotes
+  (`--taxa Escherichia coli LF82, Bacteroides fragilis`).
+
+### Changed
+
+- `foodnet derive --taxa`: once a comma or semicolon appears, the bare words between two of them make one name,
+  so `--taxa Blautia Roseburia,Bacteroides` now looks for "Blautia Roseburia" (reported as not found) where 0.3.0
+  read three names; a quoted name is always one name.
+- A replicate's series are read from its one CSV (`bioreplicate/<id>.csv`), one request per replicate instead
+  of one per series (53 instead of 542 for the CRM example); the values are the same.
+- The study crawl no longer stops at a gap of absent study ids before the last study it found before; past
+  that study, 25 absent ids in a row end it, as before.
+
+### Fixed
+
+- A server address that does not accept a connection within 3 s is left for the next one (and tried again with
+  the full time if none answers). mGrowthDB's IPv6 address did not answer through the KU Leuven VPN, and every
+  new connection waited about 17 s for it, which made a search take several minutes.
+
 ## [0.3.0] (2026-10-08)
 
 ### Added

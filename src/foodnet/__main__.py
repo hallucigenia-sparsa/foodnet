@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 
 from . import rates
@@ -24,6 +25,9 @@ DERIVE_EXAMPLES = """examples:
   the page's Example, with its report, sent to Cytoscape:
     foodnet derive --taxa "Escherichia coli LF82" "Bacteroides fragilis" "Roseburia intestinalis" \\
         --out example.json --report example_report.txt --to-cytoscape
+
+  the same taxa separated by commas (or semicolons), without quotes:
+    foodnet derive --taxa Escherichia coli LF82, Bacteroides fragilis, Roseburia intestinalis --out example.json
 
   both growth phases, as the consumed and produced matrices:
     foodnet derive --taxa Roseburia --phase both --format matrices --out roseburia.zip
@@ -47,7 +51,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     d = sub.add_parser("derive", help="derive a network from mGrowthDB (live)", epilog=DERIVE_EXAMPLES,
                        formatter_class=argparse.RawDescriptionHelpFormatter)
-    d.add_argument("--taxa", nargs="+", default=[], help="species, strains, genera or NCBI taxon ids")
+    d.add_argument("--taxa", nargs="+", default=[],
+                   help="species, strains, genera or NCBI taxon ids; strain names hold spaces, so separate several "
+                        "with commas or semicolons (--taxa Escherichia coli LF82, Bacteroides fragilis: everything "
+                        "between two of them is one name), or quote each name")
     d.add_argument("--all", dest="all_studies", action="store_true",
                    help="every batch monoculture with metabolites in mGrowthDB (the page's All)")
     d.add_argument("--conditions", default="", help="media, experiments or studies to limit the search to "
@@ -108,6 +115,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "produced matrices (zip)")
     d.add_argument("--out", help="where to write the network (default: standard output; matrices need a file)")
     d.add_argument("--report", help="also write the report to this file")
+    d.add_argument("--refresh", action="store_true",
+                   help="read everything from mGrowthDB again, not the copies kept on this machine (the species "
+                        "list, kept a day, and what was read of each study, kept while it is unchanged)")
     d.add_argument("--figure", help="also write the consumed and produced matrices as an image (SVG)")
     d.add_argument("--rates", help="also write the growth rates (CSV); needs --report-rates or --crm-mode")
     d.add_argument("--crm", help="also write the CRM parameters (zip); needs --report-rates or --crm-mode")
@@ -134,7 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
 def settings_from(a) -> dict:
     s = dict(DEFAULTS)
     s.update(phase=a.phase, fraction=a.fraction, no_growth_factor=a.no_growth_factor,
-             detection_limit=a.detection_limit, ignore_media=a.ignore_media, booleans=a.booleans,
+             detection_limit=a.detection_limit, ignore_media=a.ignore_media, booleans=a.booleans, refresh=a.refresh,
              judge_confidence=not a.mean_only, compound_limits=a.compound_limits, evaporation=a.evaporation,
              outside_evidence=a.outside_evidence, presence_entries=a.presence_entries,
              second_window_metabolites=", ".join(a.second_window or []),
@@ -173,6 +183,7 @@ def _derive(a) -> int:
     from .report import report_text
     from .search import run_query
 
+    a.taxa = taxa_entries(a.taxa)
     if not a.taxa and not a.all_studies:
         print("derive needs --taxa (or --all); see foodnet derive --help", file=sys.stderr)
         return 2
@@ -245,6 +256,33 @@ def _derive(a) -> int:
               f"Exit status {INCOMPLETE}; --allow-incomplete accepts it.", file=sys.stderr)
         return INCOMPLETE
     return 0
+
+
+def taxa_entries(words: list) -> list:
+    """The taxa of --taxa (Karoline, 2026-10-09: separate them "with a non-blank delimiter since strain names
+    include blanks"). Without a comma or semicolon each word, or quoted name, is one entry, as before. With one,
+    the bare words between two of them make one name (`--taxa Escherichia coli LF82, Bacteroides fragilis`),
+    and a quoted name stays a name of its own (a review: it was joined to the words beside it)."""
+    if not any("," in w or ";" in w for w in words):
+        return list(words)
+    entries, current = [], []
+
+    def flush():
+        if current:
+            entries.append(" ".join(current))
+            current.clear()
+    for word in words:
+        if " " in word.strip():                     # quoted on the command line: a boundary of its own
+            flush()
+            entries += [part.strip() for part in re.split(r"[,;]", word) if part.strip()]
+            continue
+        for part in re.split(r"([,;])", word):
+            if part in (",", ";"):
+                flush()
+            elif part.strip():
+                current.append(part.strip())
+    flush()
+    return entries
 
 
 def main(argv=None) -> int:

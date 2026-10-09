@@ -3,9 +3,10 @@
 grownet's prefetch, narrowed to what foodnet reads: the studies, their experiments, the bioreplicates of the
 batch monocultures of the strains asked for, and every measurement series of those replicates (growth
 curves and metabolites). The derivation then reads the same records from the client's in-memory cache, so
-its result cannot differ from reading one request at a time. Nothing is kept between sessions: mGrowthDB
-shows only the latest version of a study, and a stored copy could not tell it had gone stale (Karoline, for
-grownet, 2026-09-27).
+its result cannot differ from reading one request at a time. Nothing was kept between sessions (Karoline, for
+grownet, 2026-09-27: a stored copy could not tell it had gone stale); since 2026-10-09 what was read of a study
+is kept while its `uploadedAt` is unchanged and for at most 30 days (foodnet.store), and a replicate's series
+come from its one CSV.
 """
 from __future__ import annotations
 
@@ -48,7 +49,18 @@ def prefetch_studies(client, study_ids, keep=None, include_non_batch: bool = Fal
     """Load what reading these studies' monocultures needs, a few requests at a time."""
     if not can_prefetch(client):
         return
-    studies = [s for s in _each(client.get_study, study_ids) if s]
+    from . import store
+    read = [(sid, s) for sid, s in zip(study_ids, _each(client.get_study, study_ids), strict=True) if s]
+    for sid, s in read:
+        store.load(client, s, sid)         # what was read of an unchanged study before (Karoline, 2026-10-09)
+    try:
+        _read_monocultures(client, [s for _, s in read], keep, include_non_batch, progress)
+    finally:
+        for sid, s in read:
+            store.save(client, s, sid)
+
+
+def _read_monocultures(client, studies, keep, include_non_batch, progress) -> None:
     experiment_ids = [e["id"] for s in studies for e in s.get("experiments", [])]
     experiments = [e for e in _each(client.get_experiment, experiment_ids, progress, "Reading experiments") if e]
     wanted = []
@@ -62,14 +74,24 @@ def prefetch_studies(client, study_ids, keep=None, include_non_batch: bool = Fal
         wanted.append(e)
     stubs = [b["id"] for e in wanted for b in e.get("bioreplicates", [])]
     bioreplicates = [b for b in _each(client.get_bioreplicate, stubs, progress, "Reading replicates") if b]
-    contexts = [c["id"] for b in bioreplicates if not b.get("isAverage")
-                for c in b.get("measurementContexts", []) if (c.get("techniqueType") or "") != "ph"]
+    read = [b for b in bioreplicates if not b.get("isAverage")
+            and any((c.get("techniqueType") or "") != "ph" for c in b.get("measurementContexts", []))]
+    if hasattr(client, "get_replicate_series"):
+        # one CSV per replicate holds all its series (Karoline, 2026-10-09)
+        _each(client.get_replicate_series, [b["id"] for b in read], progress, "Reading growth curves and metabolites")
+        return
+    contexts = [c["id"] for b in read for c in b.get("measurementContexts", [])
+                if (c.get("techniqueType") or "") != "ph"]
     _each(client.get_measurement_series, contexts, progress, "Reading growth curves and metabolites")
 
 
-def study_ids_in_order(client, study_id_format: str, max_studies: int, miss_run: int) -> list:
+def study_ids_in_order(client, study_id_format: str, max_studies: int, miss_run: int, known_last: int = 0) -> list:
     """The ids of the studies mGrowthDB holds, in id order, stopping after `miss_run` absent ids in a row
-    (grownet's crawl). Only "no such study" (HTTP 404) ends it; anything else is raised."""
+    (grownet's crawl), or after MISS_AFTER_KNOWN past `known_last`, the last study a previous crawl found:
+    up to it, absent ids end nothing. Only "no such study" (HTTP 404) ends it; anything else is raised."""
+    from .taxonomy import MISS_AFTER_KNOWN
+    if known_last:
+        miss_run = MISS_AFTER_KNOWN
     found, misses, n = [], 0, 1
     while n <= max_studies and misses < miss_run:
         batch = list(range(n, min(n + WORKERS, max_studies + 1)))
@@ -84,7 +106,7 @@ def study_ids_in_order(client, study_id_format: str, max_studies: int, miss_run:
             if misses >= miss_run:
                 break
             if study is None:
-                misses += 1
+                misses += 1 if i > known_last else 0
             else:
                 misses = 0
                 found.append(study_id_format.format(i))

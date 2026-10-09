@@ -414,7 +414,7 @@ def synthetic_payload() -> dict:
     p = matrix.crm_payload(run(_NoButyrate(_steady_series()), report_rates=True, phase="both",
                                second_window_metabolites="formate",
                                second_window_start=0.0, second_window_end=24.0))
-    for key in ("derived_at", "tool_version", "readme", "settings"):
+    for key in ("derived_at", "tool_version", "readme", "settings", "data"):
         p.pop(key, None)
     p["chemistry_source"]["retrieved_at"] = ""
     p["caveats"]["warnings"] = []

@@ -13,7 +13,12 @@ matrix formats, and to R as the parameters of a consumer-resource model (CRM), w
 It is the sister tool of [grow**net**](https://github.com/crossfeed-bio/crossfeed), which builds
 interaction networks from co-cultures, and is built the same way: a thin client with no runtime
 dependencies, a local page and a command line, nothing hosted and nothing uploaded. It reads mGrowthDB, and
-in CRM mode ChEBI for the metabolites' formulas.
+in CRM mode ChEBI for the metabolites' formulas. The first search of a day reads mGrowthDB's species list from
+every study, which takes a few minutes when mGrowthDB is slow (the progress text says so); the list is then
+kept for a day in your cache folder, and what it read of a study is kept there while mGrowthDB shows the study
+unchanged (at most 30 days), so a repeated search reads almost nothing. `foodnet derive --refresh`, or Read
+everything from mGrowthDB again in Advanced settings, reads it all again; docs/DATA_GOVERNANCE.md says where
+the folder is.
 
 ## Contents
 

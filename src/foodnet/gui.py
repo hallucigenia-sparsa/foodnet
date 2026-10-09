@@ -28,10 +28,10 @@ from .cytoscape import CytoscapeError, send, style_xml
 from .export import to_graphml
 from .figure import matrices_svg
 from .legend import legend_svg
-from .mgrowthdb import MGrowthDBError
+from .mgrowthdb import MGrowthDBError, noting_slowness
 from .report import report_text
 from .search import CRM_EXAMPLE, DEFAULTS, EXAMPLE, PHASE_LABELS, compound_limits_of, run_query
-from .taxonomy import species_index
+from .taxonomy import kept_species_index
 
 TITLE = brand.NAME
 # one of each kind the first box takes, shown above it
@@ -149,6 +149,11 @@ def _settings_block(settings: dict) -> str:
   <span class="muted">how a matrix cell is written whose change was seen only in another medium than the values come
   from: NA (default, the cautious choice), TRUE, or the amount measured there, which the image shows on a
   background of its own. The evidence matrices mark these cells presence_only whatever is chosen</span></div>
+<div class="row"><label><input type="checkbox" name="refresh" value="1">
+  Read everything from mGrowthDB again</label>
+  <span class="muted">instead of the copies kept on this machine: mGrowthDB's species list (kept a day) and what
+  was read of each study (kept while the study is unchanged, at most 30 days). Use it for a study added or
+  changed today</span></div>
 <div class="row"><label><input type="checkbox" name="booleans" value="1"{_checked(s['booleans'])}>
   Report everything as booleans</label>
   <span class="muted">1 when a taxon produced or consumed a compound (in any medium), 0 when it was measured and
@@ -619,7 +624,7 @@ def parse_settings(form: dict) -> dict:
     if form.get("correction", [""])[0] in ("bh", "by"):
         s["correction"] = form["correction"][0]
     for key in ("ignore_media", "booleans", "report_rates", "merge_arcs", "merge_genera", "outside_evidence",
-                "strict_media", "judge_confidence"):
+                "strict_media", "judge_confidence", "refresh"):
         s[key] = bool(form.get(key))
     for key in ("conditions", "exclude_studies", "exclude_experiments", "exclude_metabolites", "compound_limits"):
         s[key] = form.get(key, [""])[0].strip()
@@ -628,7 +633,9 @@ def parse_settings(form: dict) -> dict:
 
 # searches kept for their pages, downloads and reports: the latest ones only
 KEPT_JOBS = 20
-INDEX_MAX_AGE = 3600
+# the client serves an hour of searches; the species list is kept a day, and what was read of a study while the
+# study is unchanged (Karoline, 2026-10-09; foodnet.taxonomy, foodnet.store)
+CLIENT_MAX_AGE = 3600
 _INDEX_LOCK = threading.Lock()
 
 
@@ -818,18 +825,22 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
         def work():
             try:
+                refresh = bool(settings.get("refresh"))
                 with _INDEX_LOCK:
-                    built = self.state.get("index_built", 0)
-                    if self.state.get("index") is None or time.monotonic() - built > INDEX_MAX_AGE:
-                        fresh = self.client_factory()
-                        progress(0, None, "Reading the species list of mGrowthDB (the first search in an hour)")
-                        self.state["index"] = species_index(fresh, progress=progress)
-                        self.state["client"] = fresh
-                        # an index the crawl could not read whole hides taxa: it serves this search (which
-                        # reports it) and is built again for the next one
-                        self.state["index_built"] = 0 if self.state["index"].failed else time.monotonic()
-                    client = self.state["client"]
-                job["result"] = run_query(client, entries, settings, self.state["index"], progress=progress,
+                    now = time.monotonic()
+                    # a refresh also drops what the page's client holds, so later searches cannot use it (a review)
+                    if refresh or self.state.get("client") is None or \
+                            now - self.state.get("client_built", 0) > CLIENT_MAX_AGE:
+                        self.state["client"] = self.client_factory()
+                        self.state["client_built"] = now
+                    # a refresh reads everything again with a client of its own, nothing in memory and no other
+                    # search sharing it (a review: a search started beside it could switch its refresh off)
+                    client = self.client_factory() if refresh else self.state["client"]
+                    # the kept list is read from the cache folder at every search (a few milliseconds), so a list
+                    # refreshed on the command line counts here too (a review); an incomplete crawl is not kept,
+                    # serves its search (which reports it) and is made again for the next one
+                    index = kept_species_index(client, progress=noting_slowness(progress, client), refresh=refresh)
+                job["result"] = run_query(client, entries, settings, index, progress=progress,
                                           all_studies=all_studies)
                 job["status"] = "done"
             except MGrowthDBError as e:
