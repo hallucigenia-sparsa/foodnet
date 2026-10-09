@@ -1,6 +1,6 @@
 Package: foodnet
 Title: Receive foodnet Consumer-Resource Model Parameters in R
-Version: 0.4.0
+Version: 0.4.0.9000
 Authors@R: person("The foodnet authors", role = c("aut", "cre"),
                   email = "noreply@example.com")
 Description: Receives consumer-resource model parameters from foodnet, the tool that derives which
