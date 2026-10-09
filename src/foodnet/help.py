@@ -354,6 +354,7 @@ again.</p>
 # the released versions, newest first (Karoline, 2026-10-09: "include the release history in the About page");
 # tests/test_help.py checks them against CHANGELOG.md
 RELEASES = (
+    ("0.4.0", "2026-10-09", "faster mGrowthDB access, kept species list and studies, --refresh"),
     ("0.3.0", "2026-10-08", "chemistry and electron balance in CRM mode"),
     ("0.2.0", "2026-10-07", "intervals, bounds, stationary phase and ranked cautions in the CRM parameters"),
     ("0.1.0", "2026-10-06", "first release"),
