@@ -44,6 +44,11 @@ or with pipx (`pipx install foodnet`), or from a clone (`pip install -e .`). Eac
 double-click `foodnet.exe`. Windows warns about a program few people have run yet; click the small "More
 info" link, then "Run anyway".
 
+If foodnet says mGrowthDB's certificate could not be verified, the Python it runs on lacks the root
+certificate mGrowthDB uses (some Pythons uv installs on macOS do). Set `SSL_CERT_FILE` to a CA bundle that
+has it, such as certifi's (the path `python3 -m certifi` prints), or install foodnet with a Python whose store
+has it, such as Homebrew's (`uv tool install --python /opt/homebrew/bin/python3 foodnet`).
+
 ## Quickstart
 
 ```bash

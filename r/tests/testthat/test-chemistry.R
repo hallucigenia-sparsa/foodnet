@@ -253,3 +253,17 @@ test_that("R's balance is foodnet's, on parameters foodnet wrote", {
         }
     }
 })
+
+test_that("the data versions come with the parameters and are printed", {
+    # an audit: the source line said "see data", and R dropped the field
+    p <- example_payload_both()
+    p$data <- list(species_list = list(read_at = "2026-10-09T12:00:00+02:00", kept = TRUE),
+                   studies = list(SMGDB00000002 = list(uploaded_at = "2025-06-05", kept_since = "2026-10-09T11:59:00+02:00"),
+                                  SMGDB00000004 = list(uploaded_at = "2025-06-26")))
+    crm <- foodnet:::as_foodnet_crm(p)
+    expect_equal(crm$data$studies$SMGDB00000002$kept_since, "2026-10-09T11:59:00+02:00")
+    out <- capture.output(print(crm))
+    expect_true(any(grepl("species list read at 2026-10-09T12:00:00\\+02:00 \\(kept on that machine\\)", out)))
+    expect_true(any(grepl("from foodnet's copy, first read at: SMGDB00000002 2026-10-09T11:59", out)))
+    expect_false(any(grepl("SMGDB00000004 ", out)))
+})

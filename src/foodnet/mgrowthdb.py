@@ -28,6 +28,7 @@ import io
 import json
 import os
 import socket
+import ssl
 import threading
 import time
 import urllib.error
@@ -264,6 +265,15 @@ class MGrowthDBClient:
                         f"mGrowthDB returned HTTP {e.code} for {url} (check the id; API docs: {API_DOCS})",
                         status=e.code) from None
                 last = MGrowthDBError(f"mGrowthDB returned HTTP {e.code} for {url} (server error)", status=e.code)
+            except ssl.SSLCertVerificationError as e:
+                # not the network: this Python's certificate store lacks the root mGrowthDB's certificate chains to,
+                # and trying again cannot help (an audit: uv's Python on macOS reported "check your network")
+                raise MGrowthDBError(
+                    f"mGrowthDB's certificate could not be verified by this Python ({e.verify_message or e}). Its "
+                    "certificate store lacks the root mGrowthDB uses (HARICA TLS RSA Root CA 2021). Point "
+                    "SSL_CERT_FILE at a CA bundle that has it, such as certifi's (the path `python3 -m certifi` "
+                    "prints), or install foodnet with a Python whose store has it, such as Homebrew's "
+                    "(uv tool install --python /opt/homebrew/bin/python3 foodnet).") from None
             except _NETWORK as e:
                 last = MGrowthDBError(
                     f"could not reach mGrowthDB at {url}: {getattr(e, 'reason', e) or type(e).__name__} "

@@ -498,6 +498,26 @@ def intervals_csv(result: dict) -> str:
     return _csv(["taxon", "resource", "phase", "start_h", "end_h", "hours"], rows)
 
 
+def provenance_lines(meta: dict) -> list:
+    """When the data were read: the species list, the studies taken from foodnet's copy on this machine and since
+    when, and a client's reuse of earlier reads (the report and every download's README; an audit: "see data"
+    pointed at a field the matrices zip does not hold)."""
+    data = meta.get("data") or {}
+    lines = []
+    if data.get("read_since"):
+        lines.append(f"Read from mGrowthDB since {data['read_since']}: what was read for earlier searches is used "
+                     "again")
+    listed = data.get("species_list") or {}
+    if listed:
+        lines.append(f"Species list read at {listed.get('read_at', '')}"
+                     + (" (kept on this machine)" if listed.get("kept") else ""))
+    kept = {sid: v["kept_since"] for sid, v in (data.get("studies") or {}).items() if v.get("kept_since")}
+    if kept:
+        lines.append("Unchanged studies from foodnet's copy on this machine, first read at: "
+                     + ", ".join(f"{sid} {when}" for sid, when in sorted(kept.items())))
+    return lines
+
+
 def readme(result: dict, which: str = "matrices") -> str:
     net = result["network"]
     s = result["settings"]
@@ -508,7 +528,8 @@ def readme(result: dict, which: str = "matrices") -> str:
     tally = counts(result)
     lines = [f"{'Consumer-resource model parameters' if which == 'crm' else 'Consumption and production matrices'}"
              f" from foodnet {net.meta.get('tool_version', '')}",
-             f"Derived {net.meta.get('derived_at', '')} from {net.meta.get('source_db', 'mGrowthDB')}.", ""]
+             f"Derived {net.meta.get('derived_at', '')} from {net.meta.get('source_db', 'mGrowthDB')}.",
+             *provenance_lines(net.meta), ""]
     if result.get("errors"):
         lines += ["INCOMPLETE: records could not be read from mGrowthDB, so these numbers may lack data. Run the "
                   "search again.", *(f"  * {e}" for e in result["errors"]), ""]

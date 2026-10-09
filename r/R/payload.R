@@ -247,7 +247,10 @@ as_foodnet_crm <- function(payload) {
              derived_at = chr(payload$derived_at),
              source_db = chr(payload$source_db),
              studies = chr_vector(payload$studies),
-             settings = payload$settings),
+             settings = payload$settings,
+             # when the data were read: each study's uploadedAt, the species list, the studies taken from
+             # foodnet's copy on that machine and since when (foodnet 0.4.0; NULL before)
+             data = payload$data),
         class = "foodnet_crm")
 }
 
@@ -295,6 +298,16 @@ count_evidence <- function(x, word) {
 print.foodnet_crm <- function(x, ...) {
     cat(sprintf("CRM parameters from %s %s, derived %s from %s\n",
                 x$tool, x$tool_version, x$derived_at, x$source_db))
+    listed <- x$data$species_list
+    if (!is.null(listed$read_at)) {
+        cat(sprintf("  species list read at %s%s\n", listed$read_at,
+                    if (isTRUE(listed$kept)) " (kept on that machine)" else ""))
+    }
+    kept <- Filter(function(s) !is.null(s$kept_since), x$data$studies)
+    if (length(kept)) {
+        cat("  from foodnet's copy, first read at: ",
+            paste(names(kept), vapply(kept, function(s) s$kept_since, character(1)), collapse = ", "), "\n", sep = "")
+    }
     cat(sprintf("  %d taxa, %d resources; %s phase; values in %s\n", length(x$taxa), length(x$resources),
                 x$phase, x$values))
     cat(sprintf("  growth rates: %d of %d taxa (%s)\n", sum(!is.na(x$growth_rates)), length(x$taxa),

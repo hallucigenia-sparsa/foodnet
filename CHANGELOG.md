@@ -31,6 +31,11 @@ semantic versioning.
 
 ### Fixed
 
+- A certificate the Python foodnet runs on cannot verify (some Pythons uv installs on macOS lack the root
+  mGrowthDB's chain ends at) is now said so, with what to do, instead of "check your network", and is not
+  retried.
+- The data versions (species list, studies from foodnet's copy) are in every download's README and in R's
+  `print()` and `x$data`; the About page's changelog link names the version.
 - A server address that does not accept a connection within 3 s is left for the next one (and tried again with
   the full time if none answers). mGrowthDB's IPv6 address did not answer through the KU Leuven VPN, and every
   new connection waited about 17 s for it, which made a search take several minutes.

@@ -360,6 +360,12 @@ RELEASES = (
 )
 
 
+def _changelog_ref() -> str:
+    """The changelog of this version: its tag for a release, main for a development version (an audit: a link to
+    main showed changes the installed version does not have)."""
+    return "main" if "dev" in __version__ else f"v{__version__}"
+
+
 def render_about() -> str:
     return f"""<h2 class="page">About</h2>
 <p>{NAME} {_e(__version__)} builds taxon and metabolite networks from mGrowthDB batch monocultures. It is the sister
@@ -370,5 +376,5 @@ per arc; in CRM mode, the metabolites' formulas and charges from <a href="https:
 (CC BY 4.0), which foodnet then contacts as well.</p>
 <h3>Release history</h3>
 <ul>{"".join(f"<li><b>{_e(v)}</b> ({_e(d)}): {_e(what)}</li>" for v, d, what in RELEASES)}</ul>
-<p>Every change, version by version: <a href="{REPOSITORY}/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
+<p>Every change, version by version: <a href="{REPOSITORY}/blob/{_changelog_ref()}/CHANGELOG.md">CHANGELOG.md</a>.</p>
 <p class="muted">{_e(brand.NAME)} is released under the Apache License 2.0.</p>"""

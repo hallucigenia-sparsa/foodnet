@@ -140,6 +140,10 @@ def _arc_edge(arc: dict) -> Edge:
                 merged_taxa=tuple(arc.get("merged_taxa", ())))
 
 
+# what a result's source says when some studies came from foodnet's copy on this machine (provenance_lines lists them)
+COPY_SOURCE = "mGrowthDB (live; unchanged studies from foodnet's copy, listed with when they were read)"
+
+
 def run_query(client, entries, settings: dict | None = None, index=None, progress=None,
               all_studies: bool = False) -> dict:
     """Taxa (names or NCBI taxon ids) to a network, with everything the page, the downloads and the R side
@@ -350,7 +354,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     used_studies = sorted({sid for c in cultures for sid in [c.study]})
     # this search's studies only: the page's client serves an hour of searches (a review)
     kept = bool(set(getattr(client, "kept_studies", None) or {}) & set(studies))
-    meta = {**provenance(), "source_db": "mGrowthDB (live; unchanged studies from foodnet's copy, see data)" if kept
+    meta = {**provenance(), "source_db": COPY_SOURCE if kept
             else "mGrowthDB (live)", "query": "all" if all_studies else "taxa",
             "taxa": names, "studies": studies, "settings": dict(s), "selection": selection,
             "phase": "window" if window else s["phase"], "window": list(window) if window else None,

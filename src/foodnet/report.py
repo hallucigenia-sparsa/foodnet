@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import Counter
 
 from .attribution import render_attribution
-from .matrix import balance_rows, conflicts, counts, presence_lines
+from .matrix import balance_rows, conflicts, counts, presence_lines, provenance_lines
 
 
 def _value(value) -> str:
@@ -43,18 +43,7 @@ def report_text(result: dict) -> str:
     rule = result["value_rule"]
     lines = [f"foodnet {meta.get('tool_version', '')} report, derived {meta.get('derived_at', '')}",
              f"Source: {meta.get('source_db', 'mGrowthDB')}"]
-    data = meta.get("data") or {}
-    listed = data.get("species_list") or {}
-    if data.get("read_since"):
-        lines.append(f"Read from mGrowthDB since {data['read_since']}: what was read for earlier searches is used "
-                     "again")
-    if listed:
-        lines.append(f"Species list read at {listed.get('read_at', '')}"
-                     + (" (kept on this machine)" if listed.get("kept") else ""))
-    kept = {sid: v["kept_since"] for sid, v in (data.get("studies") or {}).items() if v.get("kept_since")}
-    if kept:
-        lines.append("Unchanged studies from foodnet's copy on this machine, first read at: "
-                     + ", ".join(f"{sid} {when}" for sid, when in sorted(kept.items())))
+    lines += provenance_lines(meta)
     lines.append("")
     if result.get("all"):
         lines.append(f"Query: every batch monoculture with metabolites in mGrowthDB ({len(result['studies'])} studies)")

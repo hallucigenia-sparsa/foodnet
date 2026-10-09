@@ -511,3 +511,20 @@ def test_a_partial_refresh_elsewhere_leaves_no_old_replicate_in_memory(cache):
     asked = len(page.asked)
     page.get_replicate_series(6)
     assert page.asked[asked:] == ["bioreplicate/6.csv"]              # read again, not served old
+
+
+
+def test_a_certificate_this_python_cannot_verify_is_said_so_not_retried():
+    # an audit: uv's Python on macOS lacks mGrowthDB's root, and foodnet said "check your network", three times
+    import ssl
+    tries = []
+
+    class Client(mgrowthdb.MGrowthDBClient):
+        def _send(self, url, accept):
+            tries.append(url)
+            error = ssl.SSLCertVerificationError(1, "certificate verify failed")
+            error.verify_message = "unable to get local issuer certificate"
+            raise error
+    with pytest.raises(mgrowthdb.MGrowthDBError, match="SSL_CERT_FILE"):
+        Client(backoff=0)._get("study/S1.json")
+    assert len(tries) == 1
