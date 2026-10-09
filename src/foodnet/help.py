@@ -121,19 +121,19 @@ EDGE_FIELDS = {
     "medium": "The medium (or media) the arc rests on.",
     "study_ids": "The studies the arc rests on.",
     "experiments": "The mGrowthDB experiments behind it.",
-    "cautions": ", ".join(CAUTIONS) + " (see the legend). Ranked: tier 1, the value spans the wrong or an "
+    "cautions": ", ".join(CAUTIONS) + " (see the legend and Cautions). Ranked: tier 1, the value spans the wrong or an "
                 "uneven stretch of time (" + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 1)
                 + "); tier 2, whether there is a change, or how large, is less certain ("
                 + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 2) + "); tier 3, how the phase was "
                 "found, or presence only (" + ", ".join(c for c in CAUTIONS if CAUTION_TIERS.get(c) == 3) + "). The "
-                "page names the tier 1 changes first, largest first.",
+                "page names the tier 1 values first, those missing the most first. See Cautions.",
     "notes": "Remarks in words: what disagreed, what another medium showed.",
     "merged_arcs": "With merged arcs, how many studies the arc joins.",
     "merged_taxa": "With merging to genus, the taxa behind the arc.",
 }
 
 SECTIONS = (("what", "What foodnet does"), ("alone", "Alone is not in a community"),
-            ("phases", "Growth phases"), ("values", "Values, media and presence"),
+            ("phases", "Growth phases"), ("values", "Values, media and presence"), ("cautions", "Cautions"),
             ("matrices", "The two matrix formats"), ("crm", "Consumer-resource models and R"),
             ("miasim", "Simulate with miaSim, step by step"), ("cytoscape", "Cytoscape and the downloads"),
             ("empty", "When a search gives nothing"),
@@ -155,6 +155,82 @@ def _default(value) -> str:
     if isinstance(value, bool):
         return "on" if value else "off"
     return str(value) if value != "" else "empty"
+
+
+def _cautions_of(tier) -> str:
+    """The cautions of one tier (None: the ones that explain a missing value), as a list in the legend's words."""
+    from .legend import CAUTION_TEXT
+    return _dl({c: CAUTION_TEXT[c][:1].upper() + CAUTION_TEXT[c][1:] + "."
+                for c in CAUTIONS if CAUTION_TIERS.get(c) == tier})
+
+
+# the help's account of the cautions (Karoline, 2026-10-09: "add a section that explains the cautions"); every
+# caution of foodnet.model.CAUTIONS is listed under its tier, in the legend's words
+def _cautions_section() -> str:
+    return f"""<h2 id="cautions">Cautions</h2>
+<p>A caution is a note on a value, or on why a cell has none. A value with a caution is what its stretch of time
+and its replicates show; the caution says what that stretch or those replicates lack. Most values carry
+at least one, so cautions are ranked by how much they can change what a value means, from tier 1 (read it first)
+to tier 3. A value's cautions are gathered from every replicate and experiment behind it, so one replicate can
+bring a caution to a value that three experiments agree on.</p>
+<p>Cautions travel with the values: in an arc's <code>cautions</code> field; in <code>cautions.csv</code> in the
+downloads, one row for each value or empty cell that carries a caution or a note, the codes separated by spaces
+and the notes in words; and in the CRM parameters (in R, <code>crm$caveats$cautions</code>, with the tier of each
+code in <code>crm$caveats$caution_tiers</code>). When values carry a tier 1 caution, the page's first warning
+names up to eight of them, first those that miss the most of their change after the growth rate fell, then the
+other changes by size, and counts the rest. It ranks only cells with a value (produced, consumed or no change):
+an empty cell can carry cautions of any tier, which then say why it could not be decided.</p>
+<h3>Tier 1: the value spans the wrong or an uneven stretch of time</h3>
+<p>Part of the change may fall outside the phase, the value may span the whole run, or its replicates or records
+may cover different stretches. The amount can be off, and so can the direction: a compound made and then used
+again can show no change, or the other direction, over a stretch that holds both. Read these before using the
+value.</p>
+<ul>
+<li><code>still_changing</code>: the compound kept changing between the two ways of ending growth (see Growth
+phases). An exponential value lacks that change, by the mM in its note: too small where the compound kept going
+the same way, too large where it turned around. A stationary value starts where the growth rate fell and holds
+that change, so an uptake after an earlier rise is understated. With the exponential phase alone (the default),
+or where the stationary cell is empty, that change is in no value. A time window over the stretch you need (or
+the second time window, for chosen compounds) gives its change in one value.</li>
+<li><code>whole_run</code>, <code>boundaries_differ</code>, <code>start_differs</code> and
+<code>window_beyond_data</code>: a time window (Advanced settings) inside every replicate's samples gives a value
+over one stretch.</li>
+<li><code>growth_unclear</code> and <code>growth_unknown</code>: the culture's growth was never confirmed. A time
+window, or the second time window for the compounds it names, gives a value too, without this caution, so check
+the culture's growth curve in mGrowthDB first.</li>
+<li><code>short_record</code>: nothing in the settings helps; the record is short.</li>
+</ul>
+<p>A time window replaces the phases for the whole search: every culture gets a value over it, also those that
+did not grow, and none is marked for that (the warning on cultures that did not grow is not given). The second
+time window does the same for the compounds it names, also in a phase search, where that warning still names
+such a culture as giving no value. The CRM
+back-check cannot judge the Monod constants over it. Compare a window search with the phase search rather than
+replace it.</p>
+{_cautions_of(1)}
+<h3>Tier 2: whether there is a change, or how large, is less certain</h3>
+<p>A value with these rests on less: few replicates, identical replicates, experiments that differ in amount, an
+experiment left out of the call, a replicate within its series' scatter (how much it jumps from sample to sample
+around its trend, checked where the window holds four or more samples) or within what evaporation could do, or a
+phase placed from few growth samples or from other replicates. Use it, with less weight. A third replicate helps
+most where the value rests on one experiment of two. Identical replicates may be one series deposited twice:
+then treat the value as resting on one replicate, which by default decides nothing.</p>{_cautions_of(2)}
+<h3>Tier 3: how the phase was found, or presence only</h3>
+<p><code>growth_rate_boundary</code> changes nothing by itself: where the compound changed beyond its detection
+limit between the two ways of ending growth (on a stationary value, by a quarter of the value's change or more),
+the value also carries <code>still_changing</code> (tier 1).
+<code>stationary_not_reached</code> leaves a replicate without a stationary value, and the cell empty when none is
+left: an uptake that starts after growth was not sampled there, so a missing arc is not evidence of no uptake.
+No caution marks a second growth phase (a diauxic shift), which counts as stationary.
+<code>not_detected_in_value_medium</code> marks a disagreement between media: the arc's direction comes from
+another medium, while the value medium measured no change; weigh that before using it.</p>
+{_cautions_of(3)}
+<h3>No value</h3>
+<p>These say why a cell has no value (NA, and no arc), whatever other cautions it carries; the report and
+<code>cautions.csv</code> name the experiments behind it. In the evidence matrices, any other empty cell of an
+assayed compound reads <code>no_phase</code>: no stationary phase (<code>stationary_not_reached</code>), or, with
+both phases, cultures that reached no end of growth, where <code>cautions.csv</code> says <code>no_phase</code>
+too.</p>
+{_cautions_of(None)}"""
 
 
 def render_help(token: str, defaults: dict, example: tuple, job: str = "") -> str:
@@ -235,6 +311,7 @@ searched with it: when a taxon has more data in another medium, the page says so
 to fix the choice.</p>
 <p>Acid and base forms of one compound are one metabolite (acetic acid and acetate), since an HPLC measures the
 pool whatever a record calls it. A compound that was not assayed for a taxon is never written as zero.</p>
+{_cautions_section()}
 <h2 id="matrices">The two matrix formats</h2>
 <p><strong>Taxa x metabolites (CSV)</strong>: one matrix, rows taxa, columns metabolites, each cell the mean change in
 mM, positive when produced and negative when consumed (miaSim's efficiency matrix has the opposite signs, so the

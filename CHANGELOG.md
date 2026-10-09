@@ -15,7 +15,8 @@ semantic versioning.
   list was read and which studies came from the copy on this machine, since when; a name not found says the
   date of the species list it was looked up in.
 - When mGrowthDB answers slowly, the progress text says so: how many requests took over 10 s or were retried.
-- The About page lists the releases.
+- The About page lists the releases, and the help has a section on the cautions: what each means, by tier,
+  and what to do about it.
 - `foodnet derive --taxa` takes names separated by commas or semicolons, so strain names need no quotes
   (`--taxa Escherichia coli LF82, Bacteroides fragilis`).
 
@@ -39,6 +40,10 @@ semantic versioning.
 - A server address that does not accept a connection within 3 s is left for the next one (and tried again with
   the full time if none answers). mGrowthDB's IPv6 address did not answer through the KU Leuven VPN, and every
   new connection waited about 17 s for it, which made a search take several minutes.
+- A stationary value pooled with an experiment that reached no end of growth rests on the other experiments
+  and names that one in its notes; it carried `no_phase`, which is no caution (its arc failed validation), and
+  credited that experiment's study. The legend wraps long caution lines instead of cutting them off,
+  and several of them say more plainly what they mean.
 
 ## [0.3.0] (2026-10-08)
 

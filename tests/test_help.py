@@ -1,4 +1,5 @@
 """The help names every setting, every field and every legend value (grownet's rule)."""
+import html
 from dataclasses import fields
 
 from foodnet import help as help_page
@@ -64,3 +65,34 @@ def test_the_page_says_the_matrices_answer_a_mouseover(client):
 def test_the_help_names_every_caution():
     from foodnet.model import CAUTIONS
     assert all(c in help_page.EDGE_FIELDS["cautions"] for c in CAUTIONS)
+
+
+def test_the_help_explains_every_caution_under_its_tier():
+    # Karoline, 2026-10-09: "in the help, add a section that explains the cautions"
+    import html
+
+    from foodnet import help as help_page
+    from foodnet.legend import CAUTION_TEXT
+    from foodnet.model import CAUTION_TIERS, CAUTIONS
+    page = help_page.render_help("T", {}, ("A",))
+    section = page[page.index('id="cautions"'):page.index('id="matrices"')]
+    heads = [section.index(h) for h in ("Tier 1", "Tier 2", "Tier 3", "No value")]
+    assert heads == sorted(heads)
+    for caution in CAUTIONS:
+        at = section.index("<dt><code>" + caution.replace("_", "_<wbr>") + "</code></dt>")
+        tier = CAUTION_TIERS.get(caution)
+        assert heads[(tier or 4) - 1] < at < ([*heads, len(section)])[tier or 4], caution
+        assert html.escape(CAUTION_TEXT[caution][1:20], quote=True) in section, caution
+    assert 'href="#cautions"' in page
+    # every tier 1 caution says what to do (a review: a new one would ship without advice), and no_phase,
+    # which is no caution but reaches cautions.csv, is explained
+    advice = section[section.index("<ul>"):section.index("</ul>")]
+    assert all(f"<code>{c}</code>" in advice for c in CAUTIONS if CAUTION_TIERS.get(c) == 1)
+    assert "<code>no_phase</code>" in section
+
+
+def test_no_legend_line_runs_past_the_picture():
+    # a review measured six caution lines past the 900 px width
+    import re
+    for line in re.findall(r"<text [^>]*>([^<]*)</text>", legend.legend_svg()):
+        assert len(html.unescape(line)) <= legend.LINE, line

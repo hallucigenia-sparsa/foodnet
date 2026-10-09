@@ -127,8 +127,9 @@ def boundaries(cultures, fraction: float = phases.FRACTION, factor: float = phas
             found[i] = None
             if c.growth is None:
                 skipped.append((c.label, "no growth curve in this replicate or its experiment, so its growth "
-                                "phases are unknown; its metabolites give no value in the phases (no_phase; a "
-                                "time window in Advanced settings does not need one)"))
+                                "phases are unknown; its metabolites give the change over the whole run "
+                                "(whole_run, growth_unknown), and with both phases no stationary value "
+                                "(no_phase); a time window in Advanced settings does not need one"))
     return found, skipped
 
 
@@ -655,6 +656,16 @@ def pool(rows, cultures, limit: float = DETECTION_LIMIT, agree: bool = True, lim
             members = [r for r in members if "whole_run" not in r["cautions"]]
             whole_note = ("left out, as their change spans the whole run: " + ", ".join(sorted(
                 {cultures[r["culture"]].experiment_name or cultures[r["culture"]].experiment for r in whole})))
+        phaseless = [r for r in members if r["change"] is None and "no_phase" in r["cautions"]]
+        if valued and phaseless:
+            # cultures without an end of growth give no stationary value: a value from other experiments rests
+            # on those alone, and names them (reviews: their no_phase reached the value as a caution, and their
+            # studies were credited for it)
+            members = [r for r in members if r not in phaseless]
+            left = sorted({cultures[r["culture"]].experiment_name or cultures[r["culture"]].experiment
+                           for r in phaseless})
+            note = "left out, as they reached no end of growth: " + ", ".join(left)
+            whole_note = f"{whole_note}; {note}" if whole_note else note
         cautions = set(c for r in members for c in r["cautions"])
         experiments = sorted({cultures[r["culture"]].experiment for r in members})
         studies = sorted({cultures[r["culture"]].study for r in members})

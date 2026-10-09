@@ -181,6 +181,30 @@ def test_pooled_experiments_that_disagree_are_a_conflict():
     assert "E1 consumed (-2.00 mM)" in cell["notes"][0] and "E2 produced (+2.00 mM)" in cell["notes"][0]
 
 
+def test_no_phase_from_one_experiment_is_no_caution_on_a_value_of_another():
+    # a review: with Both, E2 reached no end of growth (no_phase on its stationary rows), E1 has three stationary
+    # values; the cell's value carried no_phase, which is no caution, and its arc failed validation
+    cultures = [_culture("E1", "S1", f"r{i}", {"m": [(0, 5), (10, 3)]}) for i in range(3)] + \
+               [_culture("E2", "S2", f"r{i}", {"m": [(0, 5), (10, 3)]}) for i in range(3)]
+    rows = [{"culture": i, "taxon": "ncbi:9", "metabolite": "m", "phase": "stationary", "change": -2.0 - i / 10,
+             "start": 0, "end": 10, "initial": 5, "cautions": []} for i in range(3)] + \
+           [{"culture": i, "taxon": "ncbi:9", "metabolite": "m", "phase": "stationary", "change": None,
+             "start": None, "end": None, "initial": 5, "cautions": ["no_phase"]} for i in range(3, 6)]
+    cell = derive.pool(rows, cultures)[("ncbi:9", "m", "stationary")]
+    assert cell["direction"] == "consumed" and "no_phase" not in cell["cautions"]
+    # and it rests on E1 alone, naming E2
+    assert cell["experiments"] == ["E1"] and cell["studies"] == ["S1"]
+    assert any("no end of growth" in n and "E2" in n for n in cell["notes"])
+    # a conflict in the same cell, and in a later one, still pools (a review: the note's local name replaced the
+    # experiment names the conflict notes use)
+    cultures += [_culture("E3", "S3", f"r{i}", {"m": [(0, 5), (10, 7)]}) for i in range(3)]
+    rows += [{**r, "culture": r["culture"] + 6, "change": 2.0} for r in rows[:3]]
+    rows += [{**r, "metabolite": "z"} for r in rows[:3]] + [{**r, "metabolite": "z"} for r in rows[6:9]]
+    pooled = derive.pool(rows, cultures)
+    for met in ("m", "z"):
+        assert "conflict" in pooled[("ncbi:9", met, "stationary")]["cautions"], met
+
+
 def test_growth_rates_come_from_the_metabolite_replicates_first(client):
     from foodnet import rates
     r = run(client, report_rates=True, rate_window=3)

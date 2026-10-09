@@ -7,38 +7,46 @@ to name every direction, evidence, phase and caution of the model, so a new valu
 from __future__ import annotations
 
 import html
+import textwrap
 
 from . import brand
 from .model import CAUTIONS
 
 WIDTH = 900
 ROW = 34
+LINE = 100        # characters per legend line: at 15 px, about 700 px of the 840 there are
 
 CAUTION_TEXT = {
     "single_replicate": "one replicate (by default inconclusive; decided only when judging by the mean alone)",
     "short_record": "metabolites recorded for less than 24 h",
-    "window_beyond_data": "the phase or window starts before the first or ends after the last sample; it stands in",
+    "window_beyond_data": "the phase or window starts before the first or ends after the last sample; the "
+                          "nearest sample stands in",
     "stationary_not_reached": "the culture was still growing at its last sample: no stationary phase",
     "conflict": "experiments (or taxa, merged to genus) disagree: inconclusive, no arc",
     "inconclusive": "the replicates pin down neither a change nor no change: NA, no arc (cautions.csv)",
     "not_detected_in_value_medium": "seen in another medium, and measured without a change in the value medium",
-    "phase_from_other_replicates": "no growth curve in this replicate; its experiment's median boundary is used",
+    "phase_from_other_replicates": "no growth curve, or none that ends growth, in this replicate; its "
+                                   "experiment's median boundary is used",
     "coarse_sampling": "the phase boundary rests on fewer than three growth samples",
     "boundaries_differ": "the replicates end exponential growth further apart than a sampling interval",
     "no_variance": "identical replicates (rounding, or one series twice): no test",
     "amounts_differ": "the experiments agree in direction, with amounts more than twofold apart",
-    "experiment_left_out": "an inconclusive experiment that does not contradict the others is left out",
-    "still_changing": "the compound kept changing after the growth rate fell, before the 90% rule would have ended "
-                      "growth (a slow-down, or a second substrate)",
-    "growth_rate_boundary": "growth ended where its rate fell, more than a sample before 90% of its maximum",
+    "experiment_left_out": "an inconclusive experiment that does not contradict the others is left out of the "
+                           "call, and kept in the amount",
+    "still_changing": "the compound kept changing after the growth rate fell, before the 90% rule would end growth: "
+                      "the stationary value holds that change",
+    "growth_rate_boundary": "growth ended where its rate fell, more than a sample before it reached 90% of the way to "
+                            "its maximum",
     "whole_run": "no end of growth was found, so the change is over the whole run, not a phase",
     "not_grown": "the culture did not grow (neither 1.5-fold nor, in OD, by 0.1) nor metabolize: no value, no arc",
-    "growth_unclear": "its curve shows no growth (often an OD read without its blank), but it metabolized",
+    "growth_unclear": "the culture's curve shows no growth (often an OD read without its blank), but it metabolized",
     "growth_unknown": "no growth curve at all: whole-run change, growth never checked",
-    "within_scatter": "a change within its window's own scatter: it can stop a call, not make one",
-    "within_evaporation": "no growth: a rise evaporation could explain (a set share): it can stop a call, not make one",
+    "within_scatter": "one replicate's change is within twice its own sample-to-sample scatter: by default it counts "
+                      "against a change, not for one",
+    "within_evaporation": "no growth: a rise evaporation could explain (the evaporation setting); as within_scatter",
     "start_differs": "the replicates' metabolite samples start apart, so they cover different stretches of the phase",
-    "pair_decided": "decided on two replicates (a change, or no change); a pair errs more readily than three",
+    "pair_decided": "an experiment of two replicates took part in the decision (a change, or no change); a pair "
+                    "errs more readily than three",
 }
 
 
@@ -89,7 +97,10 @@ def legend_svg() -> str:
     rows.append(_text(20, y, "Cautions (an arc column; unless one says no arc, the arc is shown)", "600"))
     for flag in CAUTIONS:
         y += 26
-        rows.append(_text(40, y, f"{flag}: {CAUTION_TEXT[flag]}"))
+        # long lines wrap, so none runs past the picture's width (a review measured six that did)
+        for i, line in enumerate(textwrap.wrap(f"{flag}: {CAUTION_TEXT[flag]}", LINE)):
+            y += 20 if i else 0
+            rows.append(_text(40 if not i else 60, y, line))
     height = y + 30
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {WIDTH} {height}" width="{WIDTH}" '
             f'height="{height}" role="img" aria-label="foodnet legend">'
