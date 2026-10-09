@@ -3,6 +3,8 @@
 All notable changes to foodnet. The format follows Keep a Changelog, and the version numbers follow
 semantic versioning.
 
+## [Unreleased]
+
 ## [0.3.0] (2026-10-08)
 
 ### Added
