@@ -106,8 +106,9 @@ def report_text(result: dict) -> str:
         from .matrix import technique_mismatch
         if technique_mismatch(result):
             lines += ["", technique_mismatch(result)]
-        lines += ["", "Decline rates (1/h; loss of log abundance from the end of growth, 90% of the rise, to the last "
-                  "sample; death: the curve leaves its plateau band or falls to zero, plateau: it stays; for "
+        rise = f"{s.get('fraction', 0.9):.0%}"
+        lines += ["", f"Decline rates (1/h; loss of log abundance from the end of growth, {rise} of the rise, to the "
+                  "last sample; death: the curve leaves its plateau band or falls to zero, plateau: it stays; for "
                   "anything but a viable count, a lower bound on death):"]
         for tid, r in sorted((result.get("declines") or {}).items(), key=lambda kv: names.get(kv[0], kv[0])):
             scatter = f" +/- {r['se']:.2g} SE between replicates" if r["se"] is not None else ""
@@ -124,8 +125,8 @@ def report_text(result: dict) -> str:
             for tid, by_met in sorted(found.items(), key=lambda kv: names.get(kv[0], kv[0])):
                 for mid, m in sorted(by_met.items(), key=lambda kv: names.get(kv[0], kv[0])):
                     scatter = f" +/- {m['se']:.2g} SE" if m["se"] is not None else ""
-                    gone = (f", gone before the plateau in {m['depleted_replicates']} of {m['n']}"
-                            if m.get("depleted_replicates") else "")
+                    gone = (f", below the detection limit at the plateau's start in {m['depleted_replicates']} "
+                            f"of {m['n']}" if m.get("depleted_replicates") else "")
                     lines.append(f"  {names.get(tid, tid)}, {names.get(mid, mid)}: {m['coefficient']:.3g}{scatter} "
                                  f"{m['unit']} (n {m['n']}, {m['start_h']:.3g} h to {m['end_h']:.3g} h{gone})")
     if result["initial"]:

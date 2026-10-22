@@ -29,7 +29,7 @@ semantic versioning.
 - CRM mode gives the Pirt maintenance coefficient as a separate characteristic (`maintenance.csv`,
   `maintenance` in `crm.json`, `crm$maintenance` in R), which nothing else uses: each taxon's uptake of each
   compound per unit of biomass per hour on its growth plateau, with its scatter, experiments, window, the
-  compound's concentration at the plateau's start and how many replicates had already used it up.
+  compound's concentration at the plateau's start and how many replicates had it below the detection limit at the plateau's start.
 
 ### Fixed
 

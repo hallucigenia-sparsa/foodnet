@@ -85,3 +85,16 @@ def test_what_a_user_reads_describes_a_release_not_our_branches():
         text = html.unescape(text)          # the help page escapes the quotes of the pinned line (a review)
         assert all(re.fullmatch(r'"v[0-9]+\.[0-9]+\.[0-9]+"', ref) for ref in re.findall(r"ref = (\S+?)[,)]", text))
         assert "work in progress" not in text.lower()
+
+
+def test_every_exported_r_function_has_a_help_page():
+    # a review: a helper put between crm_write's roxygen block and the function made `make rd` drop its page, and
+    # R CMD check then warned about undocumented code
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1] / "r"
+    exported = re.findall(r"^export\(([^)]+)\)", (root / "NAMESPACE").read_text(), re.M)
+    aliases = set()
+    for rd in (root / "man").glob("*.Rd"):
+        aliases |= set(re.findall(r"\\alias\{([^}]+)\}", rd.read_text()))
+    assert exported and set(exported) <= aliases, set(exported) - aliases

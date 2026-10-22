@@ -214,13 +214,13 @@ as_foodnet_crm <- function(payload) {
              growth_rates = rates,
              growth_rate_unit = chr(payload$growth_rate_unit, "1/h"),
              growth_rate_detail = payload$growth_rate_detail,
-             # each taxon's decline from where its growth curve enters its plateau band (1/h; NA: no usable
-             # decline), from foodnet 0.5.0:
+             # each taxon's decline from the end of its growth (1/h; NA: no usable decline), from the release
+             # after foodnet 0.4.0:
              # scatter, n, phase (death, or plateau: a lower bound) and window in decline_rate_detail
              decline_rates = if (is.null(payload$decline_rates)) NULL else per_taxon("decline_rates"),
              decline_rate_detail = payload$decline_rate_detail,
-             # the Pirt maintenance coefficient on the growth plateau, per taxon and resource (from foodnet
-             # 0.5.0): a separate characteristic no builder here uses
+             # the Pirt maintenance coefficient on the growth plateau, per taxon and resource (from the release
+             # after foodnet 0.4.0): a separate characteristic no builder here uses
              maintenance = if (is.null(payload$maintenance)) NULL else maintenance_frame(payload$maintenance),
              initial = initial,
              biomass_change = per_taxon("biomass_change"),
@@ -243,8 +243,8 @@ as_foodnet_crm <- function(payload) {
                             stationary_phase = isTRUE(caveats$stationary_phase),
                             whole_run = chr_vector(caveats$whole_run),
                             biomass_falls = chr_vector(caveats$biomass_falls),
-                            # growth curves of different techniques behind the rates or biomass (from foodnet
-                            # 0.5.0; "" when one), and why a taxon has no decline rate
+                            # growth curves of different techniques behind the rates or biomass (from the release
+                            # after foodnet 0.4.0; "" when one), and why a taxon has no decline rate
                             technique_mismatch = chr(caveats$technique_mismatch),
                             without_a_decline = unlist(caveats$without_a_decline),
                             caution_tiers = unlist(caveats$caution_tiers),

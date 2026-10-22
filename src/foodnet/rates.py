@@ -255,13 +255,15 @@ DECLINE_MIN_POINTS = 3      # the peak and two samples after it: a slope, not a 
 def decline(times, values, fraction: float = 0.9) -> dict:
     """The sustained decline once a growth curve has stopped growing (Karoline, 2026-10-09, for the biomass loss
     rate of a consumer-resource fit): the least-squares slope of log abundance from the first sample at or above
-    `fraction` of the way from the first sample to the maximum (foodnet's own end of exponential growth, the
-    `fraction` setting) to the last sample, as a rate of loss per hour (positive: the curve falls; negative: it
-    still creeps up), with that window (Karoline, 2026-10-22: "First sample >= 90% of max"; reviews: a slope
+    `fraction` of the way from the first sample to the maximum (foodnet's 90% rule for the end of exponential
+    growth, the `fraction` setting, without its growth-rate rule) to the last sample, as a rate of loss per hour
+    (positive: the curve falls; negative: it still creeps up), with that window (Karoline, 2026-10-22: "First
+    sample >= 90% of max"; reviews: a slope
     from the highest sample started on noise, and one from the plateau band's lower edge began inside
     exponential growth). `death` says whether the curve leaves its plateau band (PLATEAU, the cut the Baranyi
     fit uses) before the last sample. A curve that falls to zero is fitted over its positive samples up to the
-    zero, marked death and `to_zero`, when that leaves DECLINE_MIN_POINTS of them. What a curve counts decides
+    zero, marked death and `to_zero`, when that leaves DECLINE_MIN_POINTS of them: the fall to zero itself is not
+    in the slope, so it bounds the decline from below. What a curve counts decides
     what the rate is: optical density and total cell counts keep dead cells until they lyse, so for anything
     but a viable count it is a loss of counted biomass, which bounds death from below. RateUnavailable when
     there is no usable decline."""
@@ -281,7 +283,7 @@ def decline(times, values, fraction: float = 0.9) -> dict:
         raise RateUnavailable("the samples after the end of growth share one time")
     xs, ys = _positive_logs(times, values)
     plateau_x, _ = _until_decline(xs, ys)
-    return {"rate": -fit[0], "start": tail[0][0], "end": tail[-1][0], "points": len(tail),
+    return {"rate": -fit[0] + 0.0, "start": tail[0][0], "end": tail[-1][0], "points": len(tail),
             "death": zero is not None or len(plateau_x) < len(xs), "to_zero": zero is not None}
 
 

@@ -84,7 +84,9 @@ def build_parser() -> argparse.ArgumentParser:
     phases.add_argument("--second-window-to", type=float, default=None,
                    help="its end in hours (default: each culture's last sample)")
     phases.add_argument("--fraction", type=float, default=DEFAULTS["fraction"],
-                   help="exponential growth ends at this share of the maximal abundance (default 0.9)")
+                   help="exponential growth ends at the first sample this share of the way from the curve's start "
+                        "to its maximum, or earlier where its growth rate has fallen (default 0.9); the decline "
+                        "starts there by the share alone")
     phases.add_argument("--no-growth-factor", type=float, default=DEFAULTS["no_growth_factor"],
                    help="a culture that rose less than this many times did not grow by the fold rule (default 1.5)")
     phases.add_argument("--spike-factor", type=float, default=DEFAULTS["spike_factor"],

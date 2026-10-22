@@ -573,8 +573,9 @@ def provenance_lines(meta: dict) -> list:
 # what the decline and maintenance tables are, for the CRM README and the help alike
 DECLINE_TEXT = (
     "Decline rates (decline_rates.csv): each taxon's loss of log abundance per hour from the end of its growth "
-    "(the first sample at or above the fraction setting, 90%, of the way from the first sample to the maximum, "
-    "the rule that ends exponential growth) to its last sample; negative where the curve still creeps up. It is "
+    "(the first sample at or above the fraction setting, 90% by default, of the way from the first sample to the "
+    "maximum: foodnet's 90% rule for the end of exponential growth, without its growth-rate rule) to its last "
+    "sample; negative where the curve still creeps up. It is "
     "the mean over the replicates with metabolite data (or, where they have no growth curve, another monoculture "
     "in the same medium; source says which), over the growth curves of the technique most of them use "
     "(technique; other_techniques_left_out counts the rest), leaving out cultures that did not grow, cultures "
@@ -583,10 +584,12 @@ DECLINE_TEXT = (
     "each as independent; replicates of one experiment share inoculum and sampling, so experiments says how "
     "many independent experiments they come from. phase is death where most curves leave their plateau band "
     "(within a tenth of the curve's log rise below its maximum) before the last sample, or fall to zero "
-    "(replicates_to_zero, fitted up to the zero), else plateau. What it measures depends on the technique: "
+    "(replicates_to_zero, fitted up to the zero, so the fall itself is not in the slope and it bounds the "
+    "decline from below), else plateau. What it measures depends on the technique: "
     "optical density and total cell counts keep dead cells until they lyse, so for anything but a viable count "
     "the rate is a loss of counted biomass, which bounds death from below, and on a plateau birth and death are "
-    "confounded as well. start_h and end_h are the window. A taxon without a usable decline (fewer than three "
+    "confounded as well. start_h and end_h are the replicates' mean start and end. A taxon without a usable "
+    "decline (fewer than three "
     "samples from the end of growth to the end, a curve that spikes, or growth curves foodnet judged unusable) "
     "is NA, not 0.")
 MAINTENANCE_TEXT = (
@@ -594,7 +597,8 @@ MAINTENANCE_TEXT = (
     "here uses: what each taxon took up of a compound per unit of biomass per hour while its culture sat on its "
     "growth plateau (from its highest sample to the last sample within the plateau band), the mean over its "
     "replicates with metabolite data, with sd and se between replicates (each treated as independent), "
-    "experiments, the window and plateau_samples (the fewest growth samples a culture's plateau holds). Positive "
+    "experiments, the replicates' mean start and end of the plateau, plateau_samples (the fewest growth samples "
+    "a culture's plateau holds). Positive "
     "is uptake, negative release; a change within the detection limit is 0. start_mM is the compound's mean "
     "concentration at the plateau's start, and depleted_replicates how many replicates had it below the "
     "detection limit then: their 0 means the compound was gone, not that maintenance needed none. Per viable "
@@ -604,6 +608,12 @@ MAINTENANCE_TEXT = (
     "cells/mL it is micromoles per cell per hour); cultures in another unit, cultures that did not grow or whose "
     "values span the whole run, and of a duplicate deposit the copy with the poorer growth curve (for the "
     "compounds both copies measured) give none.")
+
+
+def decline_text(fraction: float = 0.9) -> str:
+    """DECLINE_TEXT for a search's fraction setting (a review: "90%" stood in a README of a search at 0.8)."""
+    return DECLINE_TEXT.replace("90% by default", f"{fraction:.0%} in this search").replace(
+        "foodnet's 90% rule", f"foodnet's {fraction:.0%} rule")
 
 
 def technique_mismatch(result: dict) -> str:
@@ -777,7 +787,7 @@ def readme(result: dict, which: str = "matrices") -> str:
                   *(["Entries seen only in another medium were set to TRUE in the matrices; a CRM needs amounts, "
                      "so they are missing here (their evidence says presence_only)."]
                     if presence_entries(result) == "true" else []),
-                  DECLINE_TEXT,
+                  decline_text(settings.get("fraction", 0.9)),
                   MAINTENANCE_TEXT,
                   "Initial concentrations: each metabolite's concentration at the first sample of the value-medium "
                   "cultures, averaged (initial_concentrations.csv), in mM.",

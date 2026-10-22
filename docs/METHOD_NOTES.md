@@ -357,6 +357,11 @@ with metabolite data."
     A curve that falls to zero is fitted up to the zero and counts as death; cultures that did not grow, and
     cultures whose values span the whole run where their taxon has phased ones, give no decline; another
     monoculture is used only where the value replicates have no growth curve.
+    The rule as it stands: per replicate, the slope of log abundance from the first sample at the fraction (0.9)
+    of the rise to the last sample (or the last positive one before a zero), needing three samples; per taxon, the
+    mean over the replicates of the technique and unit most use, with sd and se between replicates, experiments,
+    death where most leave the plateau band or fall to zero, and the replicates' mean start and end as start_h
+    and end_h.
 
 33. **The Pirt maintenance coefficient, as a separate characteristic.** Karoline, 2026-10-09: "build the Pirt
     maintenance coefficient, as a separate characteristic that can be used or not" (substrate consumed per

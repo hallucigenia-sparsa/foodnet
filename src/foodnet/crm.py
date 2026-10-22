@@ -126,7 +126,7 @@ def majority(units: list) -> str:
     def rank(unit):
         head = unit.split(" ", 1)[0].casefold()
         kind = GROWTH_TECHNIQUES.index(head) if head in GROWTH_TECHNIQUES else len(GROWTH_TECHNIQUES)
-        return kind, 0 if unit.endswith("(strain)") else 1        # a per-strain curve first, as reading ranks them
+        return kind, 0 if unit.endswith("(strain)") else 1        # by technique, then a per-strain curve first
     return min(set(units), key=lambda u: (-units.count(u), rank(u), u))
 
 
@@ -137,9 +137,13 @@ def summarize_declines(found: list, source: str) -> dict:
     experiments they come from (Karoline, 2026-10-22: replicates as the unit, labeled, since replicates of one
     experiment share inoculum and sampling); `phase` is "death" where most replicates leave their plateau band
     before the last sample, else "plateau"; the window is the replicates' mean start and last sample."""
-    kind = majority([f.get("technique", "") for f in found])
-    left_out = [f for f in found if f.get("technique", "") != kind]
-    found = [f for f in found if f.get("technique", "") == kind]
+    # the technique and its unit decide; whether a curve counts the strain or the culture is a label, since in a
+    # monoculture both count the one strain (a review: B. fragilis' culture-level counts were left out of a genus)
+    def measure(f):
+        return f.get("technique", "").rsplit(" (", 1)[0]
+    kind = majority([measure(f) for f in found])
+    left_out = [f for f in found if measure(f) != kind]
+    found = [f for f in found if measure(f) == kind]
     values = [f["rate"] for f in found]
     sd = statistics.stdev(values) if len(values) > 1 else None
     deaths = sum(1 for f in found if f["death"])
@@ -149,7 +153,8 @@ def summarize_declines(found: list, source: str) -> dict:
             "phase": "death" if 2 * deaths > len(values) else "plateau", "death_replicates": deaths,
             "replicates_to_zero": sum(1 for f in found if f.get("to_zero")),
             "start_h": statistics.mean(f["start"] for f in found), "end_h": statistics.mean(f["end"] for f in found),
-            "source": source, "studies": sorted({f["study"] for f in found}), "technique": kind,
+            "source": source, "studies": sorted({f["study"] for f in found}),
+            "technique": "; ".join(sorted({f.get("technique", "") for f in found})),
             "other_techniques_left_out": len(left_out), "replicates": found + left_out}
 
 

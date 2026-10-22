@@ -556,22 +556,20 @@ crm_readme <- function(x, print = TRUE) {
 #' Write the parameters as files
 #'
 #' The files of foodnet's download, for the phase `x` holds: `consumed.csv`, `produced.csv` and their
-#' `evidence_*.csv`, `growth_rates.csv`, `decline_rates.csv` and `maintenance.csv` (from foodnet 0.5.0), `initial_concentrations.csv`, `biomass.csv`, `intervals.csv` (the
+#' `evidence_*.csv`, `growth_rates.csv`, `decline_rates.csv` and `maintenance.csv` (from the release after foodnet 0.4.0), `initial_concentrations.csv`, `biomass.csv`, `intervals.csv` (the
 #' hours each value was measured over) and `bounds.csv` (each amount's lowest and highest replicate), one row
 #' per cell with a phase column, `chemistry.csv` and `electron_balance.csv` (from foodnet 0.3.0, [crm_chemistry()]
 #' and [crm_electron_balance()], the latter with a phase column), and `README.txt`, which opens with the phase. After [crm_phase()] the
 #' phase's files are named for it (`consumed_stationary.csv`, `intervals_stationary.csv`,
 #' `README_stationary.txt`, ...), so both phases can be written to one folder; the growth rates and the
-#' medium are the same in both. The tables hold what the parameters in R hold, so some have fewer columns than the download's
-#' (no replicate counts, no rate sources, no value-medium header cell).
+#' medium are the same in both. The tables hold what the parameters in R hold: growth_rates.csv, decline_rates.csv
+#' and maintenance.csv have the download's columns; the others have fewer (no value-medium header cell, and for a
+#' taxon without a growth rate no reason).
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param dir Directory to write into. It is created when it does not exist.
 #' @return The paths written, invisibly.
 #' @export
-# a count foodnet writes as 0 where there is no value (decline_rates.csv: replicates, experiments)
-zero_if_none <- function(v) ifelse(is.na(v), 0L, as.integer(v))
-
 crm_write <- function(x, dir) {
     need_crm(x)
     if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
@@ -599,13 +597,16 @@ crm_write <- function(x, dir) {
         v <- x$growth_rate_detail[[t]][[field]]
         if (is.null(v)) NA_real_ else as.numeric(v)
     }, numeric(1), USE.NAMES = FALSE)
+    rate_field <- function(field) vapply(x$taxa, function(t) {
+        v <- x$growth_rate_detail[[t]][[field]]
+        if (is.null(v)) NA_character_ else paste(unlist(v), collapse = " ")
+    }, character(1), USE.NAMES = FALSE)
+    # foodnet's growth_rates.csv columns, in its order (a review: fit_start_h stood in another column)
     put(data.frame(taxon = x$taxa, growth_rate = unname(x$growth_rates), unit = x$growth_rate_unit,
+                   replicates = zero_if_none(as.numeric(rate_field("n"))), source = rate_field("source"),
+                   studies = rate_field("studies"), method = rate_field("method"),
                    fit_start_h = fit_hours("fit_start_h"), fit_end_h = fit_hours("fit_end_h"),
-                   technique = vapply(x$taxa, function(t) {
-                       v <- x$growth_rate_detail[[t]]$technique
-                       if (is.null(v)) NA_character_ else as.character(v)
-                   }, character(1), USE.NAMES = FALSE),
-                   stringsAsFactors = FALSE), "growth_rates.csv")
+                   technique = rate_field("technique"), stringsAsFactors = FALSE), "growth_rates.csv")
     if (!is.null(x$decline_rates)) {
         detail <- function(field) vapply(x$taxa, function(t) {
             v <- x$decline_rate_detail[[t]][[field]]
@@ -628,7 +629,8 @@ crm_write <- function(x, dir) {
                        other_techniques_left_out = as.integer(detail("other_techniques_left_out")),
                        stringsAsFactors = FALSE), "decline_rates.csv")
     }
-    if (!is.null(x$maintenance)) put(x$maintenance, "maintenance.csv")
+    # foodnet's columns: biomass_unit is in R's table only (its unit column already names it)
+    if (!is.null(x$maintenance)) put(x$maintenance[setdiff(names(x$maintenance), "biomass_unit")], "maintenance.csv")
     put(data.frame(resource = x$resources, initial_mM = unname(x$initial), stringsAsFactors = FALSE),
         "initial_concentrations.csv")
     put(data.frame(taxon = x$taxa, biomass_start = unname(x$biomass_start),
@@ -1100,3 +1102,6 @@ crm_electron_balance <- function(x) {
     rownames(out) <- NULL
     out
 }
+
+# a count foodnet writes as 0 where there is no value (decline_rates.csv: replicates, experiments)
+zero_if_none <- function(v) ifelse(is.na(v), 0L, as.integer(v))

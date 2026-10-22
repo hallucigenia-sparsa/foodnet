@@ -139,7 +139,7 @@ def test_of_a_duplicate_pair_the_richer_growth_curve_gives_the_rates():
 def test_a_left_out_copy_gives_no_growth_rate_or_decline(client, monkeypatch):
     # pins the search's use of the copies: leaving A's only experiment out leaves A without either
     from foodnet import search
-    monkeypatch.setattr(search, "_growth_copies", lambda pairs: ({"EMGDB000000001"}, set()))
+    monkeypatch.setattr(search, "_growth_copies", lambda pairs, fraction=0.9: ({"EMGDB000000001"}, set()))
     r = run(client, report_rates=True, rate_window=3)
     assert "ncbi:1" not in r["rates"] and "ncbi:1" not in r["declines"]
 
@@ -213,3 +213,75 @@ def test_growth_curves_judged_unusable_give_no_maintenance(client, monkeypatch):
             [(0, 0.5), (8, 0.55), (16, 0.65), (24, 0.6)]
     r = run(client, ignore_media=True, report_rates=True)
     assert "ncbi:3" not in r["maintenance"] and "ncbi:3" not in r["declines"]
+
+
+def _curve_culture(experiment, values, technique="fc", level="strain", not_grown=False, times=None):
+    import types
+    return types.SimpleNamespace(
+        growth={"times": times or [0, 4, 8, 12, 24, 36, 48][:len(values)], "values": values, "technique": technique,
+                "unit": "", "level": level},
+        not_grown=not_grown, taxon={"id": "t"}, experiment=experiment, study="S", label=experiment,
+        metabolites={}, medium_key="m")
+
+
+DYING = [1, 10, 100, 1000, 500, 250, 125]
+
+
+def test_a_culture_that_did_not_grow_gives_no_decline():
+    found, _, skipped = crm.decline_rates(["t"], [_curve_culture("E1", DYING, not_grown=True)], [], {"m"})
+    assert "t" not in found and any("did not grow" in why for _, why in skipped)
+
+
+def test_another_monoculture_only_where_the_value_replicates_have_no_growth_curve():
+    flat = [1, 10, 100, 1000, 1000, 1000, 1000]
+    short = _curve_culture("E1", [1, 10, 100, 1000, 500])         # a curve, but too short for a decline
+    found, missing, _ = crm.decline_rates(["t"], [short], [_curve_culture("E9", flat)], {"m"})
+    assert "t" not in found and "t" in missing
+    import types
+    curveless = types.SimpleNamespace(growth=None, taxon={"id": "t"}, experiment="E1", medium_key="m")
+    found, _, _ = crm.decline_rates(["t"], [curveless], [_curve_culture("E9", flat)], {"m"})
+    assert found["t"]["source"] == crm.FROM_SAME_MEDIUM
+
+
+def test_the_fraction_setting_moves_the_start_of_the_decline():
+    curve = [1, 10, 100, 800, 1000, 900, 800]
+    early = crm.decline_rates(["t"], [_curve_culture("E1", curve)], [], {"m"}, fraction=0.7)
+    late = crm.decline_rates(["t"], [_curve_culture("E1", curve)], [], {"m"}, fraction=0.9)
+    assert early[0]["t"]["start_h"] == 12 and late[0]["t"]["start_h"] == 24
+
+
+def test_a_tie_goes_to_the_preferred_technique_then_to_a_per_strain_curve():
+    assert crm.majority(["fc Cells/mL (culture)", "fc Cells/mL (strain)"]) == "fc Cells/mL (strain)"
+    assert crm.majority(["od (strain)", "fc (culture)"]) == "fc (culture)"
+
+
+def test_a_genus_decline_keeps_strain_and_culture_level_counts_of_one_technique():
+    # a review: B. fragilis' culture-level counts were left out of a Bacteroides decline as another technique
+    found = [{"rate": r, "start": 12.0, "end": 48.0, "points": 4, "death": True, "study": "S", "experiment": e,
+              "technique": t} for r, e, t in ((0.05, "E1", "fc Cells/mL (strain)"),
+                                              (0.01, "E2", "fc Cells/mL (culture)"), (0.0, "E3", "od (culture)"))]
+    s = crm.summarize_declines(found, crm.FROM_METABOLITE_REPLICATES)
+    assert s["n"] == 2 and s["other_techniques_left_out"] == 1
+    assert s["technique"] == "fc Cells/mL (culture); fc Cells/mL (strain)"
+
+
+def test_initial_concentrations_count_a_duplicate_once():
+    import types
+
+    def c(experiment, start):
+        return types.SimpleNamespace(experiment=experiment, metabolites={"glc": {"name": "glucose",
+                                                                                 "series": [(0, start), (8, 1)]}})
+    found = crm.initial_concentrations([c("E1", 10), c("DUP", 10), c("E2", 8)], dropped={("DUP", "glc")})
+    assert found["glc"]["n"] == 2 and found["glc"]["mean"] == pytest.approx(9)
+
+
+def test_biomass_takes_the_preferred_technique_on_a_tie():
+    import types
+    cultures = []
+    for i, tech in enumerate(("od", "fc")):
+        cultures.append((i, types.SimpleNamespace(
+            growth={"times": [0, 12], "values": [1, 100], "technique": tech, "unit": ""}, taxon={"id": "t"},
+            experiment=f"E{i}")))
+    rows = [{"culture": i, "phase": "exponential", "change": -1.0, "start": 0, "end": 12, "cautions": []}
+            for i in range(2)]
+    assert crm.biomass_changes(cultures, rows, "exponential")["t"]["unit"] == "fc"

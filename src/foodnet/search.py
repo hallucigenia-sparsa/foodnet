@@ -393,7 +393,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         # the copy with the richer growth curve, which need not be the one the metabolite rule keeps (Karoline,
         # 2026-10-22, "Richer growth curve"; a review: B. thetaiotaomicron's kept copy lacks the 8 h sample, so
         # its fit ran to 24 h)
-        repeats, maint_dropped = _growth_copies(pairs)
+        repeats, maint_dropped = _growth_copies(pairs, s["fraction"])
         value_cultures = [cultures[i] for i in sorted(chosen) if cultures[i].experiment not in repeats]
         others = [c for i, c in enumerate(cultures) if i not in chosen and c.experiment not in repeats] + \
             read["growth_only"]
@@ -575,23 +575,28 @@ def _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window) -
     return out
 
 
-def _richness(cultures) -> tuple:
-    """How well an experiment's growth curves sample growth: the mean number of samples up to the highest one,
-    then the mean number of samples."""
-    curves = [c.growth for c in cultures if c.growth]
+def _richness(cultures, fraction: float = 0.9) -> tuple:
+    """How well an experiment's growth curves sample growth: the mean number of samples up to the end of growth
+    (the first at `fraction` of the rise; a review: counting to the highest sample let a noisy late maximum on a
+    plateau pass for sampled growth), then the mean number of samples."""
+    curves = [c.growth for c in cultures if c.growth and c.growth["values"]]
     if not curves:
         return (0.0, 0.0)
-    up_to_peak = [g["values"].index(max(g["values"])) + 1 for g in curves]
-    return (sum(up_to_peak) / len(curves), sum(len(g["values"]) for g in curves) / len(curves))
+
+    def growing(values):
+        first, top = values[0], max(values)
+        return next(i for i, v in enumerate(values) if v >= first + fraction * (top - first)) + 1
+    return (sum(growing(g["values"]) for g in curves) / len(curves),
+            sum(len(g["values"]) for g in curves) / len(curves))
 
 
-def _growth_copies(pairs) -> tuple:
+def _growth_copies(pairs, fraction: float = 0.9) -> tuple:
     """(experiments left out of growth rates, declines and maintenance, (experiment, compound) pairs maintenance
     leaves out): of each duplicate pair the copy whose growth curves sample growth more richly gives them (a tie
     keeps the metabolite rule's copy); of the other, maintenance keeps only compounds the pair does not share."""
     out, pairs_out = set(), set()
     for keep, drop, shared in pairs:
-        use, other = (drop, keep) if _richness(drop) > _richness(keep) else (keep, drop)
+        use, other = (drop, keep) if _richness(drop, fraction) > _richness(keep, fraction) else (keep, drop)
         out.add(other[0].experiment)
         pairs_out |= {(other[0].experiment, m) for m in shared}
     return out, pairs_out
