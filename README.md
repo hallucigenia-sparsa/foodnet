@@ -11,8 +11,8 @@ matrix formats, and to R as the parameters of a consumer-resource model (CRM), w
 [miaSim](https://bioconductor.org/packages/release/bioc/html/miaSim.html) as the example simulator.
 
 It is the sister tool of [grow**net**](https://github.com/crossfeed-bio/crossfeed), which builds
-interaction networks from co-cultures, and is built the same way: a thin client with no runtime
-dependencies, a local page and a command line, nothing hosted and nothing uploaded. It reads mGrowthDB, and
+interaction networks from co-cultures, and is built the same way: a thin client with one small runtime
+dependency (truststore, on macOS only), a local page and a command line, nothing hosted and nothing uploaded. It reads mGrowthDB, and
 in CRM mode ChEBI for the metabolites' formulas. The first search of a day reads mGrowthDB's species list from
 every study, which takes a few minutes when mGrowthDB is slow (the progress text says so); the list is then
 kept for a day in your cache folder, and what it read of a study is kept there while mGrowthDB shows the study
@@ -44,10 +44,12 @@ or with pipx (`pipx install foodnet`), or from a clone (`pip install -e .`). Eac
 double-click `foodnet.exe`. Windows warns about a program few people have run yet; click the small "More
 info" link, then "Run anyway".
 
-If foodnet says mGrowthDB's certificate could not be verified, the Python it runs on lacks the root
-certificate mGrowthDB uses (some Pythons uv installs on macOS do). Set `SSL_CERT_FILE` to a CA bundle that
-has it, such as certifi's (the path `python3 -m certifi` prints), or install foodnet with a Python whose store
-has it, such as Homebrew's (`uv tool install --python /opt/homebrew/bin/python3 foodnet`).
+On macOS foodnet checks mGrowthDB's certificate against the system's trust store, through the truststore
+package it installs with: the Pythons uv and the python.org installer put on a Mac lack the root certificate
+mGrowthDB uses. If foodnet still says the certificate could not be verified (another system, or a foodnet
+installed without its dependencies), set `SSL_CERT_FILE` to a CA bundle that has it, such as certifi's (the
+path `python3 -m certifi` prints), or install foodnet with a Python whose store has it, such as Homebrew's
+(`uv tool install --python /opt/homebrew/bin/python3 foodnet`).
 
 ## Quickstart
 
@@ -252,8 +254,8 @@ The page's help (The command line) lists every command and option with what each
 
 ## Guardrails
 
-The same as grow**net**'s: no real data in git (only synthetic fixtures under `tests/fixtures/`), no
-runtime dependencies, the network format is a contract checked against its schema, and `make check` runs
+The same as grow**net**'s: no real data in git (only synthetic fixtures under `tests/fixtures/`), one
+runtime dependency (truststore, macOS only, for mGrowthDB's certificate), the network format is a contract checked against its schema, and `make check` runs
 lint, the guardrail gate and the tests, in CI and before every commit. See [AGENTS.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.4.0/AGENTS.md) and
 [CONTRIBUTING.md](https://github.com/hallucigenia-sparsa/foodnet/blob/v0.4.0/CONTRIBUTING.md).
 

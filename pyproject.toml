@@ -14,7 +14,8 @@ authors = [
     { name = "KU Leuven, Lab of Molecular Bacteriology" },
 ]
 keywords = ["metabolites", "cross-feeding", "consumer-resource-model", "mGrowthDB", "microbial-ecology", "open-science"]
-dependencies = []
+# truststore checks certificates against the macOS trust store (src/foodnet/tls.py): the one runtime dependency
+dependencies = ["truststore>=0.10; sys_platform == 'darwin'"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]

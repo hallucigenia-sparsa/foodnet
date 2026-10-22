@@ -38,7 +38,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-from . import __version__
+from . import __version__, tls
 from .compounds import EQUIVALENT
 
 CHEBI_API = "https://www.ebi.ac.uk/chebi/backend/api/public/compound/{}/"
@@ -100,7 +100,7 @@ def _read(url: str) -> dict | None:
     request = urllib.request.Request(url, headers={"Accept": "application/json",
                                                    "User-Agent": f"foodnet/{__version__}"})
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as r:
+        with urllib.request.urlopen(request, timeout=TIMEOUT, context=tls.context()) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
         if e.code == 404:

@@ -196,7 +196,7 @@ def _chebi_answer(monkeypatch, answers):
         def __exit__(self, *a):
             return False
 
-    def urlopen(request, timeout):
+    def urlopen(request, timeout, context=None):
         calls.append(request.full_url)
         answer = answers.pop(0)
         if isinstance(answer, BaseException):

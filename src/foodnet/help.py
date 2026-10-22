@@ -557,8 +557,9 @@ def _changelog_ref() -> str:
 def render_about() -> str:
     return f"""<h2 class="page">About</h2>
 <p>{NAME} {_e(__version__)} builds taxon and metabolite networks from mGrowthDB batch monocultures. It is the sister
-tool of grownet and shares its structure: a thin client, no runtime dependencies, nothing hosted, nothing
-uploaded. It is developed at the KU Leuven Laboratory of Molecular Bacteriology.</p>
+tool of grownet and shares its structure: a thin client, one small runtime dependency (truststore, on macOS
+only, for mGrowthDB's certificate), nothing hosted, nothing uploaded. It is developed at the KU Leuven
+Laboratory of Molecular Bacteriology.</p>
 <p>Source and issues: <a href="{REPOSITORY}">{_e(REPOSITORY)}</a>. Data: <a href="{MGROWTHDB}">mGrowthDB</a>, cited
 per arc; in CRM mode, the metabolites' formulas and charges from <a href="https://www.ebi.ac.uk/chebi">ChEBI</a>
 (CC BY 4.0), which foodnet then contacts as well.</p>

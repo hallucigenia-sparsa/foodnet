@@ -28,6 +28,13 @@ semantic versioning.
   compound per unit of biomass per hour on its growth plateau, with standard error, standard deviation, n and
   the window.
 
+### Fixed
+
+- On macOS foodnet checks mGrowthDB's and ChEBI's certificates against the system's trust store, through
+  truststore, now its one runtime dependency (macOS only). With a Python uv or the python.org installer put on
+  a Mac, which lacks the root mGrowthDB's certificate chains to, `uv tool install foodnet` failed at the first
+  search.
+
 ## [0.4.0] (2026-10-09)
 
 ### Added

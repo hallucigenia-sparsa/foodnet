@@ -104,7 +104,9 @@ derivation method). Labels are created by a maintainer; if one is missing, say s
 - **The neutral format is a contract.** If `src/foodnet/model.py` changes, regenerate the schema
   (`python -m foodnet schema --out schema/metabolite_network.schema.json`) and keep it backward
   compatible where possible.
-- **No runtime dependencies.** Code under `src/` imports only the standard library and foodnet.
+- **One runtime dependency, on macOS only.** Code under `src/` imports only the standard library, foodnet and
+  truststore (`src/foodnet/tls.py`: certificates checked against the macOS trust store, as in grownet). Add no
+  other.
 - **Nothing public bearing a collaborator's name or affiliation** without their sign-off.
 - **Security problems are reported privately** (see [SECURITY.md](SECURITY.md)), never in a public issue,
   pull request, or the notes file.

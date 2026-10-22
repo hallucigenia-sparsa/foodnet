@@ -7,7 +7,7 @@ Checks:
   1. secrets          no api keys, tokens, or private keys in tracked text
   2. no-raw-data      no pulled or raw experimental data committed (only synthetic tests/fixtures)
   3. no-local-paths   no absolute local-machine paths (the repo is portable and self-contained)
-  4. self-contained   every import under src/ resolves to the standard library or foodnet itself
+  4. self-contained   every import under src/ resolves to the standard library, foodnet itself or a declared dependency
   5. house-style      docs use ASCII punctuation and US spelling; prose carries no hedging caveats
   6. schema-contract  the shipped JSON Schema matches the code, and emitted networks validate against it
   7. merge-markers    no leftover conflict markers from a merge (one once reached grownet's changelog unseen)
@@ -49,6 +49,9 @@ DASH = re.compile(r"[–—]|(?<=\S) -- (?=\S)|(?<=\S) - (?=\S)")
 MERGE_MARKER = re.compile(r"^(?:<{7}|>{7})(?: |$)", re.M)
 
 STDLIB = set(getattr(sys, "stdlib_module_names", set())) | {"__future__"}
+# the runtime dependencies pyproject.toml declares (tests/test_gate.py checks the two agree): truststore, macOS only,
+# checks mGrowthDB's certificate against the system's store (src/foodnet/tls.py)
+DECLARED = {"truststore"}
 
 
 def tracked_files():
@@ -148,7 +151,7 @@ def check_self_contained(rels):
             else:
                 continue
             for m in mods:
-                if m != "foodnet" and m not in STDLIB:
+                if m != "foodnet" and m not in STDLIB and m not in DECLARED:
                     bad.append(f"{r}: imports {m!r} (not stdlib or foodnet; declare it or drop it)")
     return bad
 

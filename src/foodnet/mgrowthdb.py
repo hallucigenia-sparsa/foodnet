@@ -29,13 +29,14 @@ import json
 import os
 import socket
 import ssl
+import sys
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import __version__
+from . import __version__, tls
 from .brand import NAME
 
 MGROWTHDB_API = "https://mgrowthdb.gbiomed.kuleuven.be/api/v1"
@@ -201,8 +202,11 @@ class MGrowthDBClient:
         if fresh or conn is None:
             if conn is not None:
                 conn.close()
-            kind = http.client.HTTPSConnection if self._scheme == "https" else http.client.HTTPConnection
-            conn = self._local.conn = kind(self._host, timeout=self.timeout)
+            if self._scheme == "https":
+                conn = http.client.HTTPSConnection(self._host, timeout=self.timeout, context=tls.context())
+            else:
+                conn = http.client.HTTPConnection(self._host, timeout=self.timeout)
+            self._local.conn = conn
             conn._create_connection = lambda address, timeout, source=None: open_socket(
                 address[0], address[1], timeout, self._family)
         return conn
@@ -268,9 +272,12 @@ class MGrowthDBClient:
             except ssl.SSLCertVerificationError as e:
                 # not the network: this Python's certificate store lacks the root mGrowthDB's certificate chains to,
                 # and trying again cannot help (an audit: uv's Python on macOS reported "check your network")
+                macos = (" On macOS, foodnet checks certificates against the system's store when the truststore "
+                         "package is installed (pip install truststore, or install foodnet again)."
+                         if sys.platform == "darwin" and not tls.system_store() else "")
                 raise MGrowthDBError(
-                    f"mGrowthDB's certificate could not be verified by this Python ({e.verify_message or e}). Its "
-                    "certificate store lacks the root mGrowthDB uses (HARICA TLS RSA Root CA 2021). Point "
+                    f"mGrowthDB's certificate could not be verified by this Python ({e.verify_message or e}).{macos} "
+                    "Its certificate store lacks the root mGrowthDB uses (HARICA TLS RSA Root CA 2021). Point "
                     "SSL_CERT_FILE at a CA bundle that has it, such as certifi's (the path `python3 -m certifi` "
                     "prints), or install foodnet with a Python whose store has it, such as Homebrew's "
                     "(uv tool install --python /opt/homebrew/bin/python3 foodnet).") from None
