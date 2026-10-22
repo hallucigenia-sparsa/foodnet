@@ -339,6 +339,8 @@ with metabolite data."
     error, n), death where most replicates show one, the mean peak and last sample as the window; from the
     same kind of cultures as the growth rate, never from spiking curves or curves without an end of exponential
     growth; per genus, over its strains' replicates together.
+    Karoline confirmed these choices on 2026-10-22 ("yes, please go ahead with them"): the highest sample as
+    the peak, the mean over replicates rather than the median, death where most replicates show one.
 
 33. **The Pirt maintenance coefficient, as a separate characteristic.** Karoline, 2026-10-09: "build the Pirt
     maintenance coefficient, as a separate characteristic that can be used or not" (substrate consumed per
@@ -349,6 +351,8 @@ with metabolite data."
     and at or after its end. Per taxon and compound: the mean over its value-set cultures in the unit most of
     them use, with standard deviation, standard error, n and the mean window; per genus, over its strains'
     cultures. Nothing else in foodnet or the R package uses it.
+    Confirmed by Karoline on 2026-10-22, with every measured compound reported (the user picks the substrates)
+    and only the unit most of a taxon's cultures use.
 
 ## Known limits
 
