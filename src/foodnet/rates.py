@@ -273,7 +273,9 @@ def decline(times, values, fraction: float = 0.9) -> dict:
         raise RateUnavailable("no positive values")
     first, top = positive[0][1], max(v for _, v in positive)
     start = next(t for t, v in positive if v >= first + fraction * (top - first))
-    zero = next((t for t, v in pairs if t > start and v <= 0), None)
+    # a fall to zero is one the curve never recovers from; a single zero followed by counts again is a sample
+    # below detection, left out, not an end (a review: one dropout cut a plateau's fit short and read as death)
+    zero = next((t for t, v in pairs if t > start and v <= 0 and all(w <= 0 for u, w in pairs if u >= t)), None)
     tail = [(t, math.log(v)) for t, v in positive if t >= start and (zero is None or t < zero)]
     if len(tail) < DECLINE_MIN_POINTS:
         raise RateUnavailable(f"fewer than {DECLINE_MIN_POINTS} samples from the end of growth to the "

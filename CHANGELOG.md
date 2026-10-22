@@ -36,6 +36,9 @@ semantic versioning.
 - A duplicate deposit, counted once in the matrices, was counted twice in the growth rates' replicates (and so
   their n and median), in the biomass and in the initial concentrations: it now counts once, and the copy
   with the richer growth curve gives the growth rate.
+- Growth rates take the growth curves of the technique and unit most of a taxon's replicates use (they pooled
+  OD and cell counts), leave out cultures whose values span the whole run where the taxon has others with a
+  phase, and a growth-only monoculture's growth curve is chosen and tested as the others are.
 - On macOS foodnet checks mGrowthDB's and ChEBI's certificates against the system's trust store, through
   truststore 0.10.5 or later, now its one runtime dependency (macOS only), with a context per thread. With a
   Python uv put on a Mac, which lacks the root mGrowthDB's certificate chains to, `uv tool install foodnet`

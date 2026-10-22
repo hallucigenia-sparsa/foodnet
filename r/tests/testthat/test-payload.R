@@ -167,11 +167,11 @@ test_that("maintenance coefficients are a table of their own, subset and written
     p <- example_payload()
     p$maintenance <- list(list(taxon = "A", resource = "glucose", coefficient = 4e-5, unit = "mM h-1 per (od)",
                                biomass_unit = "od", sd = 1e-5, se = 6e-6, n = 3, n_experiments = 1, start_h = 12,
-                               end_h = 24, plateau_samples = 2, start_mM = 2, depleted_replicates = 0,
+                               end_h = 24, plateau_samples = 2, start_mM = 2, below_limit_replicates = 0,
                                studies = list("S1")),
                           list(taxon = "B", resource = "acetate", coefficient = 0, unit = "mM h-1 per (od)",
                                biomass_unit = "od", sd = NULL, se = NULL, n = 1, n_experiments = 1, start_h = 16,
-                               end_h = 24, plateau_samples = 2, start_mM = 0, depleted_replicates = 1,
+                               end_h = 24, plateau_samples = 2, start_mM = 0, below_limit_replicates = 1,
                                studies = list("S1", "S2")))
     x <- foodnet:::as_foodnet_crm(p)
     expect_equal(nrow(x$maintenance), 2)

@@ -145,7 +145,7 @@
    ],
    "plateau_samples": 2,
    "start_mM": 4.0,
-   "depleted_replicates": 0
+   "below_limit_replicates": 0
   },
   {
    "taxon": "Alpha alpha A1",
@@ -164,7 +164,7 @@
    ],
    "plateau_samples": 2,
    "start_mM": 2.0000000000000004,
-   "depleted_replicates": 0
+   "below_limit_replicates": 0
   },
   {
    "taxon": "Beta beta B1",
@@ -183,7 +183,7 @@
    ],
    "plateau_samples": 2,
    "start_mM": 3.0,
-   "depleted_replicates": 0
+   "below_limit_replicates": 0
   },
   {
    "taxon": "Beta beta B1",
@@ -202,7 +202,7 @@
    ],
    "plateau_samples": 2,
    "start_mM": 4.0,
-   "depleted_replicates": 0
+   "below_limit_replicates": 0
   }
  ],
  "initial_concentrations": [

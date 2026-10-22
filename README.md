@@ -176,7 +176,7 @@ from below: optical density and total counts keep dead cells until they lyse. Wi
 NA, not 0. Separately, it gives the Pirt maintenance coefficient (`maintenance.csv`), which nothing else uses:
 what each taxon took up of each compound per unit of biomass per hour on its growth plateau, with its scatter,
 experiments, window, the compound's concentration at the plateau's start and how many replicates had it below the
-detection limit then (their 0 means the compound was gone, not that no maintenance needed it). Of a duplicate deposit,
+detection limit then (used up, or never there: their 0 measures no demand). Of a duplicate deposit,
 the copy with the richer growth curve gives the growth rate, decline and maintenance.
 With the phase choice Both, the stationary phase (what changed after the end of exponential growth) comes
 too, beside the exponential one. Install the companion package once, at the version of your foodnet (the

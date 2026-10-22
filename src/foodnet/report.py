@@ -125,8 +125,8 @@ def report_text(result: dict) -> str:
             for tid, by_met in sorted(found.items(), key=lambda kv: names.get(kv[0], kv[0])):
                 for mid, m in sorted(by_met.items(), key=lambda kv: names.get(kv[0], kv[0])):
                     scatter = f" +/- {m['se']:.2g} SE" if m["se"] is not None else ""
-                    gone = (f", below the detection limit at the plateau's start in {m['depleted_replicates']} "
-                            f"of {m['n']}" if m.get("depleted_replicates") else "")
+                    gone = (f", below the detection limit at the plateau's start in {m['below_limit_replicates']} "
+                            f"of {m['n']}" if m.get("below_limit_replicates") else "")
                     lines.append(f"  {names.get(tid, tid)}, {names.get(mid, mid)}: {m['coefficient']:.3g}{scatter} "
                                  f"{m['unit']} (n {m['n']}, {m['start_h']:.3g} h to {m['end_h']:.3g} h{gone})")
     if result["initial"]:

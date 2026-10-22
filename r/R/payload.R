@@ -487,7 +487,7 @@ maintenance_frame <- function(records) {
                end_h = vapply(records, num, numeric(1), "end_h"),
                plateau_samples = vapply(records, num, numeric(1), "plateau_samples"),
                start_mM = vapply(records, num, numeric(1), "start_mM"),
-               depleted_replicates = vapply(records, num, numeric(1), "depleted_replicates"),
+               below_limit_replicates = vapply(records, num, numeric(1), "below_limit_replicates"),
                biomass_unit = vapply(records, function(r) chr(r$biomass_unit), character(1)),
                studies = vapply(records, function(r) paste(unlist(r$studies), collapse = " "), character(1)),
                stringsAsFactors = FALSE)

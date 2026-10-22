@@ -82,7 +82,7 @@ def test_the_maintenance_coefficient_is_uptake_per_biomass_per_hour_on_the_plate
     assert m["coefficient"] == pytest.approx(0.5 / 1000 / 12) and m["n"] == 3
     assert (m["start_h"], m["end_h"]) == (12, 24) and m["unit"] == "mM h-1 per (fc)" and m["se"] is not None
     # glucose at the plateau's start: 1.9, 2.1 and 2 mM, so it was there to take up; two growth samples on it
-    assert m["start_mM"] == pytest.approx(2.0) and m["depleted_replicates"] == 0
+    assert m["start_mM"] == pytest.approx(2.0) and m["below_limit_replicates"] == 0
     assert (m["plateau_samples"], m["n_experiments"]) == (2, 1)
     p = matrix.crm_payload(r)
     row = next(x for x in p["maintenance"] if x["taxon"] == "Alpha alpha A1" and x["resource"] == "glucose")
@@ -100,7 +100,7 @@ def test_rates_name_the_growth_curve_technique_and_warn_when_taxa_differ(client)
     r = run(client, report_rates=True, rate_window=3)
     A, B = "ncbi:1", "ncbi:2"
     assert r["rates"][A]["technique"].startswith("fc") and r["rates"][B]["technique"].startswith("od")
-    assert matrix.rates_csv(r).splitlines()[0].endswith(",technique")
+    assert matrix.rates_csv(r).splitlines()[0].endswith(",technique,other_techniques_left_out")
     assert ",technique," in matrix.declines_csv(r).splitlines()[0]
     warning = matrix.technique_mismatch(r)
     assert warning.startswith("Growth curves of different techniques: fc") and "od for" in warning
@@ -139,7 +139,7 @@ def test_of_a_duplicate_pair_the_richer_growth_curve_gives_the_rates():
 def test_a_left_out_copy_gives_no_growth_rate_or_decline(client, monkeypatch):
     # pins the search's use of the copies: leaving A's only experiment out leaves A without either
     from foodnet import search
-    monkeypatch.setattr(search, "_growth_copies", lambda pairs, fraction=0.9: ({"EMGDB000000001"}, set()))
+    monkeypatch.setattr(search, "_growth_copies", lambda pairs, fraction=0.9, factor=1.5: ({"EMGDB000000001"}, set()))
     r = run(client, report_rates=True, rate_window=3)
     assert "ncbi:1" not in r["rates"] and "ncbi:1" not in r["declines"]
 
@@ -178,7 +178,7 @@ def test_maintenance_leaves_out_repeats_and_cultures_that_did_not_grow_and_flags
     assert any("in od" in why for _, why in skipped)
     used_up, _ = crm.maintenance([_plateau_culture("E1", (0.05, 0.0)), _plateau_culture("E1", (0.1, 0.0))], 0.2)
     gone = used_up["ncbi:9"]["glc"]
-    assert gone["coefficient"] == 0 and gone["depleted_replicates"] == 2 and gone["start_mM"] == pytest.approx(0.075)
+    assert gone["coefficient"] == 0 and gone["below_limit_replicates"] == 2 and gone["start_mM"] == pytest.approx(0.075)
 
 
 def test_fit_hours_span_every_replicates_fit():
@@ -285,3 +285,35 @@ def test_biomass_takes_the_preferred_technique_on_a_tie():
     rows = [{"culture": i, "phase": "exponential", "change": -1.0, "start": 0, "end": 12, "cautions": []}
             for i in range(2)]
     assert crm.biomass_changes(cultures, rows, "exponential")["t"]["unit"] == "fc"
+
+
+def test_a_single_zero_followed_by_counts_is_a_dropout_not_a_fall_to_zero():
+    d = rates.decline([0, 4, 8, 12, 24, 36, 48, 60], [1, 10, 100, 1000, 1000, 0, 1000, 1000])
+    assert not d["to_zero"] and not d["death"] and d["end"] == 60 and d["rate"] == pytest.approx(0, abs=1e-12)
+
+
+def test_growth_rates_take_the_technique_most_replicates_use():
+    # Karoline, 2026-10-22: "growth rates should follow the same rules"
+    import types
+
+    def c(i, technique, values):
+        return types.SimpleNamespace(taxon={"id": "t"}, study=f"S{i}", label=str(i), growth={
+            "times": [0, 2, 4, 6, 8, 10], "values": values, "technique": technique, "unit": "", "level": "culture"})
+    fast, slow = [1, 10, 100, 1000, 1000, 1000], [1, 2, 4, 8, 16, 16]
+    found, _, _ = crm.growth_rates(["t"], [c(0, "fc", fast), c(1, "fc", fast), c(2, "od", slow)], [], set(), window=3)
+    assert found["t"]["n"] == 2 and found["t"]["other_techniques_left_out"] == 1
+    assert found["t"]["technique"] == "fc (culture)" and found["t"]["studies"] == ["S0", "S1"]
+
+
+def test_the_richer_copy_is_counted_to_the_end_of_growth_not_to_a_late_maximum():
+    # a review: a copy sampled once during growth, whose plateau crept up, outranked one sampled every 2 h
+    import types
+
+    from foodnet import search
+
+    def culture(experiment, times, values):
+        return types.SimpleNamespace(experiment=experiment, growth={"times": times, "values": values})
+    dense = [culture("A", [0, 2, 4, 6, 8, 10, 12, 24, 48], [1, 3, 9, 27, 81, 243, 700, 720, 730])]
+    sparse = [culture("B", [0, 8, 14, 20, 26, 32, 38, 44, 50], [1, 300, 700, 710, 720, 730, 740, 750, 760])]
+    assert search._growth_copies([(sparse, dense, ["acetate"])])[0] == {"B"}
+    assert search._growth_copies([(dense, sparse, ["acetate"])])[0] == {"B"}

@@ -362,6 +362,11 @@ with metabolite data."
     mean over the replicates of the technique and unit most use, with sd and se between replicates, experiments,
     death where most leave the plateau band or fall to zero, and the replicates' mean start and end as start_h
     and end_h.
+    Karoline, 2026-10-22, on growth rates: "yes, growth rates should follow the same rules": the growth curves of
+    the technique and unit most replicates use, no whole-run cultures where the taxon has phased ones, and of a
+    duplicate pair the richer copy (counted to each curve's own end of exponential growth). The copy is chosen
+    only between copies both inside the search's scope, and growth-only monocultures (the fallback) get the
+    same growth curve choice and growth test as the others.
 
 33. **The Pirt maintenance coefficient, as a separate characteristic.** Karoline, 2026-10-09: "build the Pirt
     maintenance coefficient, as a separate characteristic that can be used or not" (substrate consumed per
@@ -379,7 +384,7 @@ with metabolite data."
     gone measures no demand. The unit is chosen once per taxon (over all its plateau cultures), ties going to
     the preferred technique; cultures that did not grow, a duplicate deposit's (experiment, compound) pairs and
     taxa whose growth curves give no end of exponential growth give none.
-    Second round: depleted_replicates counts the replicates below the limit at the plateau's start (one flag from
+    Second round: below_limit_replicates counts the replicates below the limit at the plateau's start (one flag from
     the mean hid a culture that took the compound up); of a duplicate pair, the copy with the richer growth
     curve gives all its compounds and the other only those the pair does not share. Per viable biomass the
     coefficient bounds m_s from above; per counted biomass with dead cells in it, it is lower.

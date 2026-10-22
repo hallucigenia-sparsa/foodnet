@@ -41,7 +41,7 @@ def technique(growth: dict) -> str:
 
 
 def _rate_values(cultures, method: str, spike_factor: float, skipped: list) -> list:
-    """[(rate, first hour, last hour the fit used, technique)] of the cultures' growth curves."""
+    """[(rate, first hour, last hour the fit used, technique, study)] of the cultures' growth curves."""
     feature = rates.fitted(method)
     values = []
     for c in cultures:
@@ -56,7 +56,7 @@ def _rate_values(cultures, method: str, spike_factor: float, skipped: list) -> l
             skipped.append((c.label, f"no growth rate: {e}"))
             continue
         if value > 0:
-            values.append((value, start, end, technique(c.growth)))
+            values.append((value, start, end, technique(c.growth), c.study))
         else:
             skipped.append((c.label, f"non-positive growth rate ({value:g})"))
     return values
@@ -81,19 +81,25 @@ def growth_rates(taxa, value_cultures, other_cultures, value_keys, ignore_media:
     found, missing = {}, {}
     for taxon in taxa:
         values = _rate_values(by_taxon.get(taxon, []), method, spike_factor, skipped)
-        source, used = FROM_METABOLITE_REPLICATES, by_taxon.get(taxon, [])
+        source = FROM_METABOLITE_REPLICATES
         if not values:
             values = _rate_values(others.get(taxon, []), method, spike_factor, skipped)
-            source, used = FROM_SAME_MEDIUM, others.get(taxon, [])
+            source = FROM_SAME_MEDIUM
         if values:
+            # the growth curves of the technique and unit most replicates use, as declines, maintenance and
+            # biomass take them (Karoline, 2026-10-22: "growth rates should follow the same rules")
+            kind = majority([v[3].rsplit(" (", 1)[0] for v in values])
+            left_out = sum(1 for v in values if v[3].rsplit(" (", 1)[0] != kind)
+            values = [v for v in values if v[3].rsplit(" (", 1)[0] == kind]
             # the hours the fits used, to set beside the values' intervals (Karoline, 2026-10-22: "add
             # fit_start_h and fit_end_h"): the earliest first and the latest last hour of any replicate's fit,
             # so no hour is named that no fit used (a review: means of 2-6 h and 20-30 h gave 11-18 h)
             found[taxon] = {"rate": statistics.median(v[0] for v in values), "unit": "1/h", "n": len(values),
-                            "source": source, "studies": sorted({c.study for c in used}), "method": method,
+                            "source": source, "studies": sorted({v[4] for v in values}), "method": method,
                             "fit_start_h": min(v[1] for v in values),
                             "fit_end_h": max(v[2] for v in values),
-                            "technique": "; ".join(sorted({v[3] for v in values}))}
+                            "technique": "; ".join(sorted({v[3] for v in values})),
+                            "other_techniques_left_out": left_out}
         elif by_taxon.get(taxon) or others.get(taxon):
             missing[taxon] = "its growth curves in this medium give no rate (see the report)"
         else:
@@ -212,7 +218,7 @@ def maintenance(value_cultures, limit: float, limits: dict | None = None,
     cultures of the unit most of its cultures use (one unit for all its compounds), and per compound the mean
     with standard deviation, standard error, n, the experiments, the window, the fewest growth samples a
     plateau holds, and the compound's mean concentration at the plateau's start: where it was below the
-    detection limit (depleted_at_start), a 0 says the compound was gone, not that no maintenance needed it (a
+    detection limit (below_limit_replicates; used up or never there), a 0 measures no demand (a
     review). On a plateau, growth and death may balance, so the coefficient bounds Pirt's m_s from above."""
     skipped, by_taxon = [], defaultdict(list)
     for c in value_cultures:
@@ -270,9 +276,10 @@ def summarize_maintenance(found: dict) -> dict:
                 "start_h": statistics.mean(e["start"] for e in same),
                 "end_h": statistics.mean(e["end"] for e in same), "studies": sorted({e["study"] for e in same}),
                 "plateau_samples": min(e["samples"] for e in same), "start_mM": at_start,
-                # how many replicates had the compound below the detection limit when the plateau began: their
-                # 0 says it was gone (a review: one flag from the mean hid a culture that took it up)
-                "depleted_replicates": gone, "cultures": entries}
+                # how many replicates had the compound below the detection limit when the plateau began (used
+                # up, or never there): their 0 measures no demand (a review: one flag from the mean hid a
+                # culture that took it up)
+                "below_limit_replicates": gone, "cultures": entries}
     return out
 
 

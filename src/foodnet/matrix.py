@@ -338,12 +338,12 @@ def rates_csv(result: dict) -> str:
         if r:
             hours = [NA if r.get(k) is None else f"{r[k]:.6g}" for k in ("fit_start_h", "fit_end_h")]
             rows.append([t.name, f"{r['rate']:.6g}", r["unit"], r["n"], r["source"], " ".join(r["studies"]),
-                         r["method"], *hours, r.get("technique", "")])
+                         r["method"], *hours, r.get("technique", ""), r.get("other_techniques_left_out", 0)])
         else:
-            rows.append([t.name, NA, "1/h", 0, result["without_a_rate"].get(t.id, ""), "", "", NA, NA, ""])
+            rows.append([t.name, NA, "1/h", 0, result["without_a_rate"].get(t.id, ""), "", "", NA, NA, "", ""])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "growth_rate", "unit", "replicates", "source", "studies", "method", "fit_start_h",
-                 "fit_end_h", "technique"], rows)
+                 "fit_end_h", "technique", "other_techniques_left_out"], rows)
 
 
 def declines_csv(result: dict) -> str:
@@ -379,11 +379,11 @@ def maintenance_csv(result: dict) -> str:
             rows.append([t.name, names.get(mid, mid), f"{m['coefficient']:.6g}", m["unit"],
                          NA if m["se"] is None else f"{m['se']:.6g}", NA if m["sd"] is None else f"{m['sd']:.6g}",
                          m["n"], m["n_experiments"], f"{m['start_h']:.6g}", f"{m['end_h']:.6g}",
-                         m["plateau_samples"], f"{m['start_mM']:.6g}", m["depleted_replicates"],
+                         m["plateau_samples"], f"{m['start_mM']:.6g}", m["below_limit_replicates"],
                          " ".join(m["studies"])])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "resource", "maintenance", "unit", "se", "sd", "replicates", "experiments", "start_h",
-                 "end_h", "plateau_samples", "start_mM", "depleted_replicates", "studies"], rows)
+                 "end_h", "plateau_samples", "start_mM", "below_limit_replicates", "studies"], rows)
 
 
 def maintenance_payload(result: dict) -> list:
@@ -600,8 +600,8 @@ MAINTENANCE_TEXT = (
     "experiments, the replicates' mean start and end of the plateau, plateau_samples (the fewest growth samples "
     "a culture's plateau holds). Positive "
     "is uptake, negative release; a change within the detection limit is 0. start_mM is the compound's mean "
-    "concentration at the plateau's start, and depleted_replicates how many replicates had it below the "
-    "detection limit then: their 0 means the compound was gone, not that maintenance needed none. Per viable "
+    "concentration at the plateau's start, and below_limit_replicates how many replicates had it below the "
+    "detection limit then (used up, or never there): their 0 measures no maintenance demand. Per viable "
     "biomass the coefficient bounds Pirt's m_s from above (growth and death may balance on a plateau); per "
     "counted biomass that includes dead cells (optical density, total counts) it is lower. The biomass is in "
     "the unit of the growth curves most of the taxon's cultures use (unit: mM per hour per that unit; per "
@@ -776,7 +776,10 @@ def readme(result: dict, which: str = "matrices") -> str:
         lines += ["Growth rates: each taxon's maximum specific growth rate in monoculture (1/h), fitted to each "
                   f"replicate's whole growth curve by {fit}, so over the interval the fit finds, not over the "
                   "phase or time window the values cover; then the median over the replicates whose metabolites "
-                  "gave the values, or else over another monoculture in the same medium. growth_rates.csv says "
+                  "gave the values, or else over another monoculture in the same medium, over the growth curves of "
+                  "the technique and unit most of them use (other_techniques_left_out counts the rest), leaving out "
+                  "cultures whose values span the whole run where the taxon has others with a phase, and of a "
+                  "duplicate deposit the copy with the poorer growth curve. growth_rates.csv says "
                   "which, per taxon, the method, and fit_start_h and fit_end_h, the earliest first and the latest last "
                   "hour any replicate's fit used, to set beside intervals.csv, and technique, the growth curve's "
                   "measurement (technique, unit, and whether it counts the strain or the whole culture): rates from "

@@ -606,7 +606,9 @@ crm_write <- function(x, dir) {
                    replicates = zero_if_none(as.numeric(rate_field("n"))), source = rate_field("source"),
                    studies = rate_field("studies"), method = rate_field("method"),
                    fit_start_h = fit_hours("fit_start_h"), fit_end_h = fit_hours("fit_end_h"),
-                   technique = rate_field("technique"), stringsAsFactors = FALSE), "growth_rates.csv")
+                   technique = rate_field("technique"),
+                   other_techniques_left_out = as.integer(rate_field("other_techniques_left_out")),
+                   stringsAsFactors = FALSE), "growth_rates.csv")
     if (!is.null(x$decline_rates)) {
         detail <- function(field) vapply(x$taxa, function(t) {
             v <- x$decline_rate_detail[[t]][[field]]
