@@ -411,8 +411,15 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     for (name in PHASE_MATRICES) {
         if (!is.null(x[[name]])) x[[name]] <- x[[name]][keep_t, keep_r, drop = FALSE]
     }
-    for (name in c("growth_rates", PHASE_VECTORS)) {
-        x[[name]] <- x[[name]][keep_t]
+    for (name in c("growth_rates", "decline_rates", PHASE_VECTORS)) {
+        if (!is.null(x[[name]])) x[[name]] <- x[[name]][keep_t]
+    }
+    if (!is.null(x$maintenance)) {
+        x$maintenance <- x$maintenance[x$maintenance$taxon %in% x$taxa[keep_t] &
+                                       x$maintenance$resource %in% x$resources[keep_r], , drop = FALSE]
+    }
+    if (!is.null(x$decline_rate_detail)) {
+        x$decline_rate_detail <- x$decline_rate_detail[intersect(names(x$decline_rate_detail), x$taxa[keep_t])]
     }
     for (ph in names(x$other_phases)) {
         b <- x$other_phases[[ph]]
@@ -549,7 +556,7 @@ crm_readme <- function(x, print = TRUE) {
 #' Write the parameters as files
 #'
 #' The files of foodnet's download, for the phase `x` holds: `consumed.csv`, `produced.csv` and their
-#' `evidence_*.csv`, `growth_rates.csv`, `initial_concentrations.csv`, `biomass.csv`, `intervals.csv` (the
+#' `evidence_*.csv`, `growth_rates.csv`, `decline_rates.csv` and `maintenance.csv` (from foodnet 0.4.1), `initial_concentrations.csv`, `biomass.csv`, `intervals.csv` (the
 #' hours each value was measured over) and `bounds.csv` (each amount's lowest and highest replicate), one row
 #' per cell with a phase column, `chemistry.csv` and `electron_balance.csv` (from foodnet 0.3.0, [crm_chemistry()]
 #' and [crm_electron_balance()], the latter with a phase column), and `README.txt`, which opens with the phase. After [crm_phase()] the
@@ -585,8 +592,25 @@ crm_write <- function(x, dir) {
     put(x$produced, "produced.csv", TRUE)
     put(x$evidence_consumed, "evidence_consumed.csv", TRUE)
     put(x$evidence_produced, "evidence_produced.csv", TRUE)
+    fit_hours <- function(field) vapply(x$taxa, function(t) {
+        v <- x$growth_rate_detail[[t]][[field]]
+        if (is.null(v)) NA_real_ else as.numeric(v)
+    }, numeric(1), USE.NAMES = FALSE)
     put(data.frame(taxon = x$taxa, growth_rate = unname(x$growth_rates), unit = x$growth_rate_unit,
+                   fit_start_h = fit_hours("fit_start_h"), fit_end_h = fit_hours("fit_end_h"),
                    stringsAsFactors = FALSE), "growth_rates.csv")
+    if (!is.null(x$decline_rates)) {
+        detail <- function(field) vapply(x$taxa, function(t) {
+            v <- x$decline_rate_detail[[t]][[field]]
+            if (is.null(v)) NA_character_ else as.character(v)
+        }, character(1), USE.NAMES = FALSE)
+        put(data.frame(taxon = x$taxa, decline_rate = unname(x$decline_rates), unit = "1/h",
+                       se = as.numeric(detail("se")), sd = as.numeric(detail("sd")),
+                       replicates = as.integer(detail("n")), phase = detail("phase"),
+                       start_h = as.numeric(detail("start_h")), end_h = as.numeric(detail("end_h")),
+                       stringsAsFactors = FALSE), "decline_rates.csv")
+    }
+    if (!is.null(x$maintenance)) put(x$maintenance, "maintenance.csv")
     put(data.frame(resource = x$resources, initial_mM = unname(x$initial), stringsAsFactors = FALSE),
         "initial_concentrations.csv")
     put(data.frame(taxon = x$taxa, biomass_start = unname(x$biomass_start),

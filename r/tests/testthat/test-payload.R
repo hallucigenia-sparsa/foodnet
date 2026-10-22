@@ -137,3 +137,50 @@ test_that("printing carries the page's ranking once, not a list of its own", {
     expect_equal(lengths(regmatches(out, gregexpr("tier 1", out))), 1)
     expect_match(out, "x\\$caveats\\$caution_tiers ranks them")
 })
+
+test_that("decline rates are kept per taxon, absent as NA, and written with their scatter", {
+    p <- example_payload()
+    p$decline_rates <- list(0.0069, NULL)
+    p$decline_rate_detail <- list(A = list(rate = 0.0069, unit = "1/h", sd = 0.0034, se = 0.0012, n = 8,
+                                           phase = "plateau", death_replicates = 2, start_h = 14, end_h = 48))
+    x <- foodnet:::as_foodnet_crm(p)
+    expect_equal(unname(x$decline_rates), c(0.0069, NA))
+    expect_match(paste(capture.output(print(x)), collapse = "\n"), "decline rates after the growth peak: 1 of 2")
+    s <- crm_subset(x, taxa = "B")
+    expect_true(is.na(s$decline_rates[["B"]]) && length(s$decline_rate_detail) == 0)
+    dir <- tempfile()
+    crm_write(x, dir)
+    d <- utils::read.csv(file.path(dir, "decline_rates.csv"))
+    expect_equal(d$se[d$taxon == "A"], 0.0012)
+    expect_equal(d$phase[d$taxon == "A"], "plateau")
+    expect_true(is.na(d$decline_rate[d$taxon == "B"]))
+    # a payload from before decline rates reads as none
+    expect_true(all(is.na(foodnet:::as_foodnet_crm(example_payload())$decline_rates)))
+})
+
+test_that("maintenance coefficients are a table of their own, subset and written with the rest", {
+    p <- example_payload()
+    p$maintenance <- list(list(taxon = "A", resource = "glucose", coefficient = 4e-5, unit = "mM per OD per h",
+                               biomass_unit = "OD", sd = 1e-5, se = 6e-6, n = 3, start_h = 12, end_h = 24),
+                          list(taxon = "B", resource = "acetate", coefficient = 0, unit = "mM per OD per h",
+                               biomass_unit = "OD", sd = NULL, se = NULL, n = 1, start_h = 16, end_h = 24))
+    x <- foodnet:::as_foodnet_crm(p)
+    expect_equal(nrow(x$maintenance), 2)
+    expect_true(is.na(x$maintenance$se[2]))
+    expect_match(paste(capture.output(print(x)), collapse = "\n"), "maintenance coefficients on the growth plateau: 2")
+    expect_equal(crm_subset(x, taxa = "A")$maintenance$resource, "glucose")
+    dir <- tempfile()
+    crm_write(x, dir)
+    expect_equal(utils::read.csv(file.path(dir, "maintenance.csv"))$maintenance[1], 4e-5)
+    expect_equal(nrow(foodnet:::as_foodnet_crm(example_payload())$maintenance), 0)
+})
+
+test_that("written growth rates carry the hours their fits used", {
+    p <- example_payload()
+    p$growth_rate_detail <- list(A = list(rate = 0.4, fit_start_h = 2, fit_end_h = 10))
+    dir <- tempfile()
+    crm_write(foodnet:::as_foodnet_crm(p), dir)
+    g <- utils::read.csv(file.path(dir, "growth_rates.csv"))
+    expect_equal(g$fit_start_h, c(2, NA))
+    expect_equal(g$fit_end_h, c(10, NA))
+})

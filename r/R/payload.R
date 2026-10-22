@@ -214,6 +214,13 @@ as_foodnet_crm <- function(payload) {
              growth_rates = rates,
              growth_rate_unit = chr(payload$growth_rate_unit, "1/h"),
              growth_rate_detail = payload$growth_rate_detail,
+             # the decline after each taxon's growth peak (1/h; NA: no usable decline), from foodnet 0.4.1:
+             # scatter, n, phase (death, or plateau: a lower bound) and window in decline_rate_detail
+             decline_rates = per_taxon("decline_rates"),
+             decline_rate_detail = payload$decline_rate_detail,
+             # the Pirt maintenance coefficient on the growth plateau, per taxon and resource (from foodnet
+             # 0.4.1): a separate characteristic no builder here uses
+             maintenance = maintenance_frame(payload$maintenance),
              initial = initial,
              biomass_change = per_taxon("biomass_change"),
              biomass_start = per_taxon("biomass_start"),
@@ -312,6 +319,14 @@ print.foodnet_crm <- function(x, ...) {
                 x$phase, x$values))
     cat(sprintf("  growth rates: %d of %d taxa (%s)\n", sum(!is.na(x$growth_rates)), length(x$taxa),
                 x$growth_rate_unit))
+    if (!is.null(x$maintenance) && nrow(x$maintenance)) {
+        cat(sprintf("  maintenance coefficients on the growth plateau: %d taxon-resource pairs (x$maintenance)\n",
+                    nrow(x$maintenance)))
+    }
+    if (!is.null(x$decline_rates) && any(!is.na(x$decline_rates))) {
+        cat(sprintf("  decline rates after the growth peak: %d of %d taxa (1/h; crm_write() gives their scatter)\n",
+                    sum(!is.na(x$decline_rates)), length(x$taxa)))
+    }
     if (length(x$caveats$media)) {
         cat("  values from: ", paste(x$caveats$media, collapse = " / "), "\n", sep = "")
     }
@@ -448,4 +463,17 @@ summary.foodnet_crm <- function(object, ...) {
                    presence_only = nrow(object$caveats$presence_only),
                    conflicts = length(object$caveats$conflicts),
                    without_a_rate = object$caveats$without_a_rate))
+}
+
+# the maintenance records of crm.json as a data frame (none: zero rows)
+maintenance_frame <- function(records) {
+    num <- function(r, k) if (is.null(r[[k]])) NA_real_ else as.numeric(r[[k]])
+    data.frame(taxon = vapply(records, function(r) chr(r$taxon), character(1)),
+               resource = vapply(records, function(r) chr(r$resource), character(1)),
+               maintenance = vapply(records, num, numeric(1), "coefficient"),
+               unit = vapply(records, function(r) chr(r$unit), character(1)),
+               se = vapply(records, num, numeric(1), "se"), sd = vapply(records, num, numeric(1), "sd"),
+               replicates = vapply(records, num, numeric(1), "n"),
+               start_h = vapply(records, num, numeric(1), "start_h"),
+               end_h = vapply(records, num, numeric(1), "end_h"), stringsAsFactors = FALSE)
 }

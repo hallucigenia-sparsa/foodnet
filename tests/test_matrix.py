@@ -106,9 +106,10 @@ def test_the_crm_package_holds_every_file(client):
     r = run(client, report_rates=True)
     z = zipfile.ZipFile(io.BytesIO(matrix.crm_package(r)))
     assert sorted(z.namelist()) == ["README.txt", "biomass.csv", "bounds.csv", "cautions.csv", "chemistry.csv",
-                                    "consumed.csv", "crm.json", "electron_balance.csv", "evidence_consumed.csv",
+                                    "consumed.csv", "crm.json", "decline_rates.csv", "electron_balance.csv",
+                                    "evidence_consumed.csv",
                                     "evidence_produced.csv", "growth_rates.csv", "initial_concentrations.csv",
-                                    "intervals.csv", "produced.csv"]
+                                    "intervals.csv", "maintenance.csv", "produced.csv"]
 
 
 def test_the_crm_payload_carries_each_taxons_growth_over_the_phase(client):
@@ -251,3 +252,42 @@ def test_booleans_give_no_bounds(client):
     r = run(client, report_rates=True, booleans=True)
     p = matrix.crm_payload(r)
     assert all(v is None for row in p["produced_lower"] for v in row)
+
+
+def test_the_crm_readme_says_over_which_interval_the_growth_rates_are_fitted(client):
+    # Karoline, 2026-10-22: "it is not entirely clear over which interval the growth rates are computed"
+    text = matrix.readme(run(client, report_rates=True), "crm")
+    assert "whole growth curve" in text and "steepest stretch of 5 consecutive samples" in text
+    assert "not over the phase or time window" in text
+    assert "Baranyi-Roberts model fitted from the first sample to the end of the curve's plateau" in \
+        matrix.readme(run(client, report_rates=True, rate_method="baranyi"), "crm")
+
+
+def test_each_growth_rate_says_over_which_hours_it_was_fitted(client):
+    # Karoline, 2026-10-22: "add fit_start_h and fit_end_h"
+    from foodnet import rates
+    # with a window of 3, the stretches from 0 h and from 4 h both rise by a factor 10 per 4 h, the one from 8 h
+    # less: the line is fitted from 0 h to 12 h
+    rate, start, end = rates.easylinear_fit([0, 4, 8, 12, 24, 36], [1, 10, 100, 1000, 1000, 1000], 3)
+    assert rate == pytest.approx(rates.easylinear([0, 4, 8, 12, 24, 36], [1, 10, 100, 1000, 1000, 1000], 3))
+    assert (start, end) == (0, 12)
+    r = run(client, report_rates=True, rate_window=3)
+    table = matrix.rates_csv(r).splitlines()
+    assert table[0].endswith("method,fit_start_h,fit_end_h")
+    alpha = next(row for row in table if row.startswith("Alpha alpha A1")).split(",")
+    assert (float(alpha[-2]), float(alpha[-1])) == (0, 12)
+    from foodnet.report import report_text
+    assert "fitted over 0 h to 12 h" in report_text(r)
+
+
+def test_both_readmes_say_where_the_numbers_come_from(client):
+    # Karoline, 2026-10-22: "is it clear how the other information in the crm output was obtained from mGrowthDB
+    # and ChEBI?"
+    r = run(client, report_rates=True)
+    crm_text, matrices_text = matrix.readme(r, "crm"), matrix.readme(r, "matrices")
+    for text in (crm_text, matrices_text):
+        assert "Where the numbers come from:" in text and "mgrowthdb.gbiomed.kuleuven.be/api" in text
+        assert "batch monocultures" in text and "per-strain measurement before the culture-level one" in text
+    assert "only each resource's formula and charge" in crm_text
+    assert "formula and charge" not in matrices_text.split("Where the numbers come from:")[1]
+    assert "mGrowthDB's own reported growth rates are not used" in crm_text

@@ -121,6 +121,74 @@
  ],
  "growth_rate_unit": "1/h",
  "growth_rate_detail": {},
+ "decline_rates": [
+  null,
+  null,
+  null
+ ],
+ "decline_rate_detail": {},
+ "maintenance": [
+  {
+   "taxon": "Alpha alpha A1",
+   "resource": "acetate",
+   "coefficient": -7.500000000000002e-05,
+   "unit": "mM per fc per h",
+   "biomass_unit": "fc",
+   "sd": 8.333333333333357e-06,
+   "se": 4.811252243246895e-06,
+   "n": 3,
+   "start_h": 12.0,
+   "end_h": 24.0,
+   "studies": [
+    "SMGDB00000001"
+   ]
+  },
+  {
+   "taxon": "Alpha alpha A1",
+   "resource": "glucose",
+   "coefficient": 8.333333333333336e-05,
+   "unit": "mM per fc per h",
+   "biomass_unit": "fc",
+   "sd": 8.333333333333324e-06,
+   "se": 4.811252243246876e-06,
+   "n": 3,
+   "start_h": 12.0,
+   "end_h": 24.0,
+   "studies": [
+    "SMGDB00000001"
+   ]
+  },
+  {
+   "taxon": "Beta beta B1",
+   "resource": "butyrate",
+   "coefficient": 0.0,
+   "unit": "mM per od per h",
+   "biomass_unit": "od",
+   "sd": 0.0,
+   "se": 0.0,
+   "n": 2,
+   "start_h": 16.0,
+   "end_h": 24.0,
+   "studies": [
+    "SMGDB00000001"
+   ]
+  },
+  {
+   "taxon": "Beta beta B1",
+   "resource": "glucose",
+   "coefficient": 0.0,
+   "unit": "mM per od per h",
+   "biomass_unit": "od",
+   "sd": 0.0,
+   "se": 0.0,
+   "n": 2,
+   "start_h": 16.0,
+   "end_h": 24.0,
+   "studies": [
+    "SMGDB00000001"
+   ]
+  }
+ ],
  "initial_concentrations": [
   0.0,
   0.0,

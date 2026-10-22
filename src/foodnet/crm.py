@@ -33,7 +33,8 @@ FROM_SAME_MEDIUM = "another monoculture in the same medium"
 
 
 def _rate_values(cultures, method: str, spike_factor: float, skipped: list) -> list:
-    feature = rates.feature(method)
+    """[(rate, first hour, last hour the fit used)] of the cultures' growth curves."""
+    feature = rates.fitted(method)
     values = []
     for c in cultures:
         if c.growth is None:
@@ -42,12 +43,12 @@ def _rate_values(cultures, method: str, spike_factor: float, skipped: list) -> l
             skipped.append((c.label, "growth curve spikes; no growth rate from it"))
             continue
         try:
-            value = feature(c.growth["times"], c.growth["values"])
+            value, start, end = feature(c.growth["times"], c.growth["values"])
         except rates.RateUnavailable as e:
             skipped.append((c.label, f"no growth rate: {e}"))
             continue
         if value > 0:
-            values.append(value)
+            values.append((value, start, end))
         else:
             skipped.append((c.label, f"non-positive growth rate ({value:g})"))
     return values
@@ -77,13 +78,136 @@ def growth_rates(taxa, value_cultures, other_cultures, value_keys, ignore_media:
             values = _rate_values(others.get(taxon, []), method, spike_factor, skipped)
             source, used = FROM_SAME_MEDIUM, others.get(taxon, [])
         if values:
-            found[taxon] = {"rate": statistics.median(values), "unit": "1/h", "n": len(values), "source": source,
-                            "studies": sorted({c.study for c in used}), "method": method}
+            # the hours the fits used, the replicates' mean, to set beside the values' intervals (Karoline,
+            # 2026-10-22: "add fit_start_h and fit_end_h")
+            found[taxon] = {"rate": statistics.median(v for v, _, _ in values), "unit": "1/h", "n": len(values),
+                            "source": source, "studies": sorted({c.study for c in used}), "method": method,
+                            "fit_start_h": statistics.mean(a for _, a, _ in values),
+                            "fit_end_h": statistics.mean(b for _, _, b in values)}
         elif by_taxon.get(taxon) or others.get(taxon):
             missing[taxon] = "its growth curves in this medium give no rate (see the report)"
         else:
             missing[taxon] = "no growth curve of it in this medium"
     return found, missing, skipped
+
+
+def _declines(cultures, spike_factor: float, skipped: list) -> list:
+    found = []
+    for c in cultures:
+        if c.growth is None or spike(c.growth["values"], spike_factor):
+            continue                                    # a spiking curve is already named for its growth rate
+        try:
+            found.append({**rates.decline(c.growth["times"], c.growth["values"]), "study": c.study})
+        except rates.RateUnavailable as e:
+            skipped.append((c.label, f"no decline rate: {e}"))
+    return found
+
+
+def summarize_declines(found: list, source: str) -> dict:
+    """One taxon's decline rate from its replicates' (`rates.decline`): the mean, its scatter (standard deviation
+    and standard error) and n, so a real drift can be told from noise; `phase` is "death" where most replicates
+    leave their plateau before the last sample, else "plateau" (a lower bound); the window is the replicates'
+    mean peak and last sample."""
+    values = [f["rate"] for f in found]
+    sd = statistics.stdev(values) if len(values) > 1 else None
+    deaths = sum(1 for f in found if f["death"])
+    return {"rate": statistics.mean(values), "unit": "1/h", "sd": sd,
+            "se": None if sd is None else sd / math.sqrt(len(values)), "n": len(values),
+            "phase": "death" if 2 * deaths > len(values) else "plateau", "death_replicates": deaths,
+            "start_h": statistics.mean(f["start"] for f in found), "end_h": statistics.mean(f["end"] for f in found),
+            "source": source, "studies": sorted({f["study"] for f in found}), "replicates": found}
+
+
+def decline_rates(taxa, value_cultures, other_cultures, value_keys, ignore_media: bool = False,
+                  spike_factor: float = SPIKE_FACTOR) -> tuple:
+    """({taxon: decline rate (summarize_declines)}, {taxon: why there is none}, skipped): the decline after each
+    taxon's growth peak, from cultures in the same order as its growth rate (the replicates with metabolite
+    data, else another monoculture in the same medium). A taxon without one is absent, never 0."""
+    skipped = []
+    by_taxon = defaultdict(list)
+    for c in value_cultures:
+        by_taxon[c.taxon["id"]].append(c)
+    others = defaultdict(list)
+    for c in other_cultures:
+        if ignore_media or c.medium_key in value_keys:
+            others[c.taxon["id"]].append(c)
+    found, missing = {}, {}
+    for taxon in taxa:
+        declines, source = _declines(by_taxon.get(taxon, []), spike_factor, skipped), FROM_METABOLITE_REPLICATES
+        if not declines:
+            declines, source = _declines(others.get(taxon, []), spike_factor, skipped), FROM_SAME_MEDIUM
+        if declines:
+            found[taxon] = summarize_declines(declines, source)
+        elif by_taxon.get(taxon) or others.get(taxon):
+            missing[taxon] = "its growth curves in this medium give no usable decline (see the report)"
+        else:
+            missing[taxon] = "no growth curve of it in this medium"
+    return found, missing, skipped
+
+
+def _curve_unit(growth: dict) -> str:
+    technique, curve_unit = growth.get("technique") or "", growth.get("unit") or ""
+    return technique if curve_unit.casefold() in ("", technique.casefold()) else f"{technique} {curve_unit}"
+
+
+def _mean_biomass(times, values, start: float, end: float) -> float:
+    """The curve's time average from `start` to `end` (both sample times), by the trapezoid rule."""
+    pts = [(t, v) for t, v in zip(times, values, strict=True) if start <= t <= end]
+    area = sum((t1 - t0) * (v0 + v1) / 2 for (t0, v0), (t1, v1) in zip(pts, pts[1:], strict=False))
+    return area / (end - start)
+
+
+def maintenance(value_cultures, limit: float, limits: dict | None = None,
+                spike_factor: float = SPIKE_FACTOR) -> tuple:
+    """({taxon: {metabolite: summary}}, skipped): the Pirt maintenance coefficient, a separate characteristic
+    for a fit to use or not (Karoline, 2026-10-09): what each culture took up of a compound per unit of biomass
+    per hour while it sat on its growth plateau (`rates.plateau`), where it no longer grew. Per culture: the
+    compound's fall over the plateau (a change within its detection limit is 0, "zeros are zeros"), over the
+    curve's mean biomass there and the plateau's hours; positive is uptake, negative release. Only a compound
+    sampled at or before the plateau's start and at or after its end counts. Per taxon and compound: the mean
+    over its cultures in the unit most of them use, with standard deviation, standard error, n and the mean
+    window; the biomass is in that curve unit, so the coefficient is mM per unit per hour."""
+    skipped, found = [], defaultdict(lambda: defaultdict(list))
+    for c in value_cultures:
+        if c.growth is None or spike(c.growth["values"], spike_factor):
+            continue
+        try:
+            start, end = rates.plateau(c.growth["times"], c.growth["values"])
+        except rates.RateUnavailable as e:
+            skipped.append((c.label, f"no maintenance coefficient: {e}"))
+            continue
+        biomass = _mean_biomass(c.growth["times"], c.growth["values"], start, end)
+        if biomass <= 0:
+            continue
+        for mid, met in c.metabolites.items():
+            series = met["series"]
+            if not series or series[0][0] > start or series[-1][0] < end:
+                continue
+            fall = value_at(series, start)[0] - value_at(series, end)[0]
+            if abs(fall) < (limits or {}).get(mid, limit):
+                fall = 0.0
+            found[c.taxon["id"]][mid].append({"value": fall / biomass / (end - start), "unit": _curve_unit(c.growth),
+                                              "start": start, "end": end, "study": c.study})
+    return summarize_maintenance(found), skipped
+
+
+def summarize_maintenance(found: dict) -> dict:
+    """{taxon: {metabolite: summary}} from {taxon: {metabolite: [per-culture entries]}} (see `maintenance`)."""
+    out = {}
+    for taxon, by_met in found.items():
+        for mid, entries in by_met.items():
+            units = [e["unit"] for e in entries]
+            unit = max(set(units), key=units.count)
+            same = [e for e in entries if e["unit"] == unit]
+            values = [e["value"] for e in same]
+            sd = statistics.stdev(values) if len(values) > 1 else None
+            out.setdefault(taxon, {})[mid] = {
+                "coefficient": statistics.mean(values), "unit": f"mM per {unit or 'biomass unit'} per h",
+                "biomass_unit": unit, "sd": sd, "se": None if sd is None else sd / math.sqrt(len(values)),
+                "n": len(values), "start_h": statistics.mean(e["start"] for e in same),
+                "end_h": statistics.mean(e["end"] for e in same), "studies": sorted({e["study"] for e in same}),
+                "cultures": entries}
+    return out
 
 
 def initial_concentrations(value_cultures) -> dict:

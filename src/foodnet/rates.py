@@ -73,6 +73,12 @@ def _line(xs, ys):
 
 def easylinear(times, values, window: int = DEFAULT_WINDOW, quota: float = QUOTA) -> float:
     """The maximum specific growth rate by growthrates' fit_easylinear (see the module docstring)."""
+    return easylinear_fit(times, values, window, quota)[0]
+
+
+def easylinear_fit(times, values, window: int = DEFAULT_WINDOW, quota: float = QUOTA) -> tuple:
+    """(rate, first hour, last hour of the stretch the final line is fitted over), by fit_easylinear; the hours
+    are None when no stretch rises."""
     if window < 2:
         raise ValueError(f"the growth rate window must hold at least 2 points, not {window}")
     xs, ys = _positive_logs(times, values)
@@ -93,11 +99,11 @@ def easylinear(times, values, window: int = DEFAULT_WINDOW, quota: float = QUOTA
         # window at all (0.95 of a negative slope lies above it). Returned as it is, so the caller treats it
         # as any non-positive property (code review of 2026-09-28: it raised a bare ValueError that dropped
         # the whole comparison, SMGDB00000014)
-        return best
+        return best, None, None
     candidates = [i for i, s in enumerate(slopes) if s >= quota * best]
     first, last = min(candidates), max(candidates) + window
     fit = _line(xs[first:last], ys[first:last])
-    return fit[0]
+    return fit[0], xs[first], xs[last - 1]
 
 
 # ---- Baranyi-Roberts --------------------------------------------------------------------------------
@@ -199,6 +205,11 @@ def _fit_once(times, logs, params, max_iter=200):
 def baranyi(times, values) -> float:
     """The Baranyi-Roberts maximum specific growth rate, guarded, fitted up to the end of the plateau after the
     curve's maximum (see the module docstring)."""
+    return baranyi_fit(times, values)[0]
+
+
+def baranyi_fit(times, values) -> tuple:
+    """(rate, first hour, last hour the model was fitted over: the first sample to the end of the plateau)."""
     xs, ys = _positive_logs(times, values)
     xs, ys = _until_decline(xs, ys)
     if len(xs) < BARANYI_MIN_POINTS:
@@ -235,7 +246,48 @@ def baranyi(times, values) -> float:
     if not r2 >= BARANYI_MIN_R2:
         raise RateUnavailable(f"Baranyi fit rejected: R2 {r2:.2f} below {BARANYI_MIN_R2}; the model does not "
                               "describe this curve up to the end of its plateau (for example two growth phases)")
-    return math.exp(best[0][1])
+    return math.exp(best[0][1]), xs[0], xs[-1]
+
+
+DECLINE_MIN_POINTS = 3      # the peak and two samples after it: a slope, not a step
+
+
+def decline(times, values) -> dict:
+    """The sustained decline after a growth curve's peak (Karoline, 2026-10-09, for the biomass loss rate of a
+    consumer-resource fit): the least-squares slope of log abundance from the peak (the highest sample) to the
+    last sample, as a rate of loss per hour (positive: the curve falls; negative: it still creeps up), with
+    that window. `death` says whether the curve leaves its plateau (falls below it by the rule the Baranyi fit
+    cuts at, PLATEAU) before the last sample: then the rate measures a death phase; otherwise the curve stays on
+    its plateau, where birth and death are confounded, so the rate bounds death from below. A decline rate, not
+    a maintenance rate: what it bounds is the user's inference. RateUnavailable when there is no usable decline
+    (the peak too close to the end)."""
+    xs, ys = _positive_logs(times, values)
+    if not ys:
+        raise RateUnavailable("no positive values")
+    peak = ys.index(max(ys))
+    tail_x, tail_y = xs[peak:], ys[peak:]
+    if len(tail_x) < DECLINE_MIN_POINTS:
+        raise RateUnavailable(f"fewer than {DECLINE_MIN_POINTS} samples from the peak to the last sample")
+    fit = _line(tail_x, tail_y)
+    if fit is None:
+        raise RateUnavailable("the samples after the peak share one time")
+    plateau_x, _ = _until_decline(xs, ys)
+    return {"rate": -fit[0], "start": tail_x[0], "end": tail_x[-1], "points": len(tail_x),
+            "death": len(plateau_x) < len(xs)}
+
+
+def plateau(times, values) -> tuple:
+    """(start, end) of a growth curve's plateau: from its peak (the highest sample) to the last sample still
+    within the plateau band (PLATEAU, the rule `decline` and the Baranyi fit use). RateUnavailable when the
+    curve has no sample on its plateau after the peak."""
+    xs, ys = _positive_logs(times, values)
+    if not ys:
+        raise RateUnavailable("no positive values")
+    peak = ys.index(max(ys))
+    kept_x, _ = _until_decline(xs, ys)
+    if len(kept_x) - 1 <= peak:
+        raise RateUnavailable("no sample on the plateau after the peak")
+    return xs[peak], kept_x[-1]
 
 
 def method_name(rate_method: str = DEFAULT_METHOD, window: int = DEFAULT_WINDOW) -> str:
@@ -243,6 +295,18 @@ def method_name(rate_method: str = DEFAULT_METHOD, window: int = DEFAULT_WINDOW)
     if rate_method not in METHODS:
         raise ValueError(f"unknown growth rate method {rate_method!r}; choose one of {METHODS}")
     return f"growth_rate:easylinear:{int(window)}" if rate_method == "easylinear" else "growth_rate:baranyi"
+
+
+def fitted(name: str):
+    """The (times, values) -> (rate, first hour, last hour fitted over) function a metric name stands for."""
+    parts = name.split(":")
+    kind = parts[1] if len(parts) > 1 else DEFAULT_METHOD
+    if parts[0] == "growth_rate" and kind == "baranyi" and len(parts) == 2:
+        return baranyi_fit
+    if parts[0] == "growth_rate" and kind == "easylinear" and len(parts) <= 3:
+        window = int(parts[2]) if len(parts) == 3 else DEFAULT_WINDOW
+        return lambda times, values: easylinear_fit(times, values, window)
+    raise ValueError(f"unknown growth rate metric {name!r}")
 
 
 def feature(name: str):

@@ -153,7 +153,9 @@ it `presence_only` either way. With Both, each metabolite has a column per phase
 ## Consumer-resource models in R
 
 CRM mode collects growth rates: from the replicates whose metabolites gave the values, else from another
-monoculture in the same medium. Get CRM parameters then downloads the matrices, the growth rates, the
+monoculture in the same medium, each fitted to a replicate's whole growth curve (easylinear's steepest stretch,
+or Baranyi up to the end of the plateau), not over the phase or time window the values cover.
+Get CRM parameters then downloads the matrices, the growth rates, the
 initial medium concentrations, each taxon's biomass change over the phase, the hours each value was measured
 over (`intervals.csv`), each amount's lowest and highest replicate (`bounds.csv`), each resource's formula
 and degree of reduction (`chemistry.csv`, from [ChEBI](https://www.ebi.ac.uk/chebi), CC BY 4.0, whose public
@@ -163,6 +165,14 @@ value and has no expected side of 1: unmeasured substrates, unmeasured products 
 so 1 minus it is no biomass yield; it is withheld when a resource the taxon consumed or produced has no
 degree of reduction, when what it took up is within the assays' detection limits (it then says what the
 share is at least), or when it lies outside its own cultures' range.
+CRM mode also gives each taxon's decline rate after its growth peak (`decline_rates.csv`): the loss of log
+abundance per hour from the peak to the last sample, the mean over the same kind of replicates as its growth
+rate, with standard error, standard deviation, n and that window, and whether it measures a death phase (the
+curves leave their plateau) or a plateau (a lower bound on death). Without a usable decline it is NA, not 0.
+Separately, it gives the Pirt maintenance coefficient (`maintenance.csv`), which nothing else uses: what each
+taxon took up of each compound per unit of biomass per hour on its growth plateau (from its peak to the last
+sample within the plateau band), with standard error, standard deviation, n and that window, in the growth
+curve's unit.
 With the phase choice Both, the stationary phase (what changed after the end of exponential growth) comes
 too, beside the exponential one. Install the companion package once, at the version of your foodnet (the
 page and the help print the line for yours, which names the release), and miaSim for the simulations:
@@ -220,7 +230,25 @@ foodnet derive --taxa Blautia Roseburia --conditions "Wilkins-Chalgren" --crm-mo
 foodnet validate network.json
 ```
 
-`foodnet derive --help` lists every option, with examples.
+Commands: `derive` (search mGrowthDB and write the results), `validate` (check a network JSON against the
+schema), `schema` (write the schema), `style` (write the Cytoscape style) and `gui` (open the local page).
+
+`derive` writes up to two kinds of result, and both can be asked for in one command:
+
+- `--out FILE` writes what `--format` names: the network as JSON (the default; with `--crm-mode` it also holds
+  the growth rates and initial concentrations) or GraphML, the signed matrix (`matrix`, CSV), or the matrices
+  zip (`matrices`: `consumed.csv`, `produced.csv` and their `evidence_*.csv` for every phase searched,
+  `signed.csv`, `cautions.csv`, `matrices.svg`, `README.txt`).
+- `--crm FILE` (needs `--crm-mode`) writes the CRM parameters zip: `consumed.csv`, `produced.csv` and their
+  evidence for the CRM's phase only (with `--phase both`, the stationary phase in `*_stationary.csv` files),
+  `cautions.csv`, `growth_rates.csv`, `decline_rates.csv`, `maintenance.csv`, `initial_concentrations.csv`,
+  `biomass.csv`, `intervals.csv`, `bounds.csv`, `chemistry.csv`, `electron_balance.csv`, `crm.json` and
+  `README.txt`.
+
+So the matrices, their evidence and `cautions.csv` are in both zips; with one phase they are the same tables.
+`--report`, `--figure` and `--rates` write the report, the figure and `growth_rates.csv` on their own.
+The page's help (The command line) lists every command and option with what each does, as
+`foodnet derive --help` does.
 
 ## Guardrails
 

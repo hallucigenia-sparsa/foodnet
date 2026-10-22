@@ -336,12 +336,59 @@ def rates_csv(result: dict) -> str:
     for t in taxa_rows(net, result):
         r = result["rates"].get(t.id)
         if r:
+            hours = [NA if r.get(k) is None else f"{r[k]:.6g}" for k in ("fit_start_h", "fit_end_h")]
             rows.append([t.name, f"{r['rate']:.6g}", r["unit"], r["n"], r["source"], " ".join(r["studies"]),
-                         r["method"]])
+                         r["method"], *hours])
         else:
-            rows.append([t.name, NA, "1/h", 0, result["without_a_rate"].get(t.id, ""), "", ""])
+            rows.append([t.name, NA, "1/h", 0, result["without_a_rate"].get(t.id, ""), "", "", NA, NA])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
-    return _csv([first, "growth_rate", "unit", "replicates", "source", "studies", "method"], rows)
+    return _csv([first, "growth_rate", "unit", "replicates", "source", "studies", "method", "fit_start_h",
+                 "fit_end_h"], rows)
+
+
+def declines_csv(result: dict) -> str:
+    """Each taxon's decline after its growth peak (foodnet.crm.decline_rates): absent (NA, with why), never 0."""
+    net = result["network"]
+    declines, missing = result.get("declines") or {}, result.get("without_a_decline") or {}
+    rows = []
+    for t in taxa_rows(net, result):
+        r = declines.get(t.id)
+        if r:
+            rows.append([t.name, f"{r['rate']:.6g}", r["unit"], NA if r["se"] is None else f"{r['se']:.6g}",
+                         NA if r["sd"] is None else f"{r['sd']:.6g}", r["n"], r["phase"], r["death_replicates"],
+                         f"{r['start_h']:.6g}", f"{r['end_h']:.6g}", r["source"], " ".join(r["studies"])])
+        else:
+            rows.append([t.name, NA, "1/h", NA, NA, 0, "", "", NA, NA, missing.get(t.id, ""), ""])
+    first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
+    return _csv([first, "decline_rate", "unit", "se", "sd", "replicates", "phase", "death_replicates",
+                 "start_h", "end_h", "source", "studies"], rows)
+
+
+def maintenance_csv(result: dict) -> str:
+    """The Pirt maintenance coefficient per taxon and compound (foodnet.crm.maintenance): a separate
+    characteristic, one row per taxon and compound measured over a growth plateau."""
+    net = result["network"]
+    names = result.get("names") or {}
+    found = result.get("maintenance") or {}
+    rows = []
+    for t in taxa_rows(net, result):
+        for mid, m in sorted((found.get(t.id) or {}).items(), key=lambda kv: names.get(kv[0], kv[0])):
+            rows.append([t.name, names.get(mid, mid), f"{m['coefficient']:.6g}", m["unit"],
+                         NA if m["se"] is None else f"{m['se']:.6g}", NA if m["sd"] is None else f"{m['sd']:.6g}",
+                         m["n"], f"{m['start_h']:.6g}", f"{m['end_h']:.6g}", " ".join(m["studies"])])
+    first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
+    return _csv([first, "resource", "maintenance", "unit", "se", "sd", "replicates", "start_h", "end_h",
+                 "studies"], rows)
+
+
+def maintenance_payload(result: dict) -> list:
+    """maintenance_csv's rows as records for crm.json and R."""
+    names = result.get("names") or {}
+    found = result.get("maintenance") or {}
+    return [{"taxon": t.name, "resource": names.get(mid, mid),
+             **{k: v for k, v in m.items() if k != "cultures"}}
+            for t in taxa_rows(result["network"], result)
+            for mid, m in sorted((found.get(t.id) or {}).items(), key=lambda kv: names.get(kv[0], kv[0]))]
 
 
 def initial_csv(result: dict) -> str:
@@ -518,6 +565,43 @@ def provenance_lines(meta: dict) -> list:
     return lines
 
 
+def sources_lines(result: dict, which: str = "matrices") -> list:
+    """Where each number comes from: which mGrowthDB records, which ChEBI fields, and what foodnet computes from
+    them (Karoline, 2026-10-22: "is it clear how the other information in the crm output was obtained from
+    mGrowthDB and ChEBI?")."""
+    from .chemistry import SOURCE as CHEBI
+    from .mgrowthdb import MGROWTHDB_API
+    lines = ["Where the numbers come from:",
+             f"  * mGrowthDB ({MGROWTHDB_API}): each study's experiments that are "
+             + ("monocultures (one strain; chemostats and serial dilutions included, as asked"
+                if result["settings"].get("include_non_batch") else
+                "batch monocultures (one strain; chemostats and serial dilutions left out")
+             + "; replicates that are averages of others left out; all reported), and "
+             "per bioreplicate its measurement series: the metabolite concentrations, in mM as mGrowthDB serves "
+             "them (other concentration units converted by foodnet, anything else left out), and its growth curve.",
+             "  * The growth curve of a replicate: a per-strain measurement before the culture-level one, and cell "
+             "counts before optical density (flow cytometry, qPCR, plate counts, CFU, 16S in absolute units, then "
+             "OD); the first that gives an end of exponential growth is used. Its technique and unit name the "
+             "unit of the biomass.",
+             "  * Compounds are mGrowthDB's metabolite records; an acid and its conjugate base (acetic acid and "
+             "acetate) are joined as one pool under the base's ChEBI id.",
+             "  * Computed by foodnet from the metabolite series: the amounts and their evidence, cautions.csv"
+             + (", intervals.csv, bounds.csv and initial_concentrations.csv (each culture's first sample)."
+                if which == "crm" else ".")]
+    if which == "crm":
+        lines += ["  * Computed by foodnet from the growth curves: growth_rates.csv, decline_rates.csv and "
+                  "biomass.csv; from both: maintenance.csv. mGrowthDB's own reported growth rates are not used.",
+                  f"  * {CHEBI}: only each resource's formula and charge, read live in CRM mode by its ChEBI id; "
+                  "the carbon atoms, the degree of reduction (chemistry.csv) and the electron balance "
+                  "(electron_balance.csv, from the amounts and the degrees of reduction) are computed by foodnet."]
+    studies = ((result["network"].meta.get("data") or {}).get("studies") or {})
+    if studies:
+        lines.append("  * Studies read, with the uploadedAt mGrowthDB gave (it changes when a study is submitted "
+                     "again): " + ", ".join(f"{sid} ({v.get('uploaded_at') or 'no uploadedAt'})"
+                                            for sid, v in sorted(studies.items())) + ".")
+    return lines + [""]
+
+
 def readme(result: dict, which: str = "matrices") -> str:
     net = result["network"]
     s = result["settings"]
@@ -609,12 +693,35 @@ def readme(result: dict, which: str = "matrices") -> str:
         if items:
             lines += [title, *(f"  * {x}" for x in items), ""]
     if which == "crm":
-        lines += ["Growth rates: each taxon's maximum specific growth rate in monoculture (1/h), the median over "
-                  "the replicates whose metabolites gave the values, or else over another monoculture in the same "
-                  "medium. growth_rates.csv says which, per taxon. A taxon without a rate needs one from elsewhere.",
+        settings = result["settings"]
+        fit = (f"easylinear, the steepest stretch of {settings.get('rate_window', 5)} consecutive samples anywhere "
+               "on the curve, widened over the neighbouring stretches whose slope reaches 95% of it"
+               if settings.get("rate_method", "easylinear") == "easylinear" else
+               "baranyi, the Baranyi-Roberts model fitted from the first sample to the end of the curve's plateau")
+        lines += ["Growth rates: each taxon's maximum specific growth rate in monoculture (1/h), fitted to each "
+                  f"replicate's whole growth curve by {fit}, so over the interval the fit finds, not over the "
+                  "phase or time window the values cover; then the median over the replicates whose metabolites "
+                  "gave the values, or else over another monoculture in the same medium. growth_rates.csv says "
+                  "which, per taxon, the method, and fit_start_h and fit_end_h, the replicates' mean first and last "
+                  "hour of the stretch the fit used, to set beside intervals.csv. A taxon without a rate needs one "
+                  "from elsewhere. crm.json also "
+                  "holds each taxon's mean growth rate over the CRM's own phase (phase_growth_rates, from "
+                  "biomass.csv); a maximum rate below it means the fit took in the plateau.",
                   *(["Entries seen only in another medium were set to TRUE in the matrices; a CRM needs amounts, "
                      "so they are missing here (their evidence says presence_only)."]
                     if presence_entries(result) == "true" else []),
+                  "Decline rates: each taxon's loss of log abundance per hour from its growth peak to its last "
+                  "sample, the mean over the same kind of replicates as its growth rate, with standard error, "
+                  "standard deviation and n (decline_rates.csv). phase says whether most curves leave their "
+                  "plateau (death: the rate measures a death phase) or stay on it (plateau: birth and death are "
+                  "confounded, so it bounds death from below); start_h and end_h are the window. A taxon without a "
+                  "usable decline is NA, not 0.",
+                  "Maintenance (maintenance.csv): the Pirt maintenance coefficient, a separate characteristic "
+                  "nothing else here uses: what each taxon took up of a compound per unit of biomass per hour while "
+                  "its culture sat on its growth plateau (from its peak to the last sample within the plateau "
+                  "band), the mean over its replicates with standard error, standard deviation, n and that window; "
+                  "positive is uptake, negative release; a change within the detection limit is 0. The biomass is "
+                  "in the growth curve's unit, which the unit column names.",
                   "Initial concentrations: each metabolite's concentration at the first sample of the value-medium "
                   "cultures, averaged (initial_concentrations.csv), in mM.",
                   "Biomass: each taxon's growth over the same phase, from its growth curve, in that curve's unit "
@@ -695,6 +802,7 @@ def readme(result: dict, which: str = "matrices") -> str:
                   "measured biomass and makes its measured by-products; crm_backcheck() simulates each taxon alone "
                   "and says how close it comes. foodnet measures no Monod constants, and miaSim's uptake of each "
                   "resource follows them: choose them, and check them with crm_backcheck().", ""]
+    lines += sources_lines(result, which)
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -930,6 +1038,15 @@ def crm_payload(result: dict) -> dict:
         "growth_rates": rates, "growth_rate_unit": "1/h",
         "growth_rate_detail": {pair["taxa"][i]: result["rates"][t.id] for i, t in enumerate(taxa)
                                if t.id in result["rates"]},
+        # the decline after each taxon's growth peak (1/h; None: no usable decline), a biomass loss rate for a
+        # fit, with its scatter, n, phase (death, or plateau: a lower bound) and window (Karoline, 2026-10-09)
+        "decline_rates": [(result.get("declines") or {}).get(t.id, {}).get("rate") for t in taxa],
+        "decline_rate_detail": {pair["taxa"][i]: {k: v for k, v in result["declines"][t.id].items()
+                                                  if k != "replicates"}
+                                for i, t in enumerate(taxa) if t.id in (result.get("declines") or {})},
+        # the Pirt maintenance coefficient on the growth plateau per taxon and compound, a separate
+        # characteristic nothing else uses (mM per biomass unit per h; positive: uptake)
+        "maintenance": maintenance_payload(result),
         "initial_concentrations": initial, "initial_unit": "mM",
         # each resource's formula, charge, carbon atoms and degree of reduction, from ChEBI (None: not in CRM mode)
         "resource_chemistry": chemistry_of(result, mets), "chemistry_source": result.get("chemistry_source"),
@@ -995,6 +1112,8 @@ def crm_package(result: dict) -> bytes:
                        _matrix_csv(pair["taxa"], pair["columns"], pair[f"evidence_{direction}"], str,
                                    first=corner(result)))
         z.writestr("growth_rates.csv", rates_csv(result))
+        z.writestr("decline_rates.csv", declines_csv(result))
+        z.writestr("maintenance.csv", maintenance_csv(result))
         z.writestr("initial_concentrations.csv", initial_csv(result))
         z.writestr("biomass.csv", biomass_csv(result))
         z.writestr("intervals.csv", intervals_csv(result))

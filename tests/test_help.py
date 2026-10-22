@@ -96,3 +96,40 @@ def test_no_legend_line_runs_past_the_picture():
     import re
     for line in re.findall(r"<text [^>]*>([^<]*)</text>", legend.legend_svg()):
         assert len(html.unescape(line)) <= legend.LINE, line
+
+
+def test_the_help_documents_every_command_line_option():
+    # Karoline, 2026-10-22: "The help should document all the options of the command line"
+    import argparse
+
+    from foodnet.__main__ import build_parser
+    page = help_page.render_help("T", {}, ("A",))
+    section = page[page.index('id="cli"'):]
+    sub = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
+    for name, parser in sub.choices.items():
+        assert f"{name}</code>:" in section, name
+        for action in parser._actions:
+            for flag in action.option_strings:
+                if flag not in ("-h", "--help"):
+                    assert f"<dt><code>{flag}" in section or f", {flag}" in section, (name, flag)
+            if action.help is None and action.dest != "help":
+                raise AssertionError(f"{name} {action.dest} has no help text")
+
+
+def test_the_help_names_every_file_of_both_zips_and_where_it_comes_from(client):
+    # Karoline, 2026-10-22: "it's not clear which results go into the out.zip and which go into the crm.zip"
+    import io
+    import zipfile
+
+    from conftest import run
+
+    from foodnet import matrix
+    r = run(client, report_rates=True)
+    documented = {}
+    for names, where, _ in help_page.CLI_FILES:
+        for n in names.split(", "):
+            documented[n] = where
+    for package, by in ((matrix.pair_package(r), help_page.MATRICES_ZIP), (matrix.crm_package(r), help_page.CRM_ZIP)):
+        files = set(zipfile.ZipFile(io.BytesIO(package)).namelist())
+        assert files <= set(documented), files - set(documented)
+        assert {n for n, where in documented.items() if by in where} == files, by

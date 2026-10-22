@@ -383,6 +383,8 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                                      else None)
 
     organism_rates, without_rate = {}, {}
+    declines, without_decline = {}, {}
+    maint = {}
     if s["report_rates"]:
         say(len(studies), len(studies), "Reading the growth rates")
         value_cultures = [cultures[i] for i in sorted(chosen)]
@@ -401,8 +403,27 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                 organism_rates.pop(t)
                 without_rate[t] = ("its growth curves give no end of exponential growth (its values span the whole "
                                    "run), so no rate is taken from them; give one yourself")
+        # the decline after the growth peak, a biomass loss rate for a fit (Karoline, 2026-10-09), from the same
+        # kind of cultures, and not from curves judged unusable either
+        declines, without_decline, decline_skips = crm.decline_rates(
+            list(taxa), value_cultures, others, set(rule["keys"]), s["ignore_media"], s["spike_factor"])
+        skipped += decline_skips
+        for t in whole_taxa:
+            if declines.get(t, {}).get("source") == crm.FROM_METABOLITE_REPLICATES:
+                declines.pop(t)
+                without_decline[t] = ("its growth curves give no end of exponential growth, so no decline is taken "
+                                      "from them")
+        # the Pirt maintenance coefficient on the growth plateau, a separate characteristic (Karoline, 2026-10-09)
+        maint, maint_skips = crm.maintenance(value_cultures, s["detection_limit"], limits, s["spike_factor"])
+        skipped += maint_skips
         if s["merge_genera"]:
             organism_rates, without_rate = _genus_rates(organism_rates, without_rate, taxa)
+            declines, without_decline = _genus_declines(declines, without_decline, taxa)
+            merged = defaultdict(lambda: defaultdict(list))
+            for tid, by_met in maint.items():
+                for mid, m in by_met.items():
+                    merged[d.genus_of(taxa, tid)][mid] += m["cultures"]
+            maint = crm.summarize_maintenance(merged)
         net.meta["growth_rates"] = {"method": rates.method_name(s["rate_method"], s["rate_window"]),
                                     "rates": organism_rates, "without_a_rate": without_rate}
     initial = crm.initial_concentrations([cultures[i] for i in sorted(chosen)])
@@ -477,7 +498,8 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
             # every taxon and metabolite with data by name, whether or not it has an arc in the network
             "names": {n.id: n.name for n in taxa_nodes + metabolite_nodes},
             "presence": matrix_presence, "value_rule": rule, "duplicates": duplicate_lines,
-            "rates": organism_rates, "without_a_rate": without_rate, "initial": initial, "biomass": biomass,
+            "rates": organism_rates, "without_a_rate": without_rate, "declines": declines,
+            "without_a_decline": without_decline, "maintenance": maint, "initial": initial, "biomass": biomass,
             "biomass_by_phase": biomass_by_phase,
             "culture_changes": by_culture, "limits": limits,
             "chemistry": chem, "chemistry_source": chemistry.provenance(chem_problem) if s["report_rates"] else None,
@@ -533,7 +555,20 @@ def _genus_rates(found, missing, taxa):
     by_genus = defaultdict(list)
     for tid, r in found.items():
         by_genus[d.genus_of(taxa, tid)].append(r)
-    out = {g: {**rs[0], "rate": statistics.median(r["rate"] for r in rs), "n": sum(r["n"] for r in rs)}
+    out = {g: {**rs[0], "rate": statistics.median(r["rate"] for r in rs), "n": sum(r["n"] for r in rs),
+               "fit_start_h": statistics.mean(r["fit_start_h"] for r in rs),
+               "fit_end_h": statistics.mean(r["fit_end_h"] for r in rs)}
+           for g, rs in by_genus.items()}
+    gone = {d.genus_of(taxa, tid): why for tid, why in missing.items() if d.genus_of(taxa, tid) not in out}
+    return out, gone
+
+
+def _genus_declines(found, missing, taxa):
+    """Decline rates per genus: over its strains' replicates together."""
+    by_genus = defaultdict(list)
+    for tid, r in found.items():
+        by_genus[d.genus_of(taxa, tid)].append(r)
+    out = {g: crm.summarize_declines([f for r in rs for f in r["replicates"]], rs[0]["source"])
            for g, rs in by_genus.items()}
     gone = {d.genus_of(taxa, tid): why for tid, why in missing.items() if d.genus_of(taxa, tid) not in out}
     return out, gone

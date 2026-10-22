@@ -328,6 +328,28 @@ with metabolite data."
     Checking every id of foodnet.compounds against ChEBI on the way found isovalerate keyed under CHEBI:50128, which is biflavonoid; it is 48942, as
     mGrowthDB records it, so isovaleric acid now joins it.
 
+32. **The decline after the growth peak.** Karoline, 2026-10-09, for a consumer-resource fit's biomass loss
+    rate: "the sustained post-peak decline rate, per species", with its scatter and n ("to tell a real drift
+    from noise"), whether it is a death phase or a plateau only ("a death phase measures death directly, a
+    plateau is a lower bound because birth and death are confounded"), its window (peak to last sample), absent
+    and not zero without a usable decline, and named a decline rate, not maintenance. Per replicate: the
+    least-squares slope of log abundance from the highest sample to the last, negated, needing the peak and two
+    samples after it; death when the curve falls below its plateau band (rates.PLATEAU, the cut the Baranyi
+    fit uses) before the last sample. Per taxon: the mean over the replicates (standard deviation, standard
+    error, n), death where most replicates show one, the mean peak and last sample as the window; from the
+    same kind of cultures as the growth rate, never from spiking curves or curves without an end of exponential
+    growth; per genus, over its strains' replicates together.
+
+33. **The Pirt maintenance coefficient, as a separate characteristic.** Karoline, 2026-10-09: "build the Pirt
+    maintenance coefficient, as a separate characteristic that can be used or not" (substrate consumed per
+    biomass per hour in the plateau; a fit maps it to a yield's floor, not to the loss rate). Per culture: the
+    plateau runs from the growth peak to the last sample within the plateau band (rates.plateau, the band the
+    Baranyi fit and the decline use); the coefficient is the compound's fall over it (within the detection limit:
+    0) over the curve's time-averaged biomass there and its hours, for a compound sampled at or before its start
+    and at or after its end. Per taxon and compound: the mean over its value-set cultures in the unit most of
+    them use, with standard deviation, standard error, n and the mean window; per genus, over its strains'
+    cultures. Nothing else in foodnet or the R package uses it.
+
 ## Known limits
 
 - **The validation is not independent.** The reproduction of a hand-checked reference matrix (106 of 108

@@ -233,6 +233,86 @@ too.</p>
 {_cautions_of(None)}"""
 
 
+# which output holds which file (Karoline, 2026-10-22: "it's not clear which results go into the out.zip and which
+# go into the crm.zip"); tests/test_help.py checks the names against the files the two zips hold
+MATRICES_ZIP, CRM_ZIP = "--format matrices --out", "--crm"
+CLI_FILES = (
+    ("consumed.csv, produced.csv", (MATRICES_ZIP, CRM_ZIP),
+     "The amounts, taxa by metabolites. In the matrices zip, every phase searched (with --phase both, a column per "
+     "phase); in the CRM zip, the CRM's phase only, and with --phase both the stationary phase in files of its own "
+     "(consumed_stationary.csv, ...). With one phase the two zips hold the same table."),
+    ("evidence_consumed.csv, evidence_produced.csv", (MATRICES_ZIP, CRM_ZIP),
+     "What each cell of the amounts rests on (measured, below_limit, presence_only, ...), split as the amounts "
+     "are."),
+    ("cautions.csv", (MATRICES_ZIP, CRM_ZIP), "Every value's cautions and notes (see Cautions); the same in both."),
+    ("README.txt", (MATRICES_ZIP, CRM_ZIP), "What the zip holds and how it was made; each zip has its own."),
+    ("signed.csv", (MATRICES_ZIP, "--format matrix --out"),
+     "One table: produced positive, consumed negative."),
+    ("matrices.svg", (MATRICES_ZIP, "--figure"), "The consumed and produced matrices as an image."),
+    ("growth_rates.csv", (CRM_ZIP, "--rates"),
+     "Each taxon's maximum specific growth rate (1/h), its source, and the hours the fit used (fit_start_h, "
+     "fit_end_h)."),
+    ("decline_rates.csv", (CRM_ZIP,), "Each taxon's decline after its growth peak (1/h), with its scatter."),
+    ("maintenance.csv", (CRM_ZIP,), "The Pirt maintenance coefficient per taxon and compound."),
+    ("initial_concentrations.csv", (CRM_ZIP,), "Each metabolite's concentration at the first sample (mM)."),
+    ("biomass.csv", (CRM_ZIP,), "Each taxon's biomass at the phase's start, its change and the phase's hours."),
+    ("intervals.csv", (CRM_ZIP,), "The hours each value was measured over."),
+    ("bounds.csv", (CRM_ZIP,), "Each amount's lowest and highest replicate."),
+    ("chemistry.csv", (CRM_ZIP,), "Each resource's formula, charge, carbon atoms and degree of reduction (ChEBI)."),
+    ("electron_balance.csv", (CRM_ZIP,), "Each taxon's electrons out over electrons in."),
+    ("crm.json", (CRM_ZIP,), "All of the CRM parameters in one file, as Send to R and --to-r send them."),
+)
+
+
+def _cli_files() -> str:
+    rows = "".join(f"<tr><td><code>{_e(name)}</code></td><td>{', '.join(f'<code>{_e(w)}</code>' for w in where)}"
+                   f"</td><td>{_e(what)}</td></tr>" for name, where, what in CLI_FILES)
+    head = "<tr><th>File</th><th>Written by</th><th>What it holds</th></tr>"
+    return f"<div class=\"scroll\"><table>{head}{rows}</table></div>"
+
+
+def _option(action) -> str:
+    name = ", ".join(action.option_strings) or action.dest
+    if action.choices:
+        name += " {" + ",".join(str(c) for c in action.choices) + "}"
+    elif action.nargs != 0:
+        metavar = action.metavar or action.dest.upper()
+        name += " " + (" ".join(metavar) if isinstance(metavar, tuple) else metavar)
+        if action.nargs in ("+", "*"):
+            name += " ..."
+    return name
+
+
+def _options(actions) -> str:
+    items = {}
+    for action in actions:
+        if action.dest == "help":
+            continue
+        text = (action.help or "").replace("%%", "%")
+        if action.default not in (None, False, [], "") and "default" not in text:
+            text += f" (default {action.default})"
+        items[_option(action)] = text[:1].upper() + text[1:] + ("" if text.endswith(".") else ".")
+    return "<dl>" + "".join(f"<dt><code>{_e(k)}</code></dt><dd>{_e(v)}</dd>" for k, v in items.items()) + "</dl>"
+
+
+def _cli_options() -> str:
+    """Every command and option of the command line, from its own parser, so none goes undocumented."""
+    import argparse
+
+    from .__main__ import build_parser
+    sub = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
+    helps = {a.dest: a.help for a in sub._choices_actions}
+    parts = []
+    for name, parser in sub.choices.items():
+        parts.append(f"<h4><code>{_e(COMMAND)} {_e(name)}</code>: {_e(helps.get(name, ''))}</h4>")
+        groups = [g for g in parser._action_groups if any(a.dest != "help" for a in g._group_actions)]
+        for group in groups:
+            if len(groups) > 1 and group.title not in ("options", "positional arguments"):
+                parts.append(f"<p><strong>{_e(group.title)}</strong></p>")
+            parts.append(_options(group._group_actions))
+    return "".join(parts)
+
+
 def render_help(token: str, defaults: dict, example: tuple, job: str = "") -> str:
     toc = "".join(f"<li><a href=\"#{key}\">{_e(title)}</a></li>" for key, title in SECTIONS)
     settings = {k: f"{v} Default: {_default(defaults.get(k))}." for k, v in SETTINGS.items()}
@@ -328,8 +408,11 @@ The first header cell names the medium the values come from. With the
 phase choice Both, each metabolite has a column per phase.</p>
 <h2 id="crm">Consumer-resource models and R</h2>
 <p>CRM mode collects growth rates: from the replicates whose metabolites gave the values, else from another
-monoculture in the same medium. Get CRM parameters then downloads the matrices, the rates, the initial medium
-concentrations, each taxon's biomass change over the phase, the hours each value was measured over
+monoculture in the same medium. Each is the maximum specific growth rate fitted to a replicate's whole growth curve
+(the rate method's own interval: easylinear's steepest stretch of samples, or Baranyi up to the end of the
+plateau), not over the phase or time window the values cover; the median over the replicates is the taxon's.
+Get CRM parameters then downloads the matrices, the rates, the initial medium concentrations, each taxon's
+biomass change over the phase, the hours each value was measured over
 (intervals.csv) and bounds on each amount (bounds.csv: its lowest and highest replicate; a 0 from 0 to the
 detection limit at least), each resource's formula, charge and degree of reduction from ChEBI (chemistry.csv)
 and each taxon's electron balance (electron_balance.csv: the electrons in its measured by-products over those in
@@ -343,6 +426,23 @@ With Both, the CRM uses the exponential phase and carries the
 stationary phase beside it: what changed after the end of exponential growth, where cells may still grow, stop
 or die (its biomass change says which); in R,
 <code>crm_phase(crm, "stationary")</code> switches to it.</p>
+<p>CRM mode also gives each taxon's decline rate after its growth peak (decline_rates.csv; in R,
+<code>crm$decline_rates</code>): the loss of log abundance per hour from the peak to the last sample, the mean
+over the same kind of replicates as its growth rate, with its standard error, standard deviation and n, so a
+real drift can be told from noise, and the window (start_h, end_h). Its phase says what it measures: death,
+where most curves leave their plateau before the last sample, or plateau, where they stay on it, so birth and
+death are confounded and the rate bounds death from below. A taxon without a usable decline (its peak less than
+two samples before the end) is NA, not 0. It is a decline rate, not a maintenance rate; an OD curve need not fall
+when cells die.</p>
+<p>Separately, CRM mode gives the Pirt maintenance coefficient (maintenance.csv; in R,
+<code>crm$maintenance</code>), a characteristic nothing else in foodnet or its R package uses, there to take or
+leave: what each taxon took up of each compound per unit of biomass per hour while its culture sat on its
+growth plateau (from its peak to the last sample within the plateau band, where it no longer grew). It is the
+compound's fall over that stretch (a change within the detection limit is 0) over the curve's mean biomass there
+and its hours, the mean over the replicates with standard error, standard deviation, n and the window; positive
+is uptake, negative release. The biomass is in the growth curve's unit, which the unit column names, so
+coefficients in OD and in cells are not comparable. A compound needs samples at or before the plateau's start
+and at or after its end.</p>
 <p>The R companion package receives them. Install it once with <code>{_e(rbridge.INSTALL_R)}</code>
 ({_e(rbridge.INSTALL_TROUBLE)}), then <code>library(foodnet); crm &lt;- foodnet_listen()</code> and press Send to R.
 The steps of a simulation are <a href="#miasim">below</a>. <code>crm_efficiency(crm)</code> builds
@@ -424,8 +524,17 @@ the study unchanged (the same <code>uploadedAt</code>) and at most 30 days. Read
 <code>$XDG_CACHE_HOME/foodnet</code> or <code>~/.cache/foodnet</code> elsewhere, or <code>FOODNET_CACHE_DIR</code>;
 deleting it reads everything
 again.</p>
-<p>Run <code>{_e(COMMAND)} derive --help</code> for every option. Problems and questions:
-<a href="{ISSUES}">{_e(ISSUES)}</a>.</p>"""
+<h3>Which file holds what</h3>
+<p><code>--out</code> writes the network, or the matrices, in the format <code>--format</code> names;
+<code>--crm</code> writes everything a consumer-resource model needs, which includes its own copy of the matrices
+for the CRM's phase. Both can be given in one command. <code>--rates</code> and <code>--figure</code> write one
+file of the zips on its own. The network JSON (<code>--format json</code>) also holds the settings, the data
+versions and, in CRM mode, the growth rates and initial concentrations.</p>
+{_cli_files()}
+<h3>Every command and option</h3>
+<p>The same as <code>{_e(COMMAND)} derive --help</code> (and <code>--help</code> after any other command) prints.</p>
+{_cli_options()}
+<p>Problems and questions: <a href="{ISSUES}">{_e(ISSUES)}</a>.</p>"""
 
 
 # the released versions, newest first (Karoline, 2026-10-09: "include the release history in the About page");
