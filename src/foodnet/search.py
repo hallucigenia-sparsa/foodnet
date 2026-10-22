@@ -387,8 +387,13 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     maint = {}
     if s["report_rates"]:
         say(len(studies), len(studies), "Reading the growth rates")
-        value_cultures = [cultures[i] for i in sorted(chosen)]
-        others = [c for i, c in enumerate(cultures) if i not in chosen] + read["growth_only"]
+        # a duplicate deposit's cultures repeat the kept deposit's, so they give no rate, decline or maintenance
+        # of their own (Karoline, 2026-10-22: "Leave out everywhere"; a review: R. intestinalis counted 11
+        # replicates where the values counted 8)
+        repeats = {e for e, _ in dropped}
+        value_cultures = [cultures[i] for i in sorted(chosen) if cultures[i].experiment not in repeats]
+        others = [c for i, c in enumerate(cultures) if i not in chosen and c.experiment not in repeats] + \
+            read["growth_only"]
         organism_rates, without_rate, rate_skips = crm.growth_rates(
             list(taxa), value_cultures, others, set(rule["keys"]), s["ignore_media"], s["rate_method"],
             s["rate_window"], s["spike_factor"])
@@ -414,8 +419,10 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                 without_decline[t] = ("its growth curves give no end of exponential growth, so no decline is taken "
                                       "from them")
         # the Pirt maintenance coefficient on the growth plateau, a separate characteristic (Karoline, 2026-10-09)
-        maint, maint_skips = crm.maintenance(value_cultures, s["detection_limit"], limits, s["spike_factor"])
+        maint, maint_skips = crm.maintenance(value_cultures, s["detection_limit"], limits, s["spike_factor"], dropped)
         skipped += maint_skips
+        for t in whole_taxa:
+            maint.pop(t, None)              # growth curves judged unusable give no plateau either (a review)
         if s["merge_genera"]:
             organism_rates, without_rate = _genus_rates(organism_rates, without_rate, taxa)
             declines, without_decline = _genus_declines(declines, without_decline, taxa)
@@ -556,8 +563,10 @@ def _genus_rates(found, missing, taxa):
     for tid, r in found.items():
         by_genus[d.genus_of(taxa, tid)].append(r)
     out = {g: {**rs[0], "rate": statistics.median(r["rate"] for r in rs), "n": sum(r["n"] for r in rs),
-               "fit_start_h": statistics.mean(r["fit_start_h"] for r in rs),
-               "fit_end_h": statistics.mean(r["fit_end_h"] for r in rs),
+               "fit_start_h": min(r["fit_start_h"] for r in rs), "fit_end_h": max(r["fit_end_h"] for r in rs),
+               # every strain's studies and sources, not the first strain's (a review)
+               "studies": sorted({sid for r in rs for sid in r["studies"]}),
+               "source": "; ".join(sorted({r["source"] for r in rs})),
                "technique": "; ".join(sorted({x for r in rs for x in r["technique"].split("; ")}))}
            for g, rs in by_genus.items()}
     gone = {d.genus_of(taxa, tid): why for tid, why in missing.items() if d.genus_of(taxa, tid) not in out}
@@ -569,7 +578,8 @@ def _genus_declines(found, missing, taxa):
     by_genus = defaultdict(list)
     for tid, r in found.items():
         by_genus[d.genus_of(taxa, tid)].append(r)
-    out = {g: crm.summarize_declines([f for r in rs for f in r["replicates"]], rs[0]["source"])
+    out = {g: crm.summarize_declines([f for r in rs for f in r["replicates"]],
+                                     "; ".join(sorted({r["source"] for r in rs})))
            for g, rs in by_genus.items()}
     gone = {d.genus_of(taxa, tid): why for tid, why in missing.items() if d.genus_of(taxa, tid) not in out}
     return out, gone

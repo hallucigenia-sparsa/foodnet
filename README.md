@@ -167,14 +167,16 @@ value and has no expected side of 1: unmeasured substrates, unmeasured products 
 so 1 minus it is no biomass yield; it is withheld when a resource the taxon consumed or produced has no
 degree of reduction, when what it took up is within the assays' detection limits (it then says what the
 share is at least), or when it lies outside its own cultures' range.
-CRM mode also gives each taxon's decline rate after its growth peak (`decline_rates.csv`): the loss of log
-abundance per hour from the peak to the last sample, the mean over the same kind of replicates as its growth
-rate, with standard error, standard deviation, n and that window, and whether it measures a death phase (the
-curves leave their plateau) or a plateau (a lower bound on death). Without a usable decline it is NA, not 0.
-Separately, it gives the Pirt maintenance coefficient (`maintenance.csv`), which nothing else uses: what each
-taxon took up of each compound per unit of biomass per hour on its growth plateau (from its peak to the last
-sample within the plateau band), with standard error, standard deviation, n and that window, in the growth
-curve's unit.
+CRM mode also gives each taxon's decline rate (`decline_rates.csv`): the loss of log abundance per hour from
+where its growth curve enters its plateau band to the last sample (negative where it still creeps up), the
+mean over its replicates in one technique, with the scatter between replicates, the number of experiments they
+come from, the window, and whether the curves leave the plateau band (death) or stay on it (plateau). For
+anything but a viable count it bounds death from below: optical density and total counts keep dead cells
+until they lyse. Without a usable decline it is NA, not 0. Separately, it gives the Pirt maintenance
+coefficient (`maintenance.csv`), which nothing else uses: what each taxon took up of each compound per unit of
+biomass per hour on its growth plateau, with its scatter, experiments, window, the compound's concentration at
+the plateau's start and whether it was already used up then (a 0 then means the compound was gone, not that no
+maintenance needed it); on a plateau it bounds Pirt's m_s from above.
 With the phase choice Both, the stationary phase (what changed after the end of exponential growth) comes
 too, beside the exponential one. Install the companion package once, at the version of your foodnet (the
 page and the help print the line for yours, which names the release), and miaSim for the simulations:

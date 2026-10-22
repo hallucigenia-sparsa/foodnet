@@ -525,6 +525,15 @@ def test_a_certificate_this_python_cannot_verify_is_said_so_not_retried():
             error = ssl.SSLCertVerificationError(1, "certificate verify failed")
             error.verify_message = "unable to get local issuer certificate"
             raise error
-    with pytest.raises(mgrowthdb.MGrowthDBError, match="SSL_CERT_FILE"):
-        Client(backoff=0)._get("study/S1.json")
+    from foodnet import tls
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(tls, "system_store", lambda: False)
+        with pytest.raises(mgrowthdb.MGrowthDBError, match="SSL_CERT_FILE"):
+            Client(backoff=0)._get("study/S1.json")
     assert len(tries) == 1
+    # with the macOS trust store, SSL_CERT_FILE is never read, so the message says the store refused it (a review)
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(tls, "system_store", lambda: True)
+        with pytest.raises(mgrowthdb.MGrowthDBError, match="refused by the macOS trust store") as e:
+            Client(backoff=0)._get("study/S1.json")
+        assert "SSL_CERT_FILE" not in str(e.value)

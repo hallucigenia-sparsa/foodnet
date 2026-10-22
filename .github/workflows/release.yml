@@ -66,6 +66,8 @@ jobs:
           if [ -d clean/Scripts ]; then bin=clean/Scripts; else bin=clean/bin; fi
           "$bin/python" -m pip install dist/*.whl
           "$bin/foodnet" --help
+          # on macOS the certificates must be checked against the system's trust store (src/foodnet/tls.py)
+          if [ "$RUNNER_OS" = "macOS" ]; then "$bin/python" -c "from foodnet import tls; assert tls.system_store()"; fi
           python packaging/smoke.py "$bin/foodnet" gui --no-browser
 
   windows:

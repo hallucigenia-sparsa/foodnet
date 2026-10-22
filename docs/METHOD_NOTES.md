@@ -341,6 +341,13 @@ with metabolite data."
     growth; per genus, over its strains' replicates together.
     Karoline confirmed these choices on 2026-10-22 ("yes, please go ahead with them"): the highest sample as
     the peak, the mean over replicates rather than the median, death where most replicates show one.
+    Revised after a review, Karoline 2026-10-22: the slope starts where the curve enters its plateau band, not at
+    its highest sample ("Anchor at plateau entry"; a simulation of flat plateaus read up to 0.044 per hour of
+    decline from a noisy high point); replicates stay the unit of sd and se, labeled, with the number of
+    experiments beside them ("Replicates, labeled"); a duplicate deposit's cultures are left out of growth
+    rates, declines and maintenance ("Leave out everywhere"; R. intestinalis had counted 11 replicates where the
+    values counted 8, which also changes its growth rate's n and median from 0.4.0). Following the rule biomass
+    and maintenance keep, a taxon's decline takes the growth curves of the technique most of its replicates use.
 
 33. **The Pirt maintenance coefficient, as a separate characteristic.** Karoline, 2026-10-09: "build the Pirt
     maintenance coefficient, as a separate characteristic that can be used or not" (substrate consumed per
@@ -353,6 +360,11 @@ with metabolite data."
     cultures. Nothing else in foodnet or the R package uses it.
     Confirmed by Karoline on 2026-10-22, with every measured compound reported (the user picks the substrates)
     and only the unit most of a taxon's cultures use.
+    After a review, Karoline 2026-10-22 ("Keep 0, add start conc. + flag"): each compound's concentration at the
+    plateau's start and depleted_at_start (below the detection limit), since a 0 where the compound was already
+    gone measures no demand. The unit is chosen once per taxon (over all its plateau cultures), ties going to
+    the preferred technique; cultures that did not grow, a duplicate deposit's (experiment, compound) pairs and
+    taxa whose growth curves give no end of exponential growth give none.
 
 ## Known limits
 

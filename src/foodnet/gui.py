@@ -159,10 +159,10 @@ def _settings_block(settings: dict) -> str:
   <span class="muted">1 when a taxon produced or consumed a compound (in any medium), 0 when it was measured and
   did not, NA when nothing says either way; no amounts</span></div>
 <div class="row"><label><input type="checkbox" name="report_rates" value="1"{_checked(s['report_rates'])}>
-  Report growth rates</label>
-  <span class="muted">each taxon's maximum specific growth rate in monoculture, as a consumer-resource model takes
-  it: from the replicates with metabolite data, else from another monoculture in the same medium. CRM mode
-  turns it on</span></div>
+  Collect CRM parameters</label>
+  <span class="muted">what a consumer-resource model needs besides the matrices: growth and decline rates,
+  maintenance, initial concentrations, biomass, chemistry from ChEBI and the electron balance. CRM mode turns
+  it on</span></div>
 <div class="row"><label>Growth rate method
   <select name="rate_method">{rate_methods}</select></label>
   <span class="muted">easylinear (default), the steepest part of the log curve, as mGrowthDB computes the rates it
@@ -231,9 +231,9 @@ def crm_mode(settings: dict, on: bool = True) -> dict:
     return {**settings, "report_rates": True if on else DEFAULTS["report_rates"]}
 
 
-CRM_MODE_MESSAGE = ("CRM mode on: growth rates on (Advanced settings). Run the search, then press Get CRM "
+CRM_MODE_MESSAGE = ("CRM mode on: Collect CRM parameters on (Advanced settings). Run the search, then press Get CRM "
                     "parameters at the top of the result; press CRM mode again to switch it off.")
-CRM_MODE_OFF_MESSAGE = "CRM mode off: growth rates off, which is the default."
+CRM_MODE_OFF_MESSAGE = "CRM mode off: Collect CRM parameters off, which is the default."
 CRM_EXAMPLE_MESSAGE = ("CRM example: five gut species in Wilkins-Chalgren (studies 2, 4, 7 and 9), 0 to 48 h, "
                        "trehalose over the whole run (Advanced settings), CRM mode on. Press Get taxon-metabolite "
                        "network, then Get CRM parameters; the help's Simulate with miaSim section has the steps "
@@ -772,8 +772,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     def _crm_files(self, path: str, query: dict):
         result = self._result(query)
         if not result or not result["settings"].get("report_rates"):
-            self._send(render_form(self.token, message="No CRM parameters yet: switch on CRM mode (or Report "
-                                                       "growth rates) and run the search again."))
+            self._send(render_form(self.token, message="No CRM parameters yet: switch on CRM mode (or Collect "
+                                                       "CRM parameters) and run the search again."))
         elif path == "/rates.csv":
             self._send(matrix.rates_csv(result), "text/csv; charset=utf-8", f"{TITLE}_growth_rates.csv")
         elif path == "/crm.json":

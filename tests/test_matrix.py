@@ -257,7 +257,7 @@ def test_booleans_give_no_bounds(client):
 def test_the_crm_readme_says_over_which_interval_the_growth_rates_are_fitted(client):
     # Karoline, 2026-10-22: "it is not entirely clear over which interval the growth rates are computed"
     text = matrix.readme(run(client, report_rates=True), "crm")
-    assert "whole growth curve" in text and "steepest stretch of 5 consecutive samples" in text
+    assert "whole growth curve" in text and "stretches of 5 consecutive samples, from the first to the last" in text
     assert "not over the phase or time window" in text
     assert "Baranyi-Roberts model fitted from the first sample to the end of the curve's plateau" in \
         matrix.readme(run(client, report_rates=True, rate_method="baranyi"), "crm")

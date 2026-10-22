@@ -214,13 +214,14 @@ as_foodnet_crm <- function(payload) {
              growth_rates = rates,
              growth_rate_unit = chr(payload$growth_rate_unit, "1/h"),
              growth_rate_detail = payload$growth_rate_detail,
-             # the decline after each taxon's growth peak (1/h; NA: no usable decline), from foodnet 0.4.1:
+             # each taxon's decline from where its growth curve enters its plateau band (1/h; NA: no usable
+             # decline), from foodnet 0.5.0:
              # scatter, n, phase (death, or plateau: a lower bound) and window in decline_rate_detail
-             decline_rates = per_taxon("decline_rates"),
+             decline_rates = if (is.null(payload$decline_rates)) NULL else per_taxon("decline_rates"),
              decline_rate_detail = payload$decline_rate_detail,
              # the Pirt maintenance coefficient on the growth plateau, per taxon and resource (from foodnet
-             # 0.4.1): a separate characteristic no builder here uses
-             maintenance = maintenance_frame(payload$maintenance),
+             # 0.5.0): a separate characteristic no builder here uses
+             maintenance = if (is.null(payload$maintenance)) NULL else maintenance_frame(payload$maintenance),
              initial = initial,
              biomass_change = per_taxon("biomass_change"),
              biomass_start = per_taxon("biomass_start"),
@@ -474,6 +475,11 @@ maintenance_frame <- function(records) {
                unit = vapply(records, function(r) chr(r$unit), character(1)),
                se = vapply(records, num, numeric(1), "se"), sd = vapply(records, num, numeric(1), "sd"),
                replicates = vapply(records, num, numeric(1), "n"),
+               experiments = vapply(records, num, numeric(1), "n_experiments"),
                start_h = vapply(records, num, numeric(1), "start_h"),
-               end_h = vapply(records, num, numeric(1), "end_h"), stringsAsFactors = FALSE)
+               end_h = vapply(records, num, numeric(1), "end_h"),
+               plateau_samples = vapply(records, num, numeric(1), "plateau_samples"),
+               start_mM = vapply(records, num, numeric(1), "start_mM"),
+               depleted_at_start = vapply(records, function(r) isTRUE(r$depleted_at_start), logical(1)),
+               stringsAsFactors = FALSE)
 }

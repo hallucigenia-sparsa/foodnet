@@ -272,9 +272,16 @@ class MGrowthDBClient:
             except ssl.SSLCertVerificationError as e:
                 # not the network: this Python's certificate store lacks the root mGrowthDB's certificate chains to,
                 # and trying again cannot help (an audit: uv's Python on macOS reported "check your network")
+                if tls.system_store():
+                    # truststore reads the macOS trust store, never SSL_CERT_FILE (a review)
+                    raise MGrowthDBError(
+                        f"mGrowthDB's certificate was refused by the macOS trust store ({e.verify_message or e}). "
+                        "The certificate itself was rejected (expired, for another host, or from a network that "
+                        "intercepts TLS); if your network intercepts TLS, add its root certificate to the macOS "
+                        "Keychain.") from None
                 macos = (" On macOS, foodnet checks certificates against the system's store when the truststore "
-                         "package is installed (pip install truststore, or install foodnet again)."
-                         if sys.platform == "darwin" and not tls.system_store() else "")
+                         "package (0.10.5 or later) is installed (pip install -U truststore, or install foodnet "
+                         "again)." if sys.platform == "darwin" else "")
                 raise MGrowthDBError(
                     f"mGrowthDB's certificate could not be verified by this Python ({e.verify_message or e}).{macos} "
                     "Its certificate store lacks the root mGrowthDB uses (HARICA TLS RSA Root CA 2021). Point "

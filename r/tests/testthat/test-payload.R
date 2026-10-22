@@ -154,8 +154,13 @@ test_that("decline rates are kept per taxon, absent as NA, and written with thei
     expect_equal(d$se[d$taxon == "A"], 0.0012)
     expect_equal(d$phase[d$taxon == "A"], "plateau")
     expect_true(is.na(d$decline_rate[d$taxon == "B"]))
-    # a payload from before decline rates reads as none
-    expect_true(all(is.na(foodnet:::as_foodnet_crm(example_payload())$decline_rates)))
+    # a payload from before decline rates has none, and crm_write() writes no empty file for them (a review)
+    old <- foodnet:::as_foodnet_crm(example_payload())
+    expect_null(old$decline_rates)
+    expect_null(old$maintenance)
+    dir2 <- tempfile()
+    crm_write(old, dir2)
+    expect_false(file.exists(file.path(dir2, "decline_rates.csv")) || file.exists(file.path(dir2, "maintenance.csv")))
 })
 
 test_that("maintenance coefficients are a table of their own, subset and written with the rest", {
@@ -172,7 +177,7 @@ test_that("maintenance coefficients are a table of their own, subset and written
     dir <- tempfile()
     crm_write(x, dir)
     expect_equal(utils::read.csv(file.path(dir, "maintenance.csv"))$maintenance[1], 4e-5)
-    expect_equal(nrow(foodnet:::as_foodnet_crm(example_payload())$maintenance), 0)
+    expect_null(foodnet:::as_foodnet_crm(example_payload())$maintenance)
 })
 
 test_that("written growth rates carry the hours their fits used", {

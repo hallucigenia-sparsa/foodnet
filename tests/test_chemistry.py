@@ -220,6 +220,9 @@ def test_a_dropped_answer_is_tried_again(monkeypatch):
 def test_an_unreachable_chebi_is_left_alone_for_the_rest_of_the_search_only(monkeypatch):
     import http.client
     calls = _chebi_answer(monkeypatch, [OSError("timed out"), http.client.IncompleteRead(b""), ACETATE])
+    # one worker: a lookup already under way when ChEBI fails still waits; the test is about the ones after it
+    # (it passed by timing alone until each thread built its own TLS context)
+    monkeypatch.setattr(chemistry, "WORKERS", 1)
     client = chemistry.Memo()                         # one client, as the page keeps for an hour
     found, problem = chemistry.resolve({"a": "30089", "g": "17234"}, client)
     assert found["g"]["note"] == "ChEBI could not be reached" and "2 of 2" in problem

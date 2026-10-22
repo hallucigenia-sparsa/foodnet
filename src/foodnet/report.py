@@ -106,24 +106,27 @@ def report_text(result: dict) -> str:
         from .matrix import technique_mismatch
         if technique_mismatch(result):
             lines += ["", technique_mismatch(result)]
-        lines += ["", "Decline rates after the growth peak (1/h; loss of log abundance from the peak to the last "
-                  "sample; death: the curve leaves its plateau, plateau: a lower bound on death):"]
+        lines += ["", "Decline rates (1/h; loss of log abundance from where the growth curve enters its plateau band "
+                  "to the last sample; death: the curve leaves the band, plateau: it stays; for anything but a "
+                  "viable count, a lower bound on death):"]
         for tid, r in sorted((result.get("declines") or {}).items(), key=lambda kv: names.get(kv[0], kv[0])):
-            scatter = f" +/- {r['se']:.2g} SE" if r["se"] is not None else ""
-            lines.append(f"  {names.get(tid, tid)}: {r['rate']:.3g}{scatter} (n {r['n']}, {r['phase']}, "
-                         f"{r['start_h']:.3g} h to {r['end_h']:.3g} h, from {r['source']}"
+            scatter = f" +/- {r['se']:.2g} SE between replicates" if r["se"] is not None else ""
+            lines.append(f"  {names.get(tid, tid)}: {r['rate']:.3g}{scatter} (n {r['n']} from "
+                         f"{r.get('n_experiments', '?')} experiment(s), {r['phase']}, {r['start_h']:.3g} h to "
+                         f"{r['end_h']:.3g} h, from {r['source']}"
                          + (f", {r['technique']}" if r.get("technique") else "") + ")")
         for tid, why in (result.get("without_a_decline") or {}).items():
             lines.append(f"  {names.get(tid, tid)}: none, {why}")
         found = result.get("maintenance") or {}
         if found:
             lines += ["", "Maintenance on the growth plateau (Pirt coefficient; uptake per biomass unit per hour, "
-                      "positive: uptake; a separate characteristic):"]
+                      "positive: uptake; a separate characteristic; an upper bound on Pirt's m_s):"]
             for tid, by_met in sorted(found.items(), key=lambda kv: names.get(kv[0], kv[0])):
                 for mid, m in sorted(by_met.items(), key=lambda kv: names.get(kv[0], kv[0])):
                     scatter = f" +/- {m['se']:.2g} SE" if m["se"] is not None else ""
+                    gone = ", used up before the plateau" if m.get("depleted_at_start") else ""
                     lines.append(f"  {names.get(tid, tid)}, {names.get(mid, mid)}: {m['coefficient']:.3g}{scatter} "
-                                 f"{m['unit']} (n {m['n']}, {m['start_h']:.3g} h to {m['end_h']:.3g} h)")
+                                 f"{m['unit']} (n {m['n']}, {m['start_h']:.3g} h to {m['end_h']:.3g} h{gone})")
     if result["initial"]:
         lines += ["", "Initial concentrations in the value medium (mM, mean of the first samples):"]
         for _, v in sorted(result["initial"].items(), key=lambda kv: kv[1]["name"]):

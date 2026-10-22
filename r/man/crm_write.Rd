@@ -12,7 +12,7 @@ crm_write(x, dir)
 \value{The paths written, invisibly.}
 \description{
 The files of foodnet's download, for the phase \code{x} holds: \code{consumed.csv}, \code{produced.csv} and their
-\code{evidence_*.csv}, \code{growth_rates.csv}, \code{initial_concentrations.csv}, \code{biomass.csv}, \code{intervals.csv} (the
+\code{evidence_*.csv}, \code{growth_rates.csv}, \code{decline_rates.csv} and \code{maintenance.csv} (from foodnet 0.5.0), \code{initial_concentrations.csv}, \code{biomass.csv}, \code{intervals.csv} (the
 hours each value was measured over) and \code{bounds.csv} (each amount's lowest and highest replicate), one row
 per cell with a phase column, \code{chemistry.csv} and \code{electron_balance.csv} (from foodnet 0.3.0, \code{\link{crm_chemistry}}
 and \code{\link{crm_electron_balance}}, the latter with a phase column), and \code{README.txt}, which opens with the phase. After \code{\link{crm_phase}} the

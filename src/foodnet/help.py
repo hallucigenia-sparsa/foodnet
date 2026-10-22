@@ -10,6 +10,7 @@ import html
 
 from . import __version__, brand, rbridge
 from .brand import COMMAND, NAME, REPOSITORY
+from .matrix import DECLINE_TEXT, MAINTENANCE_TEXT
 from .model import CAUTION_TIERS, CAUTIONS
 
 ISSUES = f"{REPOSITORY}/issues"
@@ -53,7 +54,8 @@ SETTINGS = {
                "kept a day; what was read of each study, kept while it is unchanged and at most 30 days); "
                "command line: --refresh.",
     "booleans": "Report 1, 0 or NA instead of amounts; presence in another medium counts as 1.",
-    "report_rates": "Collect each taxon's maximum specific growth rate, which a consumer-resource model needs. "
+    "report_rates": "Collect what a consumer-resource model needs besides the matrices: growth and decline rates, "
+                    "maintenance, initial concentrations, biomass, chemistry from ChEBI and the electron balance. "
                     "CRM mode switches it on.",
     "rate_method": "How a growth rate is computed: easylinear (as mGrowthDB reports rates) or baranyi.",
     "rate_window": "With easylinear, the number of points in each fitted window (5).",
@@ -292,7 +294,9 @@ def _options(actions) -> str:
         text = (action.help or "").replace("%%", "%")
         if action.default not in (None, False, [], "") and "default" not in text:
             text += f" (default {action.default})"
-        items[_option(action)] = text[:1].upper() + text[1:] + ("" if text.endswith(".") else ".")
+        # a unit leads some texts ("mM (default 0.2)"): capitalized it reads as megamolar (a review)
+        first = text[:1] if text.startswith(("mM", "pH")) else text[:1].upper()
+        items[_option(action)] = first + text[1:] + ("" if text.endswith(".") else ".")
     return "<dl>" + "".join(f"<dt><code>{_e(k)}</code></dt><dd>{_e(v)}</dd>" for k, v in items.items()) + "</dl>"
 
 
@@ -427,23 +431,10 @@ With Both, the CRM uses the exponential phase and carries the
 stationary phase beside it: what changed after the end of exponential growth, where cells may still grow, stop
 or die (its biomass change says which); in R,
 <code>crm_phase(crm, "stationary")</code> switches to it.</p>
-<p>CRM mode also gives each taxon's decline rate after its growth peak (decline_rates.csv; in R,
-<code>crm$decline_rates</code>): the loss of log abundance per hour from the peak to the last sample, the mean
-over the same kind of replicates as its growth rate, with its standard error, standard deviation and n, so a
-real drift can be told from noise, and the window (start_h, end_h). Its phase says what it measures: death,
-where most curves leave their plateau before the last sample, or plateau, where they stay on it, so birth and
-death are confounded and the rate bounds death from below. A taxon without a usable decline (its peak less than
-two samples before the end) is NA, not 0. It is a decline rate, not a maintenance rate; an OD curve need not fall
-when cells die.</p>
-<p>Separately, CRM mode gives the Pirt maintenance coefficient (maintenance.csv; in R,
-<code>crm$maintenance</code>), a characteristic nothing else in foodnet or its R package uses, there to take or
-leave: what each taxon took up of each compound per unit of biomass per hour while its culture sat on its
-growth plateau (from its peak to the last sample within the plateau band, where it no longer grew). It is the
-compound's fall over that stretch (a change within the detection limit is 0) over the curve's mean biomass there
-and its hours, the mean over the replicates with standard error, standard deviation, n and the window; positive
-is uptake, negative release. The biomass is in the growth curve's unit, which the unit column names, so
-coefficients in OD and in cells are not comparable. A compound needs samples at or before the plateau's start
-and at or after its end.</p>
+<p>CRM mode also gives each taxon's decline rate (in R, <code>crm$decline_rates</code>) and, separately, the
+Pirt maintenance coefficient (in R, <code>crm$maintenance</code>), there to take or leave.</p>
+<p>{_e(DECLINE_TEXT)}</p>
+<p>{_e(MAINTENANCE_TEXT)}</p>
 <p>The R companion package receives them. Install it once with <code>{_e(rbridge.INSTALL_R)}</code>
 ({_e(rbridge.INSTALL_TROUBLE)}), then <code>library(foodnet); crm &lt;- foodnet_listen()</code> and press Send to R.
 The steps of a simulation are <a href="#miasim">below</a>. <code>crm_efficiency(crm)</code> builds
@@ -533,7 +524,8 @@ file of the zips on its own. The network JSON (<code>--format json</code>) also 
 versions and, in CRM mode, the growth rates and initial concentrations.</p>
 {_cli_files()}
 <h3>Every command and option</h3>
-<p>The same as <code>{_e(COMMAND)} derive --help</code> (and <code>--help</code> after any other command) prints.
+<p>The options <code>{_e(COMMAND)} derive --help</code> (and <code>--help</code> after any other command) prints,
+with their defaults.
 <code>{_e(COMMAND)} --version</code> prints the version.</p>
 {_cli_options()}
 <p>Problems and questions: <a href="{ISSUES}">{_e(ISSUES)}</a>.</p>"""

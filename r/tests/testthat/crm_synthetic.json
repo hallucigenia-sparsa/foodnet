@@ -132,61 +132,77 @@
    "taxon": "Alpha alpha A1",
    "resource": "acetate",
    "coefficient": -7.500000000000002e-05,
-   "unit": "mM per fc per h",
+   "unit": "mM h-1 per (fc)",
    "biomass_unit": "fc",
    "sd": 8.333333333333357e-06,
    "se": 4.811252243246895e-06,
    "n": 3,
+   "n_experiments": 1,
    "start_h": 12.0,
    "end_h": 24.0,
    "studies": [
     "SMGDB00000001"
-   ]
+   ],
+   "plateau_samples": 2,
+   "start_mM": 4.0,
+   "depleted_at_start": false
   },
   {
    "taxon": "Alpha alpha A1",
    "resource": "glucose",
    "coefficient": 8.333333333333336e-05,
-   "unit": "mM per fc per h",
+   "unit": "mM h-1 per (fc)",
    "biomass_unit": "fc",
    "sd": 8.333333333333324e-06,
    "se": 4.811252243246876e-06,
    "n": 3,
+   "n_experiments": 1,
    "start_h": 12.0,
    "end_h": 24.0,
    "studies": [
     "SMGDB00000001"
-   ]
+   ],
+   "plateau_samples": 2,
+   "start_mM": 2.0000000000000004,
+   "depleted_at_start": false
   },
   {
    "taxon": "Beta beta B1",
    "resource": "butyrate",
    "coefficient": 0.0,
-   "unit": "mM per od per h",
+   "unit": "mM h-1 per (od)",
    "biomass_unit": "od",
    "sd": 0.0,
    "se": 0.0,
    "n": 2,
+   "n_experiments": 1,
    "start_h": 16.0,
    "end_h": 24.0,
    "studies": [
     "SMGDB00000001"
-   ]
+   ],
+   "plateau_samples": 2,
+   "start_mM": 3.0,
+   "depleted_at_start": false
   },
   {
    "taxon": "Beta beta B1",
    "resource": "glucose",
    "coefficient": 0.0,
-   "unit": "mM per od per h",
+   "unit": "mM h-1 per (od)",
    "biomass_unit": "od",
    "sd": 0.0,
    "se": 0.0,
    "n": 2,
+   "n_experiments": 1,
    "start_h": 16.0,
    "end_h": 24.0,
    "studies": [
     "SMGDB00000001"
-   ]
+   ],
+   "plateau_samples": 2,
+   "start_mM": 4.0,
+   "depleted_at_start": false
   }
  ],
  "initial_concentrations": [
@@ -606,7 +622,8 @@
    "stationary_not_reached": 3,
    "not_detected_in_value_medium": 3
   },
-  "biomass_falls": []
+  "biomass_falls": [],
+  "technique_mismatch": "Growth curves of different techniques: fc for Alpha alpha A1; od for Beta beta B1. Growth and decline rates and biomass from different techniques can differ manyfold (a cell count falls where optical density stays flat); the technique columns say which each rests on."
  },
  "phases": [
   "exponential",

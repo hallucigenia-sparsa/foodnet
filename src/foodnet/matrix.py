@@ -355,14 +355,14 @@ def declines_csv(result: dict) -> str:
         r = declines.get(t.id)
         if r:
             rows.append([t.name, f"{r['rate']:.6g}", r["unit"], NA if r["se"] is None else f"{r['se']:.6g}",
-                         NA if r["sd"] is None else f"{r['sd']:.6g}", r["n"], r["phase"], r["death_replicates"],
-                         f"{r['start_h']:.6g}", f"{r['end_h']:.6g}", r["source"], " ".join(r["studies"]),
-                         r.get("technique", "")])
+                         NA if r["sd"] is None else f"{r['sd']:.6g}", r["n"], r.get("n_experiments", ""), r["phase"],
+                         r["death_replicates"], f"{r['start_h']:.6g}", f"{r['end_h']:.6g}", r["source"],
+                         " ".join(r["studies"]), r.get("technique", "")])
         else:
-            rows.append([t.name, NA, "1/h", NA, NA, 0, "", "", NA, NA, missing.get(t.id, ""), "", ""])
+            rows.append([t.name, NA, "1/h", NA, NA, 0, 0, "", "", NA, NA, missing.get(t.id, ""), "", ""])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
-    return _csv([first, "decline_rate", "unit", "se", "sd", "replicates", "phase", "death_replicates",
-                 "start_h", "end_h", "source", "studies", "technique"], rows)
+    return _csv([first, "decline_rate", "unit", "se", "sd", "replicates", "experiments", "phase",
+                 "death_replicates", "start_h", "end_h", "source", "studies", "technique"], rows)
 
 
 def maintenance_csv(result: dict) -> str:
@@ -376,10 +376,12 @@ def maintenance_csv(result: dict) -> str:
         for mid, m in sorted((found.get(t.id) or {}).items(), key=lambda kv: names.get(kv[0], kv[0])):
             rows.append([t.name, names.get(mid, mid), f"{m['coefficient']:.6g}", m["unit"],
                          NA if m["se"] is None else f"{m['se']:.6g}", NA if m["sd"] is None else f"{m['sd']:.6g}",
-                         m["n"], f"{m['start_h']:.6g}", f"{m['end_h']:.6g}", " ".join(m["studies"])])
+                         m["n"], m["n_experiments"], f"{m['start_h']:.6g}", f"{m['end_h']:.6g}",
+                         m["plateau_samples"], f"{m['start_mM']:.6g}", "yes" if m["depleted_at_start"] else "no",
+                         " ".join(m["studies"])])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
-    return _csv([first, "resource", "maintenance", "unit", "se", "sd", "replicates", "start_h", "end_h",
-                 "studies"], rows)
+    return _csv([first, "resource", "maintenance", "unit", "se", "sd", "replicates", "experiments", "start_h",
+                 "end_h", "plateau_samples", "start_mM", "depleted_at_start", "studies"], rows)
 
 
 def maintenance_payload(result: dict) -> list:
@@ -566,16 +568,51 @@ def provenance_lines(meta: dict) -> list:
     return lines
 
 
+# what the decline and maintenance tables are, for the CRM README and the help alike
+DECLINE_TEXT = (
+    "Decline rates (decline_rates.csv): each taxon's loss of log abundance per hour from where its growth curve "
+    "enters its plateau band (within a tenth of the curve's log rise below its maximum) to its last sample; "
+    "negative where the curve still creeps up. It is the mean over the replicates with metabolite data, else "
+    "another monoculture in the same medium (source says which), over the growth curves of the technique most "
+    "of them use (technique; replicates of another technique are left out). sd and se are the scatter between "
+    "replicates, "
+    "treating each as independent; replicates of one experiment share inoculum and sampling, so experiments "
+    "says how many independent experiments they come from. phase is death where most curves leave their "
+    "plateau band before the last sample, else plateau. What it measures depends on the technique: optical "
+    "density and total cell counts keep dead cells until they lyse, so for anything but a viable count the rate "
+    "is a loss of counted biomass, which bounds death from below, and on a plateau birth and death are "
+    "confounded as well. start_h and end_h are the window. A taxon without a usable decline (fewer than three "
+    "samples from the plateau's start to the end, a curve that spikes or falls to zero, or growth curves "
+    "foodnet judged unusable) is NA, not 0.")
+MAINTENANCE_TEXT = (
+    "Maintenance (maintenance.csv): the Pirt maintenance coefficient, a separate characteristic nothing else "
+    "here uses: what each taxon took up of a compound per unit of biomass per hour while its culture sat on its "
+    "growth plateau (from its highest sample to the last sample within the plateau band), the mean over its "
+    "replicates with metabolite data, with sd and se between replicates (each treated as independent), "
+    "experiments, the window and plateau_samples (the fewest growth samples a culture's plateau holds). Positive "
+    "is uptake, negative release; a change within the detection limit is 0. start_mM is the compound's mean "
+    "concentration at the plateau's start; depleted_at_start says it was below the detection limit, so a 0 "
+    "there means the compound was gone, not that maintenance needed none. On a plateau growth and death may "
+    "balance, so the coefficient bounds Pirt's m_s from above. The biomass is in the unit of the growth curves "
+    "most of the taxon's cultures use (unit: mM per hour per that unit; per cells/mL it is micromoles per "
+    "cell per hour); cultures in another unit, cultures that did not grow, a duplicate deposit and "
+    "growth curves foodnet judged unusable give none.")
+
+
 def technique_mismatch(result: dict) -> str:
     """A warning when the growth rates or decline rates rest on growth curves of more than one technique, across
     taxa or within one, which a model would compare as if they were alike; empty otherwise."""
     names = result.get("names") or {}
     used = {}
+    # the technique alone: a log-slope rate does not depend on the unit's scale (Cells/mL against Cells/uL)
     for kind in ("rates", "declines"):
         for tid, r in (result.get(kind) or {}).items():
             for t in (r.get("technique") or "").split("; "):
                 if t:
-                    used.setdefault(t.rsplit(" (", 1)[0], set()).add(names.get(tid, tid))
+                    used.setdefault(t.split(" ", 1)[0], set()).add(names.get(tid, tid))
+    for tid, b in (result.get("biomass") or {}).items():
+        if b and b.get("unit"):
+            used.setdefault(b["unit"].split(" ", 1)[0], set()).add(names.get(tid, tid))
     if len(used) < 2:
         return ""
     return ("Growth curves of different techniques: " + "; ".join(
@@ -600,11 +637,13 @@ def sources_lines(result: dict, which: str = "matrices") -> list:
              "them (other concentration units converted by foodnet, anything else left out), and its growth curve.",
              "  * The growth curve of a replicate: a per-strain measurement before the culture-level one, and cell "
              "counts before optical density (flow cytometry, qPCR, plate counts, CFU, 16S in absolute units, then "
-             "OD); the first that gives an end of exponential growth is used. Its technique and unit name the "
-             "unit of the biomass.",
+             "OD); for a culture with metabolites, the first that gives an end of exponential growth is used, for "
+             "a monoculture without them (a growth rate's fallback) the first in that order. It sets the growth "
+             "phases and is the unit of the biomass.",
              "  * Compounds are mGrowthDB's metabolite records; an acid and its conjugate base (acetic acid and "
              "acetate) are joined as one pool under the base's ChEBI id.",
-             "  * Computed by foodnet from the metabolite series: the amounts and their evidence, cautions.csv"
+             "  * Computed by foodnet from the metabolite series, over the phase the growth curve sets (or the time "
+             "window): the amounts and their evidence, cautions.csv"
              + (", intervals.csv, bounds.csv and initial_concentrations.csv (each culture's first sample)."
                 if which == "crm" else ".")]
     if which == "crm":
@@ -713,16 +752,16 @@ def readme(result: dict, which: str = "matrices") -> str:
             lines += [title, *(f"  * {x}" for x in items), ""]
     if which == "crm":
         settings = result["settings"]
-        fit = (f"easylinear, the steepest stretch of {settings.get('rate_window', 5)} consecutive samples anywhere "
-               "on the curve, widened over the neighbouring stretches whose slope reaches 95% of it"
+        fit = (f"easylinear: of the stretches of {settings.get('rate_window', 5)} consecutive samples, from the "
+               "first to the last whose slope reaches 95% of the steepest, with every sample between"
                if settings.get("rate_method", "easylinear") == "easylinear" else
                "baranyi, the Baranyi-Roberts model fitted from the first sample to the end of the curve's plateau")
         lines += ["Growth rates: each taxon's maximum specific growth rate in monoculture (1/h), fitted to each "
                   f"replicate's whole growth curve by {fit}, so over the interval the fit finds, not over the "
                   "phase or time window the values cover; then the median over the replicates whose metabolites "
                   "gave the values, or else over another monoculture in the same medium. growth_rates.csv says "
-                  "which, per taxon, the method, and fit_start_h and fit_end_h, the replicates' mean first and last "
-                  "hour of the stretch the fit used, to set beside intervals.csv, and technique, the growth curve's "
+                  "which, per taxon, the method, and fit_start_h and fit_end_h, the earliest first and the latest last "
+                  "hour any replicate's fit used, to set beside intervals.csv, and technique, the growth curve's "
                   "measurement (technique, unit, and whether it counts the strain or the whole culture): rates from "
                   "different techniques can differ manyfold. A taxon without a rate needs one "
                   "from elsewhere. crm.json also "
@@ -731,18 +770,8 @@ def readme(result: dict, which: str = "matrices") -> str:
                   *(["Entries seen only in another medium were set to TRUE in the matrices; a CRM needs amounts, "
                      "so they are missing here (their evidence says presence_only)."]
                     if presence_entries(result) == "true" else []),
-                  "Decline rates: each taxon's loss of log abundance per hour from its growth peak to its last "
-                  "sample, the mean over the same kind of replicates as its growth rate, with standard error, "
-                  "standard deviation and n (decline_rates.csv). phase says whether most curves leave their "
-                  "plateau (death: the rate measures a death phase) or stay on it (plateau: birth and death are "
-                  "confounded, so it bounds death from below); start_h and end_h are the window. A taxon without a "
-                  "usable decline is NA, not 0.",
-                  "Maintenance (maintenance.csv): the Pirt maintenance coefficient, a separate characteristic "
-                  "nothing else here uses: what each taxon took up of a compound per unit of biomass per hour while "
-                  "its culture sat on its growth plateau (from its peak to the last sample within the plateau "
-                  "band), the mean over its replicates with standard error, standard deviation, n and that window; "
-                  "positive is uptake, negative release; a change within the detection limit is 0. The biomass is "
-                  "in the growth curve's unit, which the unit column names.",
+                  DECLINE_TEXT,
+                  MAINTENANCE_TEXT,
                   "Initial concentrations: each metabolite's concentration at the first sample of the value-medium "
                   "cultures, averaged (initial_concentrations.csv), in mM.",
                   "Biomass: each taxon's growth over the same phase, from its growth curve, in that curve's unit "
@@ -1111,7 +1140,9 @@ def crm_payload(result: dict) -> dict:
                     "cautions": block["cautions"], "inconclusive": block["inconclusive"],
                     # how much each caution matters (1 most), so R can say which values to read first
                     "caution_tiers": dict(CAUTION_TIERS),
-                    "biomass_falls": block["biomass_falls"]},
+                    "biomass_falls": block["biomass_falls"],
+                    # growth curves of different techniques behind the rates or biomass ("" when one)
+                    "technique_mismatch": technique_mismatch(result)},
         # with "Both", the stationary phase beside the exponential one, with the same taxa and resources
         "phases": crm_phases(result),
         "other_phases": {p: _phase_block(result, p) for p in crm_phases(result)[1:]},

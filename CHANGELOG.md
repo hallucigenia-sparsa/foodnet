@@ -14,29 +14,31 @@ semantic versioning.
 - The CRM README, the help and the README say over which interval the growth rates are fitted: each
   replicate's whole growth curve, by the rate method's own interval, not the phase or time window of the values.
 - `growth_rates.csv` (and the report, crm.json's `growth_rate_detail` and R's `crm_write()`) gives `fit_start_h`
-  and `fit_end_h`: the replicates' mean first and last hour of the stretch each growth rate was fitted over.
+  and `fit_end_h`: the earliest first and the latest last hour any replicate's growth-rate fit used.
 - `growth_rates.csv` and `decline_rates.csv` name the growth curve's technique (technique, unit, strain or
   culture), and the CRM README and the report warn when taxa rest on different techniques: a cell count can
   fall where optical density stays flat.
 - Both downloads' README says where the numbers come from: which mGrowthDB records (and which growth curve of
   a replicate), what only ChEBI gives (formula and charge), what foodnet computes from them, and the studies
   read with their uploadedAt.
-- CRM mode gives each taxon's decline rate after its growth peak (`decline_rates.csv`, `decline_rates` and
-  `decline_rate_detail` in `crm.json`, `crm$decline_rates` in R): the loss of log abundance per hour from the
-  peak to the last sample, the mean over the replicates with its standard error, standard deviation and n, its
-  window, and whether it measures a death phase or a plateau (a lower bound on death). Absent, not 0, where
-  there is no usable decline.
+- CRM mode gives each taxon's decline rate (`decline_rates.csv`, `decline_rates` and `decline_rate_detail` in
+  `crm.json`, `crm$decline_rates` in R): the loss of log abundance per hour from where the growth curve enters
+  its plateau band to the last sample, the mean over the replicates of one technique, with the scatter between
+  replicates, the number of experiments, the window, and whether the curves leave the plateau (death) or stay
+  on it. Absent, not 0, where there is no usable decline.
 - CRM mode gives the Pirt maintenance coefficient as a separate characteristic (`maintenance.csv`,
   `maintenance` in `crm.json`, `crm$maintenance` in R), which nothing else uses: each taxon's uptake of each
-  compound per unit of biomass per hour on its growth plateau, with standard error, standard deviation, n and
-  the window.
+  compound per unit of biomass per hour on its growth plateau, with its scatter, experiments, window, the
+  compound's concentration at the plateau's start and whether it was already used up.
 
 ### Fixed
 
+- A duplicate deposit, counted once in the matrices, was counted twice in the growth rates' replicates (and so
+  their n and median): its cultures now give no growth rate.
 - On macOS foodnet checks mGrowthDB's and ChEBI's certificates against the system's trust store, through
-  truststore, now its one runtime dependency (macOS only). With a Python uv or the python.org installer put on
-  a Mac, which lacks the root mGrowthDB's certificate chains to, `uv tool install foodnet` failed at the first
-  search.
+  truststore 0.10.5 or later, now its one runtime dependency (macOS only), with a context per thread. With a
+  Python uv or the python.org installer put on a Mac, which lacks the root mGrowthDB's certificate chains to,
+  `uv tool install foodnet` failed at the first search.
 
 ## [0.4.0] (2026-10-09)
 

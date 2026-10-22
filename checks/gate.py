@@ -49,9 +49,10 @@ DASH = re.compile(r"[–—]|(?<=\S) -- (?=\S)|(?<=\S) - (?=\S)")
 MERGE_MARKER = re.compile(r"^(?:<{7}|>{7})(?: |$)", re.M)
 
 STDLIB = set(getattr(sys, "stdlib_module_names", set())) | {"__future__"}
-# the runtime dependencies pyproject.toml declares (tests/test_gate.py checks the two agree): truststore, macOS only,
-# checks mGrowthDB's certificate against the system's store (src/foodnet/tls.py)
-DECLARED = {"truststore"}
+# the runtime dependencies pyproject.toml declares, and the one file each may be imported in (tests/test_tls.py
+# checks the names agree with pyproject): truststore, macOS only, checks mGrowthDB's certificate against the
+# system's store, imported only in src/foodnet/tls.py, behind its platform check
+DECLARED = {"truststore": {"src/foodnet/tls.py"}}
 
 
 def tracked_files():
@@ -151,7 +152,7 @@ def check_self_contained(rels):
             else:
                 continue
             for m in mods:
-                if m != "foodnet" and m not in STDLIB and m not in DECLARED:
+                if m != "foodnet" and m not in STDLIB and r not in DECLARED.get(m, ()):
                     bad.append(f"{r}: imports {m!r} (not stdlib or foodnet; declare it or drop it)")
     return bad
 

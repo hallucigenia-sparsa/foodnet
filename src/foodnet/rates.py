@@ -253,24 +253,34 @@ DECLINE_MIN_POINTS = 3      # the peak and two samples after it: a slope, not a 
 
 
 def decline(times, values) -> dict:
-    """The sustained decline after a growth curve's peak (Karoline, 2026-10-09, for the biomass loss rate of a
-    consumer-resource fit): the least-squares slope of log abundance from the peak (the highest sample) to the
-    last sample, as a rate of loss per hour (positive: the curve falls; negative: it still creeps up), with
-    that window. `death` says whether the curve leaves its plateau (falls below it by the rule the Baranyi fit
-    cuts at, PLATEAU) before the last sample: then the rate measures a death phase; otherwise the curve stays on
-    its plateau, where birth and death are confounded, so the rate bounds death from below. A decline rate, not
-    a maintenance rate: what it bounds is the user's inference. RateUnavailable when there is no usable decline
-    (the peak too close to the end)."""
+    """The sustained decline after a growth curve reaches its plateau (Karoline, 2026-10-09, for the biomass loss
+    rate of a consumer-resource fit): the least-squares slope of log abundance from the first sample within the
+    plateau band (PLATEAU below the maximum, the band the Baranyi fit cuts at) to the last sample, as a rate of
+    loss per hour (positive: the curve falls; negative: it still creeps up), with that window. The start is
+    where the curve enters the band, not its highest sample (Karoline, 2026-10-22, "Anchor at plateau entry"):
+    a slope from the highest sample starts on whatever noise made it highest, and a review's simulation of flat
+    plateaus read a decline of up to 0.044 per hour where there was none. `death` says whether the curve leaves
+    its plateau band before the last sample. What a curve counts decides what the rate is: optical density and
+    total cell counts keep dead cells until they lyse, so for anything but a viable count it is a loss of counted
+    biomass, which bounds death from below. RateUnavailable when there is no usable decline (fewer than
+    DECLINE_MIN_POINTS samples from the plateau's start to the last sample, or a curve that falls to zero)."""
+    pairs = list(zip(times, values, strict=True))
     xs, ys = _positive_logs(times, values)
     if not ys:
         raise RateUnavailable("no positive values")
-    peak = ys.index(max(ys))
-    tail_x, tail_y = xs[peak:], ys[peak:]
+    top = max(ys)
+    band = top - PLATEAU * (top - ys[0])
+    entry = next(i for i, y in enumerate(ys) if y >= band)
+    zero = [t for t, v in pairs if t > xs[entry] and v <= 0]
+    if zero:
+        # log abundance has no value at 0: the strongest decline would otherwise read as too few samples (a review)
+        raise RateUnavailable(f"the curve falls to zero at {zero[0]:g} h")
+    tail_x, tail_y = xs[entry:], ys[entry:]
     if len(tail_x) < DECLINE_MIN_POINTS:
-        raise RateUnavailable(f"fewer than {DECLINE_MIN_POINTS} samples from the peak to the last sample")
+        raise RateUnavailable(f"fewer than {DECLINE_MIN_POINTS} samples from the plateau's start to the last sample")
     fit = _line(tail_x, tail_y)
     if fit is None:
-        raise RateUnavailable("the samples after the peak share one time")
+        raise RateUnavailable("the samples after the plateau's start share one time")
     plateau_x, _ = _until_decline(xs, ys)
     return {"rate": -fit[0], "start": tail_x[0], "end": tail_x[-1], "points": len(tail_x),
             "death": len(plateau_x) < len(xs)}

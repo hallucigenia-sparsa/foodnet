@@ -49,7 +49,7 @@ def test_the_crm_parameters_carry_decline_rates_or_say_why_not(client):
     p = matrix.crm_payload(r)
     assert all(v is None for v in p["decline_rates"]) and p["decline_rate_detail"] == {}
     table = zipfile.ZipFile(io.BytesIO(matrix.crm_package(r))).read("decline_rates.csv").decode()
-    assert table.splitlines()[0].startswith("taxon,decline_rate,unit,se,sd,replicates,phase")
+    assert table.splitlines()[0].startswith("taxon,decline_rate,unit,se,sd,replicates,experiments,phase")
     assert all(row.split(",")[1] == "NA" for row in table.splitlines()[1:])
 
 
@@ -80,7 +80,10 @@ def test_the_maintenance_coefficient_is_uptake_per_biomass_per_hour_on_the_plate
     A, GLC = "ncbi:1", next(m for m, n in r["names"].items() if n == "glucose")
     m = r["maintenance"][A][GLC]
     assert m["coefficient"] == pytest.approx(0.5 / 1000 / 12) and m["n"] == 3
-    assert (m["start_h"], m["end_h"]) == (12, 24) and m["unit"].startswith("mM per ") and m["se"] is not None
+    assert (m["start_h"], m["end_h"]) == (12, 24) and m["unit"] == "mM h-1 per (fc)" and m["se"] is not None
+    # glucose at the plateau's start: 1.9, 2.1 and 2 mM, so it was there to take up; two growth samples on it
+    assert m["start_mM"] == pytest.approx(2.0) and not m["depleted_at_start"]
+    assert (m["plateau_samples"], m["n_experiments"]) == (2, 1)
     p = matrix.crm_payload(r)
     row = next(x for x in p["maintenance"] if x["taxon"] == "Alpha alpha A1" and x["resource"] == "glucose")
     assert row["coefficient"] == pytest.approx(m["coefficient"]) and "cultures" not in row
@@ -102,3 +105,48 @@ def test_rates_name_the_growth_curve_technique_and_warn_when_taxa_differ(client)
     warning = matrix.technique_mismatch(r)
     assert warning.startswith("Growth curves of different techniques: fc") and "od for" in warning
     assert warning in matrix.readme(r, "crm")
+
+
+def test_the_decline_starts_where_the_curve_enters_its_plateau_not_at_its_highest_sample():
+    # Karoline, 2026-10-22: "Anchor at plateau entry"; a noisy high point at 24 h no longer starts the slope
+    d = rates.decline([0, 4, 8, 12, 24, 36, 48], [1, 10, 100, 1000, 1300, 1000, 1000])
+    assert d["start"] == 12 and d["points"] == 4
+    with pytest.raises(rates.RateUnavailable, match="falls to zero at 36 h"):
+        rates.decline([0, 4, 8, 12, 24, 36, 48], [1, 10, 100, 1000, 100, 0, 0])
+
+
+def test_a_tie_between_units_always_goes_to_the_preferred_technique():
+    # a review: a tie went by string hashing, which changes from run to run
+    assert crm.majority(["od", "fc Cells/mL", "od", "fc Cells/mL"]) == "fc Cells/mL"
+    assert crm.majority(["od", "od", "fc Cells/mL"]) == "od"
+
+
+def test_declines_keep_the_technique_most_replicates_use():
+    found = [{"rate": r, "start": 12.0, "end": 48.0, "points": 4, "death": True, "study": "S", "experiment": e,
+              "technique": t} for r, e, t in ((0.05, "E1", "fc Cells/mL (strain)"),
+                                              (0.06, "E1", "fc Cells/mL (strain)"), (0.0, "E2", "od (culture)"))]
+    s = crm.summarize_declines(found, crm.FROM_METABOLITE_REPLICATES)
+    assert s["rate"] == pytest.approx(0.055) and s["technique"] == "fc Cells/mL (strain)"
+    assert (s["n"], s["n_experiments"], s["other_techniques_left_out"]) == (2, 1, 1)
+
+
+def _plateau_culture(experiment, glucose, not_grown=False, technique="fc"):
+    import types
+    return types.SimpleNamespace(
+        growth={"times": [0, 4, 8, 12, 24], "values": [1, 10, 100, 1000, 1000], "technique": technique,
+                "unit": "", "level": "culture"},
+        not_grown=not_grown, taxon={"id": "ncbi:9"}, experiment=experiment, study="S", label=experiment,
+        metabolites={"glc": {"series": [(0, 10), (12, glucose[0]), (24, glucose[1])]}})
+
+
+def test_maintenance_leaves_out_repeats_and_cultures_that_did_not_grow_and_flags_a_used_up_compound():
+    cultures = [_plateau_culture("E1", (2.0, 1.0)), _plateau_culture("E1", (2.2, 1.0)),
+                _plateau_culture("DUP", (2.0, 1.0)), _plateau_culture("E3", (2.0, 1.0), not_grown=True),
+                _plateau_culture("E4", (2.0, 1.0), technique="od")]
+    found, skipped = crm.maintenance(cultures, 0.2, dropped={("DUP", "glc")})
+    m = found["ncbi:9"]["glc"]
+    assert (m["n"], m["n_experiments"], m["biomass_unit"]) == (2, 1, "fc")      # not DUP, E3, nor E4's OD
+    assert any("in od" in why for _, why in skipped)
+    used_up, _ = crm.maintenance([_plateau_culture("E1", (0.05, 0.0)), _plateau_culture("E1", (0.1, 0.0))], 0.2)
+    gone = used_up["ncbi:9"]["glc"]
+    assert gone["coefficient"] == 0 and gone["depleted_at_start"] and gone["start_mM"] == pytest.approx(0.075)

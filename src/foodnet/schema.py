@@ -3,7 +3,7 @@
 The schema is built from the model's own fields and vocabularies, and the shipped file
 (`schema/metabolite_network.schema.json`) must equal it: the guardrail gate checks both, and that an emitted
 network validates (grownet's contract rule). `validate_document` checks what the schema says, by hand, since
-the tool has no runtime dependencies.
+the tool uses the standard library only here.
 """
 from __future__ import annotations
 
