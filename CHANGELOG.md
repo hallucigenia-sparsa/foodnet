@@ -22,23 +22,24 @@ semantic versioning.
   a replicate), what only ChEBI gives (formula and charge), what foodnet computes from them, and the studies
   read with their uploadedAt.
 - CRM mode gives each taxon's decline rate (`decline_rates.csv`, `decline_rates` and `decline_rate_detail` in
-  `crm.json`, `crm$decline_rates` in R): the loss of log abundance per hour from where the growth curve enters
-  its plateau band to the last sample, the mean over the replicates of one technique, with the scatter between
-  replicates, the number of experiments, the window, and whether the curves leave the plateau (death) or stay
-  on it. Absent, not 0, where there is no usable decline.
+  `crm.json`, `crm$decline_rates` in R): the loss of log abundance per hour from the end of growth (the first
+  sample at 90% of the rise) to the last sample, the mean over the replicates of one technique, with the scatter between
+  replicates, the number of experiments, the window, and whether the curves leave the plateau or fall to zero
+  (death) or stay on it. Absent, not 0, where there is no usable decline.
 - CRM mode gives the Pirt maintenance coefficient as a separate characteristic (`maintenance.csv`,
   `maintenance` in `crm.json`, `crm$maintenance` in R), which nothing else uses: each taxon's uptake of each
   compound per unit of biomass per hour on its growth plateau, with its scatter, experiments, window, the
-  compound's concentration at the plateau's start and whether it was already used up.
+  compound's concentration at the plateau's start and how many replicates had already used it up.
 
 ### Fixed
 
 - A duplicate deposit, counted once in the matrices, was counted twice in the growth rates' replicates (and so
-  their n and median): its cultures now give no growth rate.
+  their n and median), in the biomass and in the initial concentrations: it now counts once, and the copy
+  with the richer growth curve gives the growth rate.
 - On macOS foodnet checks mGrowthDB's and ChEBI's certificates against the system's trust store, through
   truststore 0.10.5 or later, now its one runtime dependency (macOS only), with a context per thread. With a
-  Python uv or the python.org installer put on a Mac, which lacks the root mGrowthDB's certificate chains to,
-  `uv tool install foodnet` failed at the first search.
+  Python uv put on a Mac, which lacks the root mGrowthDB's certificate chains to, `uv tool install foodnet`
+  failed at the first search.
 
 ## [0.4.0] (2026-10-09)
 

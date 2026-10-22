@@ -145,7 +145,7 @@
    ],
    "plateau_samples": 2,
    "start_mM": 4.0,
-   "depleted_at_start": false
+   "depleted_replicates": 0
   },
   {
    "taxon": "Alpha alpha A1",
@@ -164,7 +164,7 @@
    ],
    "plateau_samples": 2,
    "start_mM": 2.0000000000000004,
-   "depleted_at_start": false
+   "depleted_replicates": 0
   },
   {
    "taxon": "Beta beta B1",
@@ -183,7 +183,7 @@
    ],
    "plateau_samples": 2,
    "start_mM": 3.0,
-   "depleted_at_start": false
+   "depleted_replicates": 0
   },
   {
    "taxon": "Beta beta B1",
@@ -202,7 +202,7 @@
    ],
    "plateau_samples": 2,
    "start_mM": 4.0,
-   "depleted_at_start": false
+   "depleted_replicates": 0
   }
  ],
  "initial_concentrations": [
@@ -623,7 +623,12 @@
    "not_detected_in_value_medium": 3
   },
   "biomass_falls": [],
-  "technique_mismatch": "Growth curves of different techniques: fc for Alpha alpha A1; od for Beta beta B1. Growth and decline rates and biomass from different techniques can differ manyfold (a cell count falls where optical density stays flat); the technique columns say which each rests on."
+  "technique_mismatch": "Growth curves of different techniques: fc for Alpha alpha A1; od for Beta beta B1. Growth and decline rates and biomass from different techniques can differ manyfold (a cell count falls where optical density stays flat); the technique columns say which each rests on.",
+  "without_a_decline": {
+   "Alpha alpha A1": "its growth curves in this medium give no usable decline (see the report)",
+   "Beta beta B1": "its growth curves in this medium give no usable decline (see the report)",
+   "Gamma gamma C1": "no growth curve of it in this medium"
+  }
  },
  "phases": [
   "exponential",

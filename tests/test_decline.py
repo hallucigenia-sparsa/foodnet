@@ -82,7 +82,7 @@ def test_the_maintenance_coefficient_is_uptake_per_biomass_per_hour_on_the_plate
     assert m["coefficient"] == pytest.approx(0.5 / 1000 / 12) and m["n"] == 3
     assert (m["start_h"], m["end_h"]) == (12, 24) and m["unit"] == "mM h-1 per (fc)" and m["se"] is not None
     # glucose at the plateau's start: 1.9, 2.1 and 2 mM, so it was there to take up; two growth samples on it
-    assert m["start_mM"] == pytest.approx(2.0) and not m["depleted_at_start"]
+    assert m["start_mM"] == pytest.approx(2.0) and m["depleted_replicates"] == 0
     assert (m["plateau_samples"], m["n_experiments"]) == (2, 1)
     p = matrix.crm_payload(r)
     row = next(x for x in p["maintenance"] if x["taxon"] == "Alpha alpha A1" and x["resource"] == "glucose")
@@ -101,18 +101,47 @@ def test_rates_name_the_growth_curve_technique_and_warn_when_taxa_differ(client)
     A, B = "ncbi:1", "ncbi:2"
     assert r["rates"][A]["technique"].startswith("fc") and r["rates"][B]["technique"].startswith("od")
     assert matrix.rates_csv(r).splitlines()[0].endswith(",technique")
-    assert matrix.declines_csv(r).splitlines()[0].endswith(",technique")
+    assert ",technique," in matrix.declines_csv(r).splitlines()[0]
     warning = matrix.technique_mismatch(r)
     assert warning.startswith("Growth curves of different techniques: fc") and "od for" in warning
     assert warning in matrix.readme(r, "crm")
 
 
-def test_the_decline_starts_where_the_curve_enters_its_plateau_not_at_its_highest_sample():
-    # Karoline, 2026-10-22: "Anchor at plateau entry"; a noisy high point at 24 h no longer starts the slope
-    d = rates.decline([0, 4, 8, 12, 24, 36, 48], [1, 10, 100, 1000, 1300, 1000, 1000])
-    assert d["start"] == 12 and d["points"] == 4
-    with pytest.raises(rates.RateUnavailable, match="falls to zero at 36 h"):
+def test_the_decline_starts_at_the_end_of_growth_not_at_the_highest_sample():
+    # Karoline, 2026-10-22: "First sample >= 90% of max": 1 + 0.9 * 1299 = 1170 is first reached at 24 h, not at
+    # the band's lower edge (12 h, still growing) nor on the noise that made 24 h the highest
+    d = rates.decline([0, 4, 8, 12, 24, 36, 48, 60], [1, 10, 100, 800, 1300, 1000, 1000, 1000])
+    assert d["start"] == 24 and d["points"] == 4
+    # a curve that falls to zero is fitted up to the zero and counts as death
+    z = rates.decline([0, 4, 8, 12, 24, 36, 48, 60], [1, 10, 100, 1000, 500, 250, 125, 0])
+    assert z["to_zero"] and z["death"] and z["end"] == 48 and z["rate"] == pytest.approx(math.log(2) / 12)
+    with pytest.raises(rates.RateUnavailable, match="to the zero"):
         rates.decline([0, 4, 8, 12, 24, 36, 48], [1, 10, 100, 1000, 100, 0, 0])
+
+
+def test_of_a_duplicate_pair_the_richer_growth_curve_gives_the_rates():
+    # Karoline, 2026-10-22: "Richer growth curve": the metabolite rule kept E1, whose curve lacks the 8 h sample
+    import types
+
+    from foodnet import search
+
+    def culture(experiment, times):
+        return types.SimpleNamespace(experiment=experiment, growth={"times": times,
+                                                                    "values": [10 ** i for i in range(len(times))]})
+    sparse = [culture("E1", [0, 4, 12, 16]) for _ in range(3)]
+    rich = [culture("E2", [0, 4, 8, 12, 16]) for _ in range(3)]
+    out, maint_out = search._growth_copies([(sparse, rich, ["acetate", "glucose"])])
+    assert out == {"E1"} and maint_out == {("E1", "acetate"), ("E1", "glucose")}
+    # a tie keeps the metabolite rule's copy
+    assert search._growth_copies([(rich, [culture("E3", [0, 4, 8, 12, 16])], ["acetate"])])[0] == {"E3"}
+
+
+def test_a_left_out_copy_gives_no_growth_rate_or_decline(client, monkeypatch):
+    # pins the search's use of the copies: leaving A's only experiment out leaves A without either
+    from foodnet import search
+    monkeypatch.setattr(search, "_growth_copies", lambda pairs: ({"EMGDB000000001"}, set()))
+    r = run(client, report_rates=True, rate_window=3)
+    assert "ncbi:1" not in r["rates"] and "ncbi:1" not in r["declines"]
 
 
 def test_a_tie_between_units_always_goes_to_the_preferred_technique():
@@ -149,4 +178,38 @@ def test_maintenance_leaves_out_repeats_and_cultures_that_did_not_grow_and_flags
     assert any("in od" in why for _, why in skipped)
     used_up, _ = crm.maintenance([_plateau_culture("E1", (0.05, 0.0)), _plateau_culture("E1", (0.1, 0.0))], 0.2)
     gone = used_up["ncbi:9"]["glc"]
-    assert gone["coefficient"] == 0 and gone["depleted_at_start"] and gone["start_mM"] == pytest.approx(0.075)
+    assert gone["coefficient"] == 0 and gone["depleted_replicates"] == 2 and gone["start_mM"] == pytest.approx(0.075)
+
+
+def test_fit_hours_span_every_replicates_fit():
+    # a review: means of 2-6 h and 20-30 h named 11-18 h, which no fit used
+    import types
+    curves = [([0, 2, 4, 6, 8, 10], [1, 10, 100, 1000, 1000, 1000]),
+              ([0, 10, 20, 25, 30, 40], [1, 1, 10, 100, 1000, 1000])]
+    cultures = [types.SimpleNamespace(taxon={"id": "t"}, study="S", label=str(i), growth={
+        "times": t, "values": v, "technique": "od", "unit": "", "level": "culture"}) for i, (t, v) in enumerate(curves)]
+    found, _, _ = crm.growth_rates(["t"], cultures, [], set(), window=3)
+    assert (found["t"]["fit_start_h"], found["t"]["fit_end_h"]) == (0, 30)
+
+
+def test_merged_genera_keep_every_strains_studies(client):
+    r = run(client, report_rates=True, rate_window=3, merge_genera=True)
+    assert all(set(v["studies"]) for v in r["rates"].values())
+    from foodnet import search
+    merged, _ = search._genus_rates({"a": {"rate": 0.1, "n": 1, "studies": ["S1"], "source": "x", "fit_start_h": 0,
+                                           "fit_end_h": 8, "technique": "od (culture)"},
+                                     "b": {"rate": 0.3, "n": 2, "studies": ["S2"], "source": "y", "fit_start_h": 2,
+                                           "fit_end_h": 12, "technique": "fc (strain)"}},
+                                    {}, {"a": {"genus": "G", "name": "G a"}, "b": {"genus": "G", "name": "G b"}})
+    g = next(iter(merged.values()))
+    assert g["studies"] == ["S1", "S2"] and g["source"] == "x; y" and (g["fit_start_h"], g["fit_end_h"]) == (0, 12)
+
+
+def test_growth_curves_judged_unusable_give_no_maintenance(client, monkeypatch):
+    # an OD read without its blank: C's curves give no end of exponential growth, so its values span the whole
+    # run; as for its growth rate and decline, it gets no maintenance (a review)
+    for rep in ("c1", "c1b"):
+        client.contexts[client.bioreplicates[rep]["measurementContexts"][0]["id"]] = \
+            [(0, 0.5), (8, 0.55), (16, 0.65), (24, 0.6)]
+    r = run(client, ignore_media=True, report_rates=True)
+    assert "ncbi:3" not in r["maintenance"] and "ncbi:3" not in r["declines"]

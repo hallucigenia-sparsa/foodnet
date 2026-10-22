@@ -282,7 +282,8 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     unmatched = [n for n in (second or {}).get("names", [])
                  if not any(d.second_window_matches(met, [n]) for c in cultures for met in c.metabolites.values())]
     skipped += skips
-    dropped, duplicate_lines = d.duplicates(cultures)
+    pairs = d.duplicate_pairs(cultures)
+    dropped, duplicate_lines = d.from_pairs(pairs)
     rows = [r for r in rows if (cultures[r["culture"]].experiment, r["metabolite"]) not in dropped]
     # cultures with a phase value vote for the value medium; a whole-run change is a value, but no phase's
     # and neither does a second-window change (Karoline, 2026-10-07: "phase values only"), so naming a compound
@@ -387,10 +388,12 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     maint = {}
     if s["report_rates"]:
         say(len(studies), len(studies), "Reading the growth rates")
-        # a duplicate deposit's cultures repeat the kept deposit's, so they give no rate, decline or maintenance
-        # of their own (Karoline, 2026-10-22: "Leave out everywhere"; a review: R. intestinalis counted 11
-        # replicates where the values counted 8)
-        repeats = {e for e, _ in dropped}
+        # of a duplicate deposit, one copy gives the growth rate, decline and maintenance (Karoline, 2026-10-22:
+        # "Leave out everywhere"; a review: R. intestinalis counted 11 replicates where the values counted 8):
+        # the copy with the richer growth curve, which need not be the one the metabolite rule keeps (Karoline,
+        # 2026-10-22, "Richer growth curve"; a review: B. thetaiotaomicron's kept copy lacks the 8 h sample, so
+        # its fit ran to 24 h)
+        repeats, maint_dropped = _growth_copies(pairs)
         value_cultures = [cultures[i] for i in sorted(chosen) if cultures[i].experiment not in repeats]
         others = [c for i, c in enumerate(cultures) if i not in chosen and c.experiment not in repeats] + \
             read["growth_only"]
@@ -410,8 +413,17 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                                    "run), so no rate is taken from them; give one yourself")
         # the decline after the growth peak, a biomass loss rate for a fit (Karoline, 2026-10-09), from the same
         # kind of cultures, and not from curves judged unusable either
+        # nor from a culture whose own values span the whole run where its taxon has cultures with a phase, as
+        # biomass leaves it out (a review: two cultures that did not grow set a taxon's decline)
+        phased = {cultures[r["culture"]].taxon["id"] for r in value_rows
+                  if r["change"] is not None and "whole_run" not in r["cautions"]}
+        unphased = {r["culture"] for r in value_rows if "whole_run" in r["cautions"]} - \
+            {r["culture"] for r in value_rows if r["change"] is not None and "whole_run" not in r["cautions"]}
+        unphased = {id(cultures[i]) for i in unphased if cultures[i].taxon["id"] in phased}
+        curve_cultures = [c for c in value_cultures if id(c) not in unphased]
         declines, without_decline, decline_skips = crm.decline_rates(
-            list(taxa), value_cultures, others, set(rule["keys"]), s["ignore_media"], s["spike_factor"])
+            list(taxa), curve_cultures, others, set(rule["keys"]), s["ignore_media"], s["spike_factor"],
+            s["fraction"])
         skipped += decline_skips
         for t in whole_taxa:
             if declines.get(t, {}).get("source") == crm.FROM_METABOLITE_REPLICATES:
@@ -419,7 +431,11 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                 without_decline[t] = ("its growth curves give no end of exponential growth, so no decline is taken "
                                       "from them")
         # the Pirt maintenance coefficient on the growth plateau, a separate characteristic (Karoline, 2026-10-09)
-        maint, maint_skips = crm.maintenance(value_cultures, s["detection_limit"], limits, s["spike_factor"], dropped)
+        # every chosen culture but the copy left out above: of the other copy of a pair only the compounds the
+        # kept one did not measure (a review: R. intestinalis lost the formate only RI_WC measured)
+        maint, maint_skips = crm.maintenance(
+            [cultures[i] for i in sorted(chosen) if id(cultures[i]) not in unphased], s["detection_limit"], limits,
+            s["spike_factor"], maint_dropped)
         skipped += maint_skips
         for t in whole_taxa:
             maint.pop(t, None)              # growth curves judged unusable give no plateau either (a review)
@@ -433,15 +449,18 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
             maint = crm.summarize_maintenance(merged)
         net.meta["growth_rates"] = {"method": rates.method_name(s["rate_method"], s["rate_window"]),
                                     "rates": organism_rates, "without_a_rate": without_rate}
-    initial = crm.initial_concentrations([cultures[i] for i in sorted(chosen)])
+    initial = crm.initial_concentrations([cultures[i] for i in sorted(chosen)], dropped)
     # the growth over the phase a CRM is parameterized from (foodnet.matrix.crm_phase)
     crm_ph = "window" if window else ("exponential" if s["phase"] == "both" else s["phase"])
-    biomass = crm.biomass_changes([(i, cultures[i]) for i in sorted(chosen)], value_rows, crm_ph)
+    # a duplicate deposit counts once in the biomass as in the values (a review: R. intestinalis 11 against 8)
+    biomass_cultures = [(i, cultures[i]) for i in sorted(chosen) if cultures[i].experiment not in
+                        {drop[0].experiment for _, drop, _ in pairs}]
+    biomass = crm.biomass_changes(biomass_cultures, value_rows, crm_ph)
     # with "Both", the stationary phase travels beside the exponential one in the CRM parameters (Karoline,
     # 2026-10-07), with its own growth over it
     biomass_by_phase = {crm_ph: biomass}
     if crm_ph == "exponential" and s["phase"] == "both":
-        biomass_by_phase["stationary"] = crm.biomass_changes([(i, cultures[i]) for i in sorted(chosen)], value_rows,
+        biomass_by_phase["stationary"] = crm.biomass_changes(biomass_cultures, value_rows,
                                                              "stationary")
     # each culture's own changes, for the range of the electron balance (none for merged genera, whose strains
     # are no one culture's)
@@ -554,6 +573,28 @@ def _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window) -
                        "growth_unclear), so their values are the change over the whole run, not a phase (evidence "
                        "whole_run, arcs in phase whole_run). A CRM built on them takes in stationary uptake too.")
     return out
+
+
+def _richness(cultures) -> tuple:
+    """How well an experiment's growth curves sample growth: the mean number of samples up to the highest one,
+    then the mean number of samples."""
+    curves = [c.growth for c in cultures if c.growth]
+    if not curves:
+        return (0.0, 0.0)
+    up_to_peak = [g["values"].index(max(g["values"])) + 1 for g in curves]
+    return (sum(up_to_peak) / len(curves), sum(len(g["values"]) for g in curves) / len(curves))
+
+
+def _growth_copies(pairs) -> tuple:
+    """(experiments left out of growth rates, declines and maintenance, (experiment, compound) pairs maintenance
+    leaves out): of each duplicate pair the copy whose growth curves sample growth more richly gives them (a tie
+    keeps the metabolite rule's copy); of the other, maintenance keeps only compounds the pair does not share."""
+    out, pairs_out = set(), set()
+    for keep, drop, shared in pairs:
+        use, other = (drop, keep) if _richness(drop) > _richness(keep) else (keep, drop)
+        out.add(other[0].experiment)
+        pairs_out |= {(other[0].experiment, m) for m in shared}
+    return out, pairs_out
 
 
 def _genus_rates(found, missing, taxa):

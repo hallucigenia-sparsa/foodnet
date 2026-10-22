@@ -2,8 +2,9 @@
 grownet").
 
 On macOS the certificates are checked against the system's trust store, through truststore, foodnet's one runtime
-dependency (macOS only). Pythons that uv or the python.org installer put on a Mac check them against
-/etc/ssl/cert.pem, which lacks the root mGrowthDB's certificate chains to (HARICA TLS RSA Root CA 2021), so
+dependency (macOS only). The Pythons uv puts on a Mac check them against /etc/ssl/cert.pem, which lacks the root
+mGrowthDB's certificate chains to (HARICA TLS RSA Root CA 2021), and the python.org installer's has no root store
+at all until its Install Certificates step is run, so
 `uv tool install foodnet`, the README's install, failed at the first search; tests passed because the
 development Python (Anaconda's) and Homebrew's ship their own bundles. Elsewhere, or where truststore is missing,
 fails to load or is older than 0.10.5, it is Python's default context.

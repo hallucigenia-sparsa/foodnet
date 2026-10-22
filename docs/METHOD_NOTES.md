@@ -348,6 +348,15 @@ with metabolite data."
     rates, declines and maintenance ("Leave out everywhere"; R. intestinalis had counted 11 replicates where the
     values counted 8, which also changes its growth rate's n and median from 0.4.0). Following the rule biomass
     and maintenance keep, a taxon's decline takes the growth curves of the technique most of its replicates use.
+    Revised again after the second round, Karoline 2026-10-22: the slope starts at the first sample at or above
+    the fraction setting (0.9) of the way from the first sample to the maximum, foodnet's own end of exponential
+    growth ("First sample >= 90% of max"; the plateau band's lower edge lay inside exponential growth for cell
+    counts, which rise 6 to 7 log units, and read a true death of 0.02 per hour as -0.001); of a duplicate
+    pair, the copy whose growth curves sample growth more richly gives growth rates, declines and maintenance
+    ("Richer growth curve"; B. thetaiotaomicron's kept copy lacks the 8 h sample, so its rates fitted to 24 h).
+    A curve that falls to zero is fitted up to the zero and counts as death; cultures that did not grow, and
+    cultures whose values span the whole run where their taxon has phased ones, give no decline; another
+    monoculture is used only where the value replicates have no growth curve.
 
 33. **The Pirt maintenance coefficient, as a separate characteristic.** Karoline, 2026-10-09: "build the Pirt
     maintenance coefficient, as a separate characteristic that can be used or not" (substrate consumed per
@@ -365,6 +374,10 @@ with metabolite data."
     gone measures no demand. The unit is chosen once per taxon (over all its plateau cultures), ties going to
     the preferred technique; cultures that did not grow, a duplicate deposit's (experiment, compound) pairs and
     taxa whose growth curves give no end of exponential growth give none.
+    Second round: depleted_replicates counts the replicates below the limit at the plateau's start (one flag from
+    the mean hid a culture that took the compound up); of a duplicate pair, the copy with the richer growth
+    curve gives all its compounds and the other only those the pair does not share. Per viable biomass the
+    coefficient bounds m_s from above; per counted biomass with dead cells in it, it is lower.
 
 ## Known limits
 

@@ -145,7 +145,7 @@ test_that("decline rates are kept per taxon, absent as NA, and written with thei
                                            phase = "plateau", death_replicates = 2, start_h = 14, end_h = 48))
     x <- foodnet:::as_foodnet_crm(p)
     expect_equal(unname(x$decline_rates), c(0.0069, NA))
-    expect_match(paste(capture.output(print(x)), collapse = "\n"), "decline rates after the growth peak: 1 of 2")
+    expect_match(paste(capture.output(print(x)), collapse = "\n"), "decline rates from the end of growth: 1 of 2")
     s <- crm_subset(x, taxa = "B")
     expect_true(is.na(s$decline_rates[["B"]]) && length(s$decline_rate_detail) == 0)
     dir <- tempfile()
@@ -165,10 +165,14 @@ test_that("decline rates are kept per taxon, absent as NA, and written with thei
 
 test_that("maintenance coefficients are a table of their own, subset and written with the rest", {
     p <- example_payload()
-    p$maintenance <- list(list(taxon = "A", resource = "glucose", coefficient = 4e-5, unit = "mM per OD per h",
-                               biomass_unit = "OD", sd = 1e-5, se = 6e-6, n = 3, start_h = 12, end_h = 24),
-                          list(taxon = "B", resource = "acetate", coefficient = 0, unit = "mM per OD per h",
-                               biomass_unit = "OD", sd = NULL, se = NULL, n = 1, start_h = 16, end_h = 24))
+    p$maintenance <- list(list(taxon = "A", resource = "glucose", coefficient = 4e-5, unit = "mM h-1 per (od)",
+                               biomass_unit = "od", sd = 1e-5, se = 6e-6, n = 3, n_experiments = 1, start_h = 12,
+                               end_h = 24, plateau_samples = 2, start_mM = 2, depleted_replicates = 0,
+                               studies = list("S1")),
+                          list(taxon = "B", resource = "acetate", coefficient = 0, unit = "mM h-1 per (od)",
+                               biomass_unit = "od", sd = NULL, se = NULL, n = 1, n_experiments = 1, start_h = 16,
+                               end_h = 24, plateau_samples = 2, start_mM = 0, depleted_replicates = 1,
+                               studies = list("S1", "S2")))
     x <- foodnet:::as_foodnet_crm(p)
     expect_equal(nrow(x$maintenance), 2)
     expect_true(is.na(x$maintenance$se[2]))
@@ -188,4 +192,21 @@ test_that("written growth rates carry the hours their fits used", {
     g <- utils::read.csv(file.path(dir, "growth_rates.csv"))
     expect_equal(g$fit_start_h, c(2, NA))
     expect_equal(g$fit_end_h, c(10, NA))
+})
+
+
+test_that("a technique mismatch is printed, and a taxon without a decline says why in the written file", {
+    p <- example_payload()
+    p$decline_rates <- list(0.0069, NULL)
+    p$decline_rate_detail <- list(A = list(rate = 0.0069, n = 8, n_experiments = 3, phase = "death",
+                                           source = "the replicates with metabolite data", studies = list("S1")))
+    p$caveats$technique_mismatch <- "Growth curves of different techniques: fc for A; od for B."
+    p$caveats$without_a_decline <- list(B = "no growth curve of it in this medium")
+    x <- foodnet:::as_foodnet_crm(p)
+    expect_match(paste(capture.output(print(x)), collapse = "\n"), "different techniques: fc for A")
+    dir <- tempfile()
+    crm_write(x, dir)
+    d <- utils::read.csv(file.path(dir, "decline_rates.csv"))
+    expect_equal(d$source[d$taxon == "B"], "no growth curve of it in this medium")
+    expect_equal(d$replicates[d$taxon == "B"], 0)
 })

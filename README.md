@@ -45,8 +45,8 @@ double-click `foodnet.exe`. Windows warns about a program few people have run ye
 info" link, then "Run anyway".
 
 On macOS foodnet checks mGrowthDB's certificate against the system's trust store, through the truststore
-package it installs with: the Pythons uv and the python.org installer put on a Mac lack the root certificate
-mGrowthDB uses. If foodnet still says the certificate could not be verified (another system, or a foodnet
+package it installs with: the Pythons uv puts on a Mac lack the root certificate mGrowthDB uses, and the
+python.org installer's has no root store until its Install Certificates step is run. If foodnet still says the certificate could not be verified (another system, or a foodnet
 installed without its dependencies), set `SSL_CERT_FILE` to a CA bundle that has it, such as certifi's (the
 path `python3 -m certifi` prints), or install foodnet with a Python whose store has it, such as Homebrew's
 (`uv tool install --python /opt/homebrew/bin/python3 foodnet`).
@@ -168,15 +168,16 @@ so 1 minus it is no biomass yield; it is withheld when a resource the taxon cons
 degree of reduction, when what it took up is within the assays' detection limits (it then says what the
 share is at least), or when it lies outside its own cultures' range.
 CRM mode also gives each taxon's decline rate (`decline_rates.csv`): the loss of log abundance per hour from
-where its growth curve enters its plateau band to the last sample (negative where it still creeps up), the
-mean over its replicates in one technique, with the scatter between replicates, the number of experiments they
-come from, the window, and whether the curves leave the plateau band (death) or stay on it (plateau). For
-anything but a viable count it bounds death from below: optical density and total counts keep dead cells
-until they lyse. Without a usable decline it is NA, not 0. Separately, it gives the Pirt maintenance
-coefficient (`maintenance.csv`), which nothing else uses: what each taxon took up of each compound per unit of
-biomass per hour on its growth plateau, with its scatter, experiments, window, the compound's concentration at
-the plateau's start and whether it was already used up then (a 0 then means the compound was gone, not that no
-maintenance needed it); on a plateau it bounds Pirt's m_s from above.
+the end of its growth (the first sample at 90% of the rise, the rule that ends exponential growth) to the last
+sample (negative where it still creeps up), the mean over its replicates in one technique, with the scatter
+between replicates, the number of experiments they come from, the window, and whether the curves leave the
+plateau band or fall to zero (death) or stay on it (plateau). For anything but a viable count it bounds death
+from below: optical density and total counts keep dead cells until they lyse. Without a usable decline it is
+NA, not 0. Separately, it gives the Pirt maintenance coefficient (`maintenance.csv`), which nothing else uses:
+what each taxon took up of each compound per unit of biomass per hour on its growth plateau, with its scatter,
+experiments, window, the compound's concentration at the plateau's start and how many replicates had already
+used it up (their 0 means the compound was gone, not that no maintenance needed it). Of a duplicate deposit,
+the copy with the richer growth curve gives the growth rate, decline and maintenance.
 With the phase choice Both, the stationary phase (what changed after the end of exponential growth) comes
 too, beside the exponential one. Install the companion package once, at the version of your foodnet (the
 page and the help print the line for yours, which names the release), and miaSim for the simulations:

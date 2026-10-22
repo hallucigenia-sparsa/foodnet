@@ -255,7 +255,7 @@ CLI_FILES = (
      "Each taxon's maximum specific growth rate (1/h), its source, the hours the fit used (fit_start_h, "
      "fit_end_h) and the growth curve's technique."),
     ("decline_rates.csv", (CRM_ZIP,),
-     "Each taxon's decline after its growth peak (1/h), with its scatter and technique."),
+     "Each taxon's decline from the end of its growth (1/h), with its scatter and technique."),
     ("maintenance.csv", (CRM_ZIP,), "The Pirt maintenance coefficient per taxon and compound."),
     ("initial_concentrations.csv", (CRM_ZIP,), "Each metabolite's concentration at the first sample (mM)."),
     ("biomass.csv", (CRM_ZIP,), "Each taxon's biomass at the phase's start, its change and the phase's hours."),

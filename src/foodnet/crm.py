@@ -101,13 +101,16 @@ def growth_rates(taxa, value_cultures, other_cultures, value_keys, ignore_media:
     return found, missing, skipped
 
 
-def _declines(cultures, spike_factor: float, skipped: list) -> list:
+def _declines(cultures, spike_factor: float, skipped: list, fraction: float = 0.9) -> list:
     found = []
     for c in cultures:
         if c.growth is None or spike(c.growth["values"], spike_factor):
             continue                                    # a spiking curve is already named for its growth rate
+        if getattr(c, "not_grown", False):
+            skipped.append((c.label, "no decline rate: the culture did not grow"))
+            continue
         try:
-            found.append({**rates.decline(c.growth["times"], c.growth["values"]), "study": c.study,
+            found.append({**rates.decline(c.growth["times"], c.growth["values"], fraction), "study": c.study,
                           "experiment": c.experiment, "technique": technique(c.growth)})
         except rates.RateUnavailable as e:
             skipped.append((c.label, f"no decline rate: {e}"))
@@ -122,7 +125,8 @@ def majority(units: list) -> str:
 
     def rank(unit):
         head = unit.split(" ", 1)[0].casefold()
-        return GROWTH_TECHNIQUES.index(head) if head in GROWTH_TECHNIQUES else len(GROWTH_TECHNIQUES)
+        kind = GROWTH_TECHNIQUES.index(head) if head in GROWTH_TECHNIQUES else len(GROWTH_TECHNIQUES)
+        return kind, 0 if unit.endswith("(strain)") else 1        # a per-strain curve first, as reading ranks them
     return min(set(units), key=lambda u: (-units.count(u), rank(u), u))
 
 
@@ -143,13 +147,14 @@ def summarize_declines(found: list, source: str) -> dict:
             "se": None if sd is None else sd / math.sqrt(len(values)), "n": len(values),
             "n_experiments": len({f.get("experiment") for f in found}),
             "phase": "death" if 2 * deaths > len(values) else "plateau", "death_replicates": deaths,
+            "replicates_to_zero": sum(1 for f in found if f.get("to_zero")),
             "start_h": statistics.mean(f["start"] for f in found), "end_h": statistics.mean(f["end"] for f in found),
             "source": source, "studies": sorted({f["study"] for f in found}), "technique": kind,
             "other_techniques_left_out": len(left_out), "replicates": found + left_out}
 
 
 def decline_rates(taxa, value_cultures, other_cultures, value_keys, ignore_media: bool = False,
-                  spike_factor: float = SPIKE_FACTOR) -> tuple:
+                  spike_factor: float = SPIKE_FACTOR, fraction: float = 0.9) -> tuple:
     """({taxon: decline rate (summarize_declines)}, {taxon: why there is none}, skipped): the decline after each
     taxon's growth peak, from cultures in the same order as its growth rate (the replicates with metabolite
     data, else another monoculture in the same medium). A taxon without one is absent, never 0."""
@@ -163,9 +168,12 @@ def decline_rates(taxa, value_cultures, other_cultures, value_keys, ignore_media
             others[c.taxon["id"]].append(c)
     found, missing = {}, {}
     for taxon in taxa:
-        declines, source = _declines(by_taxon.get(taxon, []), spike_factor, skipped), FROM_METABOLITE_REPLICATES
-        if not declines:
-            declines, source = _declines(others.get(taxon, []), spike_factor, skipped), FROM_SAME_MEDIUM
+        declines = _declines(by_taxon.get(taxon, []), spike_factor, skipped, fraction)
+        source = FROM_METABOLITE_REPLICATES
+        # another monoculture only where the value replicates have no growth curve: never in place of curves
+        # that gave no usable decline (a review: curves falling to zero gave way to a flat one elsewhere)
+        if not declines and not any(c.growth for c in by_taxon.get(taxon, [])):
+            declines, source = _declines(others.get(taxon, []), spike_factor, skipped, fraction), FROM_SAME_MEDIUM
         if declines:
             found[taxon] = summarize_declines(declines, source)
         elif by_taxon.get(taxon) or others.get(taxon):
@@ -249,6 +257,7 @@ def summarize_maintenance(found: dict) -> dict:
             values = [e["value"] for e in same]
             sd = statistics.stdev(values) if len(values) > 1 else None
             at_start = statistics.mean(e["at_start"] for e in same)
+            gone = sum(1 for e in same if e["at_start"] < e["limit"])
             out.setdefault(taxon, {})[mid] = {
                 "coefficient": statistics.mean(values), "unit": f"mM h-1 per ({unit or 'biomass unit'})",
                 "biomass_unit": unit, "sd": sd, "se": None if sd is None else sd / math.sqrt(len(values)),
@@ -256,17 +265,21 @@ def summarize_maintenance(found: dict) -> dict:
                 "start_h": statistics.mean(e["start"] for e in same),
                 "end_h": statistics.mean(e["end"] for e in same), "studies": sorted({e["study"] for e in same}),
                 "plateau_samples": min(e["samples"] for e in same), "start_mM": at_start,
-                "depleted_at_start": at_start < min(e["limit"] for e in same), "cultures": entries}
+                # how many replicates had the compound below the detection limit when the plateau began: their
+                # 0 says it was gone (a review: one flag from the mean hid a culture that took it up)
+                "depleted_replicates": gone, "cultures": entries}
     return out
 
 
-def initial_concentrations(value_cultures) -> dict:
+def initial_concentrations(value_cultures, dropped=frozenset()) -> dict:
     """{metabolite: {"name", "mean", "min", "max", "n"}}: the concentration at each value-set culture's first
-    metabolite sample, in mM."""
+    metabolite sample, in mM; a duplicate deposit's repeated compounds (`dropped`) count once, as in the values."""
     found = defaultdict(list)
     names = {}
     for c in value_cultures:
         for mid, met in c.metabolites.items():
+            if (c.experiment, mid) in dropped:
+                continue
             found[mid].append(met["series"][0][1])
             names[mid] = met["name"]
     return {mid: {"name": names[mid], "mean": statistics.mean(v), "min": min(v), "max": max(v), "n": len(v)}
@@ -289,7 +302,7 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
             if "whole_run" in r["cautions"]:
                 whole.add(r["culture"])
     for culture, found in seen.items():
-        windows[culture] = max(set(found), key=lambda w: (found.count(w), w[1] - w[0]))
+        windows[culture] = max(sorted(set(found)), key=lambda w: (found.count(w), w[1] - w[0]))
     # as in the values (foodnet.derive.pool): where a taxon has cultures with a phase, its whole-run cultures
     # are left out, so the biomass comes from the same cultures and window as the amounts (a tenth review
     # round: study SMGDB00000010 deposits R. intestinalis and a Lachnospiraceae strain under one taxon)
@@ -314,7 +327,7 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
     out = {}
     for taxon, found in by_taxon.items():
         units = [f["unit"] for f in found]
-        unit = max(sorted(set(units)), key=units.count)
+        unit = majority(units)          # a tie goes to the preferred technique, as for declines and maintenance
         same = [f for f in found if f["unit"] == unit]
 
         def per_experiment(key, same=same):

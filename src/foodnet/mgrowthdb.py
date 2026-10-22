@@ -278,7 +278,7 @@ class MGrowthDBClient:
                         f"mGrowthDB's certificate was refused by the macOS trust store ({e.verify_message or e}). "
                         "The certificate itself was rejected (expired, for another host, or from a network that "
                         "intercepts TLS); if your network intercepts TLS, add its root certificate to the macOS "
-                        "Keychain.") from None
+                        "Keychain and set it to Always Trust.") from None
                 macos = (" On macOS, foodnet checks certificates against the system's store when the truststore "
                          "package (0.10.5 or later) is installed (pip install -U truststore, or install foodnet "
                          "again)." if sys.platform == "darwin" else "")

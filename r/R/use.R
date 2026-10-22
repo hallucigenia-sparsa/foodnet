@@ -569,6 +569,9 @@ crm_readme <- function(x, print = TRUE) {
 #' @param dir Directory to write into. It is created when it does not exist.
 #' @return The paths written, invisibly.
 #' @export
+# a count foodnet writes as 0 where there is no value (decline_rates.csv: replicates, experiments)
+zero_if_none <- function(v) ifelse(is.na(v), 0L, as.integer(v))
+
 crm_write <- function(x, dir) {
     need_crm(x)
     if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
@@ -615,10 +618,14 @@ crm_write <- function(x, dir) {
         # the columns of foodnet's own decline_rates.csv (a review: R wrote fewer)
         put(data.frame(taxon = x$taxa, decline_rate = unname(x$decline_rates), unit = "1/h",
                        se = as.numeric(detail("se")), sd = as.numeric(detail("sd")),
-                       replicates = as.integer(detail("n")), experiments = as.integer(detail("n_experiments")),
+                       replicates = zero_if_none(detail("n")), experiments = zero_if_none(detail("n_experiments")),
                        phase = detail("phase"), death_replicates = as.integer(detail("death_replicates")),
+                       replicates_to_zero = as.integer(detail("replicates_to_zero")),
                        start_h = as.numeric(detail("start_h")), end_h = as.numeric(detail("end_h")),
-                       source = detail("source"), studies = studies, technique = detail("technique"),
+                       source = ifelse(is.na(detail("source")), unname(x$caveats$without_a_decline[x$taxa]) %||%
+                                           NA_character_, detail("source")),
+                       studies = studies, technique = detail("technique"),
+                       other_techniques_left_out = as.integer(detail("other_techniques_left_out")),
                        stringsAsFactors = FALSE), "decline_rates.csv")
     }
     if (!is.null(x$maintenance)) put(x$maintenance, "maintenance.csv")

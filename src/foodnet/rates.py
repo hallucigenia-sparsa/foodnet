@@ -252,38 +252,37 @@ def baranyi_fit(times, values) -> tuple:
 DECLINE_MIN_POINTS = 3      # the peak and two samples after it: a slope, not a step
 
 
-def decline(times, values) -> dict:
-    """The sustained decline after a growth curve reaches its plateau (Karoline, 2026-10-09, for the biomass loss
-    rate of a consumer-resource fit): the least-squares slope of log abundance from the first sample within the
-    plateau band (PLATEAU below the maximum, the band the Baranyi fit cuts at) to the last sample, as a rate of
-    loss per hour (positive: the curve falls; negative: it still creeps up), with that window. The start is
-    where the curve enters the band, not its highest sample (Karoline, 2026-10-22, "Anchor at plateau entry"):
-    a slope from the highest sample starts on whatever noise made it highest, and a review's simulation of flat
-    plateaus read a decline of up to 0.044 per hour where there was none. `death` says whether the curve leaves
-    its plateau band before the last sample. What a curve counts decides what the rate is: optical density and
-    total cell counts keep dead cells until they lyse, so for anything but a viable count it is a loss of counted
-    biomass, which bounds death from below. RateUnavailable when there is no usable decline (fewer than
-    DECLINE_MIN_POINTS samples from the plateau's start to the last sample, or a curve that falls to zero)."""
-    pairs = list(zip(times, values, strict=True))
-    xs, ys = _positive_logs(times, values)
-    if not ys:
+def decline(times, values, fraction: float = 0.9) -> dict:
+    """The sustained decline once a growth curve has stopped growing (Karoline, 2026-10-09, for the biomass loss
+    rate of a consumer-resource fit): the least-squares slope of log abundance from the first sample at or above
+    `fraction` of the way from the first sample to the maximum (foodnet's own end of exponential growth, the
+    `fraction` setting) to the last sample, as a rate of loss per hour (positive: the curve falls; negative: it
+    still creeps up), with that window (Karoline, 2026-10-22: "First sample >= 90% of max"; reviews: a slope
+    from the highest sample started on noise, and one from the plateau band's lower edge began inside
+    exponential growth). `death` says whether the curve leaves its plateau band (PLATEAU, the cut the Baranyi
+    fit uses) before the last sample. A curve that falls to zero is fitted over its positive samples up to the
+    zero, marked death and `to_zero`, when that leaves DECLINE_MIN_POINTS of them. What a curve counts decides
+    what the rate is: optical density and total cell counts keep dead cells until they lyse, so for anything
+    but a viable count it is a loss of counted biomass, which bounds death from below. RateUnavailable when
+    there is no usable decline."""
+    pairs = sorted(zip(times, values, strict=True))
+    positive = [(t, v) for t, v in pairs if v > 0]
+    if not positive:
         raise RateUnavailable("no positive values")
-    top = max(ys)
-    band = top - PLATEAU * (top - ys[0])
-    entry = next(i for i, y in enumerate(ys) if y >= band)
-    zero = [t for t, v in pairs if t > xs[entry] and v <= 0]
-    if zero:
-        # log abundance has no value at 0: the strongest decline would otherwise read as too few samples (a review)
-        raise RateUnavailable(f"the curve falls to zero at {zero[0]:g} h")
-    tail_x, tail_y = xs[entry:], ys[entry:]
-    if len(tail_x) < DECLINE_MIN_POINTS:
-        raise RateUnavailable(f"fewer than {DECLINE_MIN_POINTS} samples from the plateau's start to the last sample")
-    fit = _line(tail_x, tail_y)
+    first, top = positive[0][1], max(v for _, v in positive)
+    start = next(t for t, v in positive if v >= first + fraction * (top - first))
+    zero = next((t for t, v in pairs if t > start and v <= 0), None)
+    tail = [(t, math.log(v)) for t, v in positive if t >= start and (zero is None or t < zero)]
+    if len(tail) < DECLINE_MIN_POINTS:
+        raise RateUnavailable(f"fewer than {DECLINE_MIN_POINTS} samples from the end of growth to the "
+                              + ("zero" if zero is not None else "last sample"))
+    fit = _line([t for t, _ in tail], [y for _, y in tail])
     if fit is None:
-        raise RateUnavailable("the samples after the plateau's start share one time")
+        raise RateUnavailable("the samples after the end of growth share one time")
+    xs, ys = _positive_logs(times, values)
     plateau_x, _ = _until_decline(xs, ys)
-    return {"rate": -fit[0], "start": tail_x[0], "end": tail_x[-1], "points": len(tail_x),
-            "death": len(plateau_x) < len(xs)}
+    return {"rate": -fit[0], "start": tail[0][0], "end": tail[-1][0], "points": len(tail),
+            "death": zero is not None or len(plateau_x) < len(xs), "to_zero": zero is not None}
 
 
 def plateau(times, values) -> tuple:

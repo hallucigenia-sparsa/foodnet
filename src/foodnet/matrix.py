@@ -356,13 +356,15 @@ def declines_csv(result: dict) -> str:
         if r:
             rows.append([t.name, f"{r['rate']:.6g}", r["unit"], NA if r["se"] is None else f"{r['se']:.6g}",
                          NA if r["sd"] is None else f"{r['sd']:.6g}", r["n"], r.get("n_experiments", ""), r["phase"],
-                         r["death_replicates"], f"{r['start_h']:.6g}", f"{r['end_h']:.6g}", r["source"],
-                         " ".join(r["studies"]), r.get("technique", "")])
+                         r["death_replicates"], r.get("replicates_to_zero", 0), f"{r['start_h']:.6g}",
+                         f"{r['end_h']:.6g}", r["source"], " ".join(r["studies"]), r.get("technique", ""),
+                         r.get("other_techniques_left_out", 0)])
         else:
-            rows.append([t.name, NA, "1/h", NA, NA, 0, 0, "", "", NA, NA, missing.get(t.id, ""), "", ""])
+            rows.append([t.name, NA, "1/h", NA, NA, 0, 0, "", "", "", NA, NA, missing.get(t.id, ""), "", "", ""])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "decline_rate", "unit", "se", "sd", "replicates", "experiments", "phase",
-                 "death_replicates", "start_h", "end_h", "source", "studies", "technique"], rows)
+                 "death_replicates", "replicates_to_zero", "start_h", "end_h", "source", "studies", "technique",
+                 "other_techniques_left_out"], rows)
 
 
 def maintenance_csv(result: dict) -> str:
@@ -377,11 +379,11 @@ def maintenance_csv(result: dict) -> str:
             rows.append([t.name, names.get(mid, mid), f"{m['coefficient']:.6g}", m["unit"],
                          NA if m["se"] is None else f"{m['se']:.6g}", NA if m["sd"] is None else f"{m['sd']:.6g}",
                          m["n"], m["n_experiments"], f"{m['start_h']:.6g}", f"{m['end_h']:.6g}",
-                         m["plateau_samples"], f"{m['start_mM']:.6g}", "yes" if m["depleted_at_start"] else "no",
+                         m["plateau_samples"], f"{m['start_mM']:.6g}", m["depleted_replicates"],
                          " ".join(m["studies"])])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "resource", "maintenance", "unit", "se", "sd", "replicates", "experiments", "start_h",
-                 "end_h", "plateau_samples", "start_mM", "depleted_at_start", "studies"], rows)
+                 "end_h", "plateau_samples", "start_mM", "depleted_replicates", "studies"], rows)
 
 
 def maintenance_payload(result: dict) -> list:
@@ -570,20 +572,23 @@ def provenance_lines(meta: dict) -> list:
 
 # what the decline and maintenance tables are, for the CRM README and the help alike
 DECLINE_TEXT = (
-    "Decline rates (decline_rates.csv): each taxon's loss of log abundance per hour from where its growth curve "
-    "enters its plateau band (within a tenth of the curve's log rise below its maximum) to its last sample; "
-    "negative where the curve still creeps up. It is the mean over the replicates with metabolite data, else "
-    "another monoculture in the same medium (source says which), over the growth curves of the technique most "
-    "of them use (technique; replicates of another technique are left out). sd and se are the scatter between "
-    "replicates, "
-    "treating each as independent; replicates of one experiment share inoculum and sampling, so experiments "
-    "says how many independent experiments they come from. phase is death where most curves leave their "
-    "plateau band before the last sample, else plateau. What it measures depends on the technique: optical "
-    "density and total cell counts keep dead cells until they lyse, so for anything but a viable count the rate "
-    "is a loss of counted biomass, which bounds death from below, and on a plateau birth and death are "
+    "Decline rates (decline_rates.csv): each taxon's loss of log abundance per hour from the end of its growth "
+    "(the first sample at or above the fraction setting, 90%, of the way from the first sample to the maximum, "
+    "the rule that ends exponential growth) to its last sample; negative where the curve still creeps up. It is "
+    "the mean over the replicates with metabolite data (or, where they have no growth curve, another monoculture "
+    "in the same medium; source says which), over the growth curves of the technique most of them use "
+    "(technique; other_techniques_left_out counts the rest), leaving out cultures that did not grow, cultures "
+    "whose values span the whole run where the taxon has others with a phase, and one copy of a duplicate "
+    "deposit (the one with the poorer growth curve). sd and se are the scatter between replicates, treating "
+    "each as independent; replicates of one experiment share inoculum and sampling, so experiments says how "
+    "many independent experiments they come from. phase is death where most curves leave their plateau band "
+    "(within a tenth of the curve's log rise below its maximum) before the last sample, or fall to zero "
+    "(replicates_to_zero, fitted up to the zero), else plateau. What it measures depends on the technique: "
+    "optical density and total cell counts keep dead cells until they lyse, so for anything but a viable count "
+    "the rate is a loss of counted biomass, which bounds death from below, and on a plateau birth and death are "
     "confounded as well. start_h and end_h are the window. A taxon without a usable decline (fewer than three "
-    "samples from the plateau's start to the end, a curve that spikes or falls to zero, or growth curves "
-    "foodnet judged unusable) is NA, not 0.")
+    "samples from the end of growth to the end, a curve that spikes, or growth curves foodnet judged unusable) "
+    "is NA, not 0.")
 MAINTENANCE_TEXT = (
     "Maintenance (maintenance.csv): the Pirt maintenance coefficient, a separate characteristic nothing else "
     "here uses: what each taxon took up of a compound per unit of biomass per hour while its culture sat on its "
@@ -591,12 +596,14 @@ MAINTENANCE_TEXT = (
     "replicates with metabolite data, with sd and se between replicates (each treated as independent), "
     "experiments, the window and plateau_samples (the fewest growth samples a culture's plateau holds). Positive "
     "is uptake, negative release; a change within the detection limit is 0. start_mM is the compound's mean "
-    "concentration at the plateau's start; depleted_at_start says it was below the detection limit, so a 0 "
-    "there means the compound was gone, not that maintenance needed none. On a plateau growth and death may "
-    "balance, so the coefficient bounds Pirt's m_s from above. The biomass is in the unit of the growth curves "
-    "most of the taxon's cultures use (unit: mM per hour per that unit; per cells/mL it is micromoles per "
-    "cell per hour); cultures in another unit, cultures that did not grow, a duplicate deposit and "
-    "growth curves foodnet judged unusable give none.")
+    "concentration at the plateau's start, and depleted_replicates how many replicates had it below the "
+    "detection limit then: their 0 means the compound was gone, not that maintenance needed none. Per viable "
+    "biomass the coefficient bounds Pirt's m_s from above (growth and death may balance on a plateau); per "
+    "counted biomass that includes dead cells (optical density, total counts) it is lower. The biomass is in "
+    "the unit of the growth curves most of the taxon's cultures use (unit: mM per hour per that unit; per "
+    "cells/mL it is micromoles per cell per hour); cultures in another unit, cultures that did not grow or whose "
+    "values span the whole run, and of a duplicate deposit the copy with the poorer growth curve (for the "
+    "compounds both copies measured) give none.")
 
 
 def technique_mismatch(result: dict) -> str:
@@ -1142,7 +1149,11 @@ def crm_payload(result: dict) -> dict:
                     "caution_tiers": dict(CAUTION_TIERS),
                     "biomass_falls": block["biomass_falls"],
                     # growth curves of different techniques behind the rates or biomass ("" when one)
-                    "technique_mismatch": technique_mismatch(result)},
+                    "technique_mismatch": technique_mismatch(result),
+                    # why a taxon has no decline rate (crm_write writes it as the source, as foodnet does)
+                    "without_a_decline": {pair["taxa"][i]: why for i, t in enumerate(taxa)
+                                          for tid, why in (result.get("without_a_decline") or {}).items()
+                                          if tid == t.id}},
         # with "Both", the stationary phase beside the exponential one, with the same taxa and resources
         "phases": crm_phases(result),
         "other_phases": {p: _phase_block(result, p) for p in crm_phases(result)[1:]},

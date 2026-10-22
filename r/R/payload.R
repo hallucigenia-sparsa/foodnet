@@ -243,6 +243,10 @@ as_foodnet_crm <- function(payload) {
                             stationary_phase = isTRUE(caveats$stationary_phase),
                             whole_run = chr_vector(caveats$whole_run),
                             biomass_falls = chr_vector(caveats$biomass_falls),
+                            # growth curves of different techniques behind the rates or biomass (from foodnet
+                            # 0.5.0; "" when one), and why a taxon has no decline rate
+                            technique_mismatch = chr(caveats$technique_mismatch),
+                            without_a_decline = unlist(caveats$without_a_decline),
                             caution_tiers = unlist(caveats$caution_tiers),
                             inconclusive = inconclusive,
                             incomplete = isTRUE(caveats$incomplete),
@@ -325,7 +329,7 @@ print.foodnet_crm <- function(x, ...) {
                     nrow(x$maintenance)))
     }
     if (!is.null(x$decline_rates) && any(!is.na(x$decline_rates))) {
-        cat(sprintf("  decline rates after the growth peak: %d of %d taxa (1/h; crm_write() gives their scatter)\n",
+        cat(sprintf("  decline rates from the end of growth: %d of %d taxa (1/h; crm_write() gives their scatter)\n",
                     sum(!is.na(x$decline_rates)), length(x$taxa)))
     }
     if (length(x$caveats$media)) {
@@ -336,6 +340,9 @@ print.foodnet_crm <- function(x, ...) {
         cat(paste0("   * ", x$caveats$errors, "\n"), sep = "")
     }
     cat("  Read before you simulate:\n")
+    if (nzchar(x$caveats$technique_mismatch %||% "")) {
+        cat("   * ", x$caveats$technique_mismatch, "\n", sep = "")
+    }
     if (length(x$caveats$warnings)) {
         cat(paste0("   * ", x$caveats$warnings, "\n"), sep = "")
     }
@@ -480,6 +487,10 @@ maintenance_frame <- function(records) {
                end_h = vapply(records, num, numeric(1), "end_h"),
                plateau_samples = vapply(records, num, numeric(1), "plateau_samples"),
                start_mM = vapply(records, num, numeric(1), "start_mM"),
-               depleted_at_start = vapply(records, function(r) isTRUE(r$depleted_at_start), logical(1)),
+               depleted_replicates = vapply(records, num, numeric(1), "depleted_replicates"),
+               biomass_unit = vapply(records, function(r) chr(r$biomass_unit), character(1)),
+               studies = vapply(records, function(r) paste(unlist(r$studies), collapse = " "), character(1)),
                stringsAsFactors = FALSE)
 }
+
+`%||%` <- function(a, b) if (is.null(a)) b else a

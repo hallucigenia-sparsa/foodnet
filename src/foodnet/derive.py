@@ -496,11 +496,29 @@ def duplicates(cultures) -> tuple:
     ri2 while ri2 is not contained in it. The deposit that holds the other is kept; when each holds the
     other, the one with more replicates (the earlier study on a tie). The other gives only the compounds the
     kept one did not measure."""
+    return from_pairs(duplicate_pairs(cultures))
+
+
+def from_pairs(pairs) -> tuple:
+    """`duplicates`' (dropped, found) from `duplicate_pairs`."""
+    dropped, found = set(), []
+    for keep, drop, shared in pairs:
+        for m in shared:
+            dropped.add((drop[0].experiment, m))
+        found.append(f"{drop[0].experiment_name or drop[0].experiment} ({drop[0].study}) repeats "
+                     f"{keep[0].experiment_name or keep[0].experiment} ({keep[0].study}) on "
+                     f"{len(shared)} compound(s): counted once, from {keep[0].study}")
+    return dropped, found
+
+
+def duplicate_pairs(cultures) -> list:
+    """[(kept cultures, dropped cultures, shared compounds)]: the duplicate deposits `duplicates` finds, as pairs
+    of experiments, so a caller can tell which experiment repeats which (see `duplicates` for the rule)."""
     by_exp = defaultdict(list)
     for c in cultures:
         by_exp[c.experiment].append(c)
     keys = sorted(by_exp, key=lambda e: (by_exp[e][0].study, e))
-    dropped, found = set(), []
+    pairs = []
     for x, ea in enumerate(keys):
         for eb in keys[x + 1:]:
             a, b = by_exp[ea], by_exp[eb]
@@ -521,12 +539,8 @@ def duplicates(cultures) -> tuple:
                 keep, drop = (a, b) if b_in_a else (b, a)
             else:
                 keep, drop = (a, b) if len(a) >= len(b) else (b, a)
-            for m in shared:
-                dropped.add((drop[0].experiment, m))
-            found.append(f"{drop[0].experiment_name or drop[0].experiment} ({drop[0].study}) repeats "
-                         f"{keep[0].experiment_name or keep[0].experiment} ({keep[0].study}) on "
-                         f"{len(shared)} compound(s): counted once, from {keep[0].study}")
-    return dropped, found
+            pairs.append((keep, drop, sorted(shared)))
+    return pairs
 
 
 # ---- 4. pooling ------------------------------------------------------------------------------------
