@@ -133,3 +133,14 @@ def test_the_help_names_every_file_of_both_zips_and_where_it_comes_from(client):
         files = set(zipfile.ZipFile(io.BytesIO(package)).namelist())
         assert files <= set(documented), files - set(documented)
         assert {n for n, where in documented.items() if by in where} == files, by
+
+
+def test_the_command_line_states_its_version(capsys):
+    import pytest
+
+    from foodnet import __version__
+    from foodnet.__main__ import build_parser
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--version"])
+    assert capsys.readouterr().out.strip() == f"foodnet {__version__}"
+    assert "--version</code> prints the version" in help_page.render_help("T", {}, ("A",))

@@ -230,7 +230,7 @@ foodnet derive --taxa Blautia Roseburia --conditions "Wilkins-Chalgren" --crm-mo
 foodnet validate network.json
 ```
 
-Commands: `derive` (search mGrowthDB and write the results), `validate` (check a network JSON against the
+`foodnet --version` prints the version. Commands: `derive` (search mGrowthDB and write the results), `validate` (check a network JSON against the
 schema), `schema` (write the schema), `style` (write the Cytoscape style) and `gui` (open the local page).
 
 `derive` writes up to two kinds of result, and both can be asked for in one command:

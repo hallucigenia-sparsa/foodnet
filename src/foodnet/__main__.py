@@ -14,7 +14,7 @@ import json
 import re
 import sys
 
-from . import rates
+from . import __version__, rates
 from .search import DEFAULTS, PHASE_LABELS
 
 # the exit status of a derive whose result is incomplete (records that could not be read): its files are
@@ -47,6 +47,8 @@ DERIVE_EXAMPLES = """examples:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="foodnet", description=__doc__.split("\n\n")[0])
+    p.add_argument("--version", action="version", version=f"foodnet {__version__}",
+                   help="print foodnet's version and exit")
     sub = p.add_subparsers(dest="command")
 
     d = sub.add_parser("derive", help="derive a network from mGrowthDB (live)", epilog=DERIVE_EXAMPLES,

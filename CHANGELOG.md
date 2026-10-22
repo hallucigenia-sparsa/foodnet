@@ -7,6 +7,7 @@ semantic versioning.
 
 ### Added
 
+- `foodnet --version` prints the version.
 - The help documents the command line in full: every command and option (read from the command line itself, so
   none can go missing) and which file each output holds, including the tables found in both the matrices zip and
   the CRM zip. `foodnet derive --help` groups its options by what they are for.

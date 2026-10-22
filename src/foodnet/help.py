@@ -532,7 +532,8 @@ file of the zips on its own. The network JSON (<code>--format json</code>) also 
 versions and, in CRM mode, the growth rates and initial concentrations.</p>
 {_cli_files()}
 <h3>Every command and option</h3>
-<p>The same as <code>{_e(COMMAND)} derive --help</code> (and <code>--help</code> after any other command) prints.</p>
+<p>The same as <code>{_e(COMMAND)} derive --help</code> (and <code>--help</code> after any other command) prints.
+<code>{_e(COMMAND)} --version</code> prints the version.</p>
 {_cli_options()}
 <p>Problems and questions: <a href="{ISSUES}">{_e(ISSUES)}</a>.</p>"""
 
