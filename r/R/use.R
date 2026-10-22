@@ -629,6 +629,7 @@ crm_write <- function(x, dir) {
                                            NA_character_, detail("source")),
                        studies = studies, technique = detail("technique"),
                        other_techniques_left_out = as.integer(detail("other_techniques_left_out")),
+                       fit_r2 = as.numeric(detail("fit_r2")),
                        stringsAsFactors = FALSE), "decline_rates.csv")
     }
     # foodnet's columns: biomass_unit is in R's table only (its unit column already names it)

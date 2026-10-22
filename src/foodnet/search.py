@@ -402,6 +402,12 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         # only between copies both inside the search's scope: an out-of-scope copy never displaces the one in it
         # (a review: --outside-evidence let study 7's copy take B. thetaiotaomicron's rates from study 2's)
         repeats, maint_dropped = _growth_copies(scoped_pairs, s["fraction"], s["no_growth_factor"])
+        # where the rates take the other copy than the values, say so beside the duplicate (a review)
+        for keep, drop, _ in scoped_pairs:
+            if keep[0].experiment in repeats:
+                duplicate_lines.append(f"{drop[0].experiment_name or drop[0].experiment} ({drop[0].study}) gives the "
+                                       "growth rate, decline and maintenance instead, its growth curves sampling "
+                                       "growth more richly")
         # growth-only monocultures (a rate's fallback) get their growth curve and growth test as the others do
         d.boundaries(read["growth_only"], s["fraction"], s["no_growth_factor"], s["spike_factor"])
         value_cultures = [cultures[i] for i in sorted(chosen) if cultures[i].experiment not in repeats]
@@ -446,7 +452,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         # kept one did not measure (a review: R. intestinalis lost the formate only RI_WC measured)
         maint, maint_skips = crm.maintenance(
             [cultures[i] for i in sorted(chosen) if id(cultures[i]) not in unphased], s["detection_limit"], limits,
-            s["spike_factor"], maint_dropped)
+            s["spike_factor"], maint_dropped, s["fraction"])
         skipped += maint_skips
         for t in whole_taxa:
             maint.pop(t, None)              # growth curves judged unusable give no plateau either (a review)
@@ -619,18 +625,28 @@ def _growth_copies(pairs, fraction: float = 0.9, factor: float = 1.5) -> tuple:
 
 
 def _genus_rates(found, missing, taxa):
-    """Rates per genus: the median of its strains' rates."""
+    """Rates per genus: the median of its strains' rates, over the strains whose curves are of the technique and
+    unit most of the genus's replicates use (a review: a Bacteroides rate was the median of two flow cytometry
+    and two OD strains, a value no strain had)."""
     import statistics
     by_genus = defaultdict(list)
     for tid, r in found.items():
         by_genus[d.genus_of(taxa, tid)].append(r)
-    out = {g: {**rs[0], "rate": statistics.median(r["rate"] for r in rs), "n": sum(r["n"] for r in rs),
-               "fit_start_h": min(r["fit_start_h"] for r in rs), "fit_end_h": max(r["fit_end_h"] for r in rs),
-               # every strain's studies and sources, not the first strain's (a review)
-               "studies": sorted({sid for r in rs for sid in r["studies"]}),
-               "source": "; ".join(sorted({r["source"] for r in rs})),
-               "technique": "; ".join(sorted({x for r in rs for x in r["technique"].split("; ")}))}
-           for g, rs in by_genus.items()}
+
+    def measure(r):
+        return r["technique"].split("; ")[0].rsplit(" (", 1)[0]
+    out = {}
+    for g, rs in by_genus.items():
+        kind = crm.majority([measure(r) for r in rs for _ in range(r["n"])])
+        kept = [r for r in rs if measure(r) == kind]
+        out[g] = {**kept[0], "rate": statistics.median(r["rate"] for r in kept), "n": sum(r["n"] for r in kept),
+                  "fit_start_h": min(r["fit_start_h"] for r in kept), "fit_end_h": max(r["fit_end_h"] for r in kept),
+                  # every strain's studies and sources, not the first strain's (a review)
+                  "studies": sorted({sid for r in kept for sid in r["studies"]}),
+                  "source": "; ".join(sorted({r["source"] for r in kept})),
+                  "technique": "; ".join(sorted({x for r in kept for x in r["technique"].split("; ")})),
+                  "other_techniques_left_out": sum(r.get("other_techniques_left_out", 0) for r in kept)
+                  + sum(r["n"] for r in rs if measure(r) != kind)}
     gone = {d.genus_of(taxa, tid): why for tid, why in missing.items() if d.genus_of(taxa, tid) not in out}
     return out, gone
 

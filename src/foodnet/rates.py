@@ -283,24 +283,34 @@ def decline(times, values, fraction: float = 0.9) -> dict:
     fit = _line([t for t, _ in tail], [y for _, y in tail])
     if fit is None:
         raise RateUnavailable("the samples after the end of growth share one time")
+    # how much of the tail's log abundance the line explains: a fitter can tell a rate from a shape (a crash then
+    # a plateau reads as one middling slope; a review)
+    mean = sum(y for _, y in tail) / len(tail)
+    total = sum((y - mean) ** 2 for _, y in tail)
+    residual = sum((y - (fit[0] * t + fit[1])) ** 2 for t, y in tail)
     xs, ys = _positive_logs(times, values)
     plateau_x, _ = _until_decline(xs, ys)
     return {"rate": -fit[0] + 0.0, "start": tail[0][0], "end": tail[-1][0], "points": len(tail),
+            "r2": 1 - residual / total if total > 0 else None,
             "death": zero is not None or len(plateau_x) < len(xs), "to_zero": zero is not None}
 
 
-def plateau(times, values) -> tuple:
-    """(start, end) of a growth curve's plateau: from its peak (the highest sample) to the last sample still
-    within the plateau band (PLATEAU, the rule `decline` and the Baranyi fit use). RateUnavailable when the
-    curve has no sample on its plateau after the peak."""
-    xs, ys = _positive_logs(times, values)
-    if not ys:
+def plateau(times, values, fraction: float = 0.9) -> tuple:
+    """(start, end) of a growth curve's plateau: from the end of growth, where `decline` starts (the first sample
+    at `fraction` of the way from the first sample to the maximum, on the linear scale; Karoline, 2026-10-22:
+    "Where the decline starts", since a start at the highest sample moved with noise and left out every curve
+    whose highest sample was its last), to the last sample still within the plateau band (PLATEAU, the rule
+    `decline` and the Baranyi fit use). RateUnavailable when that leaves fewer than two samples."""
+    pairs = sorted((t, v) for t, v in zip(times, values, strict=True) if v > 0)
+    if not pairs:
         raise RateUnavailable("no positive values")
-    peak = ys.index(max(ys))
+    first, top = pairs[0][1], max(v for _, v in pairs)
+    start = next(t for t, v in pairs if v >= first + fraction * (top - first))
+    xs, ys = _positive_logs(times, values)
     kept_x, _ = _until_decline(xs, ys)
-    if len(kept_x) - 1 <= peak:
-        raise RateUnavailable("no sample on the plateau after the peak")
-    return xs[peak], kept_x[-1]
+    if kept_x[-1] <= start:
+        raise RateUnavailable("no sample on the plateau after the end of growth")
+    return start, kept_x[-1]
 
 
 def method_name(rate_method: str = DEFAULT_METHOD, window: int = DEFAULT_WINDOW) -> str:

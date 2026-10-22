@@ -358,13 +358,14 @@ def declines_csv(result: dict) -> str:
                          NA if r["sd"] is None else f"{r['sd']:.6g}", r["n"], r.get("n_experiments", ""), r["phase"],
                          r["death_replicates"], r.get("replicates_to_zero", 0), f"{r['start_h']:.6g}",
                          f"{r['end_h']:.6g}", r["source"], " ".join(r["studies"]), r.get("technique", ""),
-                         r.get("other_techniques_left_out", 0)])
+                         r.get("other_techniques_left_out", 0),
+                         NA if r.get("fit_r2") is None else f"{r['fit_r2']:.3g}"])
         else:
-            rows.append([t.name, NA, "1/h", NA, NA, 0, 0, "", "", "", NA, NA, missing.get(t.id, ""), "", "", ""])
+            rows.append([t.name, NA, "1/h", NA, NA, 0, 0, "", 0, 0, NA, NA, missing.get(t.id, ""), "", "", 0, NA])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "decline_rate", "unit", "se", "sd", "replicates", "experiments", "phase",
                  "death_replicates", "replicates_to_zero", "start_h", "end_h", "source", "studies", "technique",
-                 "other_techniques_left_out"], rows)
+                 "other_techniques_left_out", "fit_r2"], rows)
 
 
 def maintenance_csv(result: dict) -> str:
@@ -380,10 +381,11 @@ def maintenance_csv(result: dict) -> str:
                          NA if m["se"] is None else f"{m['se']:.6g}", NA if m["sd"] is None else f"{m['sd']:.6g}",
                          m["n"], m["n_experiments"], f"{m['start_h']:.6g}", f"{m['end_h']:.6g}",
                          m["plateau_samples"], f"{m['start_mM']:.6g}", m["below_limit_replicates"],
-                         " ".join(m["studies"])])
+                         m.get("other_units_left_out", 0), " ".join(m["studies"])])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "resource", "maintenance", "unit", "se", "sd", "replicates", "experiments", "start_h",
-                 "end_h", "plateau_samples", "start_mM", "below_limit_replicates", "studies"], rows)
+                 "end_h", "plateau_samples", "start_mM", "below_limit_replicates", "other_units_left_out",
+                 "studies"], rows)
 
 
 def maintenance_payload(result: dict) -> list:
@@ -572,10 +574,11 @@ def provenance_lines(meta: dict) -> list:
 
 # what the decline and maintenance tables are, for the CRM README and the help alike
 DECLINE_TEXT = (
-    "Decline rates (decline_rates.csv): each taxon's loss of log abundance per hour from the end of its growth "
+    "Decline rates (decline_rates.csv): each taxon's loss of natural-log abundance per hour from the end of its "
+    "growth "
     "(the first sample at or above the fraction setting, 90% by default, of the way from the first sample to the "
-    "maximum: foodnet's 90% rule for the end of exponential growth, without its growth-rate rule) to its last "
-    "sample; negative where the curve still creeps up. It is "
+    "maximum on the linear scale: foodnet's 90% rule for the end of exponential growth, without its growth-rate "
+    "rule) to its last sample; negative where the curve still creeps up. It is "
     "the mean over the replicates with metabolite data (or, where they have no growth curve, another monoculture "
     "in the same medium; source says which), over the growth curves of the technique most of them use "
     "(technique; other_techniques_left_out counts the rest), leaving out cultures that did not grow, cultures "
@@ -586,28 +589,32 @@ DECLINE_TEXT = (
     "(within a tenth of the curve's log rise below its maximum) before the last sample, or fall to zero "
     "(replicates_to_zero, fitted up to the zero, so the fall itself is not in the slope and it bounds the "
     "decline from below), else plateau. What it measures depends on the technique: "
-    "optical density and total cell counts keep dead cells until they lyse, so for anything but a viable count "
-    "the rate is a loss of counted biomass, which bounds death from below, and on a plateau birth and death are "
-    "confounded as well. start_h and end_h are the replicates' mean start and end. A taxon without a usable "
+    "only plate counts and CFU count living cells; optical density, flow cytometry (unless live-stained), qPCR and "
+    "16S keep dead cells until they lyse, so for them the rate is a loss of counted biomass, which bounds death "
+    "from below, and on a plateau birth and death are "
+    "confounded as well. fit_r2 is the median share of each replicate's log abundance the line explains: a low one "
+    "means the curve is no single exponential decline (a crash, then a plateau). start_h and end_h are the "
+    "replicates' mean start and end. A taxon without a usable "
     "decline (fewer than three "
     "samples from the end of growth to the end, a curve that spikes, or growth curves foodnet judged unusable) "
     "is NA, not 0.")
 MAINTENANCE_TEXT = (
     "Maintenance (maintenance.csv): the Pirt maintenance coefficient, a separate characteristic nothing else "
     "here uses: what each taxon took up of a compound per unit of biomass per hour while its culture sat on its "
-    "growth plateau (from its highest sample to the last sample within the plateau band), the mean over its "
+    "growth plateau (from where the decline starts to the last sample within the plateau band), the mean over its "
     "replicates with metabolite data, with sd and se between replicates (each treated as independent), "
     "experiments, the replicates' mean start and end of the plateau, plateau_samples (the fewest growth samples "
     "a culture's plateau holds). Positive "
     "is uptake, negative release; a change within the detection limit is 0. start_mM is the compound's mean "
     "concentration at the plateau's start, and below_limit_replicates how many replicates had it below the "
     "detection limit then (used up, or never there): their 0 measures no maintenance demand. Per viable "
-    "biomass the coefficient bounds Pirt's m_s from above (growth and death may balance on a plateau); per "
-    "counted biomass that includes dead cells (optical density, total counts) it is lower. The biomass is in "
+    "biomass (plate counts, CFU) the coefficient bounds Pirt's m_s from above (growth and death may balance on a "
+    "plateau); per counted biomass that includes dead cells (optical density, flow cytometry unless live-"
+    "stained, qPCR, 16S) it is lower by their share, so it bounds m_s in neither direction. The biomass is in "
     "the unit of the growth curves most of the taxon's cultures use (unit: mM per hour per that unit; per "
     "cells/mL it is micromoles per cell per hour); cultures in another unit, cultures that did not grow or whose "
     "values span the whole run, and of a duplicate deposit the copy with the poorer growth curve (for the "
-    "compounds both copies measured) give none.")
+    "compounds both copies measured) give none; other_units_left_out counts the cultures in another unit.")
 
 
 def decline_text(fraction: float = 0.9) -> str:

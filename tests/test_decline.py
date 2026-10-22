@@ -175,7 +175,7 @@ def test_maintenance_leaves_out_repeats_and_cultures_that_did_not_grow_and_flags
     found, skipped = crm.maintenance(cultures, 0.2, dropped={("DUP", "glc")})
     m = found["ncbi:9"]["glc"]
     assert (m["n"], m["n_experiments"], m["biomass_unit"]) == (2, 1, "fc")      # not DUP, E3, nor E4's OD
-    assert any("in od" in why for _, why in skipped)
+    assert m["other_units_left_out"] == 1                                   # E4's OD culture, counted
     used_up, _ = crm.maintenance([_plateau_culture("E1", (0.05, 0.0)), _plateau_culture("E1", (0.1, 0.0))], 0.2)
     gone = used_up["ncbi:9"]["glc"]
     assert gone["coefficient"] == 0 and gone["below_limit_replicates"] == 2 and gone["start_mM"] == pytest.approx(0.075)
@@ -197,12 +197,17 @@ def test_merged_genera_keep_every_strains_studies(client):
     assert all(set(v["studies"]) for v in r["rates"].values())
     from foodnet import search
     merged, _ = search._genus_rates({"a": {"rate": 0.1, "n": 1, "studies": ["S1"], "source": "x", "fit_start_h": 0,
-                                           "fit_end_h": 8, "technique": "od (culture)"},
+                                           "fit_end_h": 8, "technique": "fc (culture)"},
                                      "b": {"rate": 0.3, "n": 2, "studies": ["S2"], "source": "y", "fit_start_h": 2,
-                                           "fit_end_h": 12, "technique": "fc (strain)"}},
-                                    {}, {"a": {"genus": "G", "name": "G a"}, "b": {"genus": "G", "name": "G b"}})
+                                           "fit_end_h": 12, "technique": "fc (strain)"},
+                                     "c": {"rate": 0.01, "n": 1, "studies": ["S3"], "source": "z", "fit_start_h": 0,
+                                           "fit_end_h": 40, "technique": "od (culture)"}},
+                                    {}, {t: {"genus": "G", "name": f"G {t}"} for t in "abc"})
     g = next(iter(merged.values()))
     assert g["studies"] == ["S1", "S2"] and g["source"] == "x; y" and (g["fit_start_h"], g["fit_end_h"]) == (0, 12)
+    # the OD strain is of another technique than most of the genus's replicates (a review: a Bacteroides median
+    # of flow cytometry and OD strains)
+    assert g["rate"] == pytest.approx(0.2) and g["other_techniques_left_out"] == 1
 
 
 def test_growth_curves_judged_unusable_give_no_maintenance(client, monkeypatch):
@@ -250,9 +255,8 @@ def test_the_fraction_setting_moves_the_start_of_the_decline():
     assert early[0]["t"]["start_h"] == 12 and late[0]["t"]["start_h"] == 24
 
 
-def test_a_tie_goes_to_the_preferred_technique_then_to_a_per_strain_curve():
-    assert crm.majority(["fc Cells/mL (culture)", "fc Cells/mL (strain)"]) == "fc Cells/mL (strain)"
-    assert crm.majority(["od (strain)", "fc (culture)"]) == "fc (culture)"
+def test_a_tie_goes_to_the_preferred_technique_whatever_the_name():
+    assert crm.majority(["od", "fc"]) == "fc" and crm.majority(["cfu", "plates"]) == "plates"
 
 
 def test_a_genus_decline_keeps_strain_and_culture_level_counts_of_one_technique():
@@ -275,7 +279,7 @@ def test_initial_concentrations_count_a_duplicate_once():
     assert found["glc"]["n"] == 2 and found["glc"]["mean"] == pytest.approx(9)
 
 
-def test_biomass_takes_the_preferred_technique_on_a_tie():
+def test_biomass_takes_the_preferred_technique_on_a_tie_too():
     import types
     cultures = []
     for i, tech in enumerate(("od", "fc")):
@@ -317,3 +321,58 @@ def test_the_richer_copy_is_counted_to_the_end_of_growth_not_to_a_late_maximum()
     sparse = [culture("B", [0, 8, 14, 20, 26, 32, 38, 44, 50], [1, 300, 700, 710, 720, 730, 740, 750, 760])]
     assert search._growth_copies([(sparse, dense, ["acetate"])])[0] == {"B"}
     assert search._growth_copies([(dense, sparse, ["acetate"])])[0] == {"B"}
+
+
+def test_a_copy_outside_the_search_never_takes_the_rates_of_one_inside_it(client, monkeypatch):
+    # a review: with --outside-evidence, study 7's copy took B. thetaiotaomicron's rates from study 2's
+    from foodnet import derive, search
+    real = derive.duplicate_pairs
+
+    def pairs(cultures):
+        a = [c for c in cultures if c.experiment == "EMGDB000000001"]
+        c4 = [c for c in cultures if c.experiment == "EMGDB000000004"]
+        return real(cultures) + ([(a, c4, [])] if a and c4 else [])
+    monkeypatch.setattr(search.d, "duplicate_pairs", pairs)
+    monkeypatch.setattr(search, "_richness", lambda cultures, *a: (9.0, 9.0) if cultures[0].experiment ==
+                        "EMGDB000000004" else (1.0, 1.0))
+    r = run(client, report_rates=True, rate_window=3, conditions="SMGDB00000001", outside_evidence=True)
+    assert "ncbi:1" in r["rates"] and r["rates"]["ncbi:1"]["source"] == crm.FROM_METABOLITE_REPLICATES
+
+
+def test_the_readme_and_report_state_the_searchs_fraction(client):
+    from foodnet.report import report_text
+    r = run(client, report_rates=True, fraction=0.8)
+    assert "80% in this search" in matrix.readme(r, "crm") and "80% of the rise" in report_text(r)
+
+
+def test_a_flat_fit_reads_zero_not_minus_zero():
+    d = rates.decline([0, 4, 8, 12, 24, 36], [1, 10, 100, 1000, 1000, 1000])
+    assert str(d["rate"]) == "0.0"
+
+
+def test_biomass_takes_the_preferred_technique_where_the_alphabet_disagrees():
+    # plates before cfu by preference, cfu before plates by name
+    import types
+    cultures = [(i, types.SimpleNamespace(growth={"times": [0, 12], "values": [1, 100], "technique": tech, "unit": ""},
+                                          taxon={"id": "t"}, experiment=f"E{i}"))
+                for i, tech in enumerate(("cfu", "plates"))]
+    rows = [{"culture": i, "phase": "exponential", "change": -1.0, "start": 0, "end": 12, "cautions": []}
+            for i in range(2)]
+    assert crm.biomass_changes(cultures, rows, "exponential")["t"]["unit"] == "plates"
+
+
+def test_r_writes_the_same_columns_as_foodnet(client):
+    # the R test pins crm_write's headers; these are foodnet's own, so the two stay the same (a review)
+    import pathlib
+    import re
+    r = run(client, report_rates=True)
+    rtest = (pathlib.Path(__file__).parents[1] / "r" / "tests" / "testthat" / "test-payload.R").read_text()
+    written = ",".join(re.findall(r'"([A-Za-z0-9_]+)"', rtest[rtest.index("writes the download's columns"):]))
+    for table in (matrix.rates_csv, matrix.declines_csv, matrix.maintenance_csv):
+        names = table(r).splitlines()[0].split(",")
+        assert ",".join(names) in written, names
+
+
+def test_a_curve_whose_highest_sample_is_its_last_still_has_a_plateau():
+    # Karoline, 2026-10-22: the plateau starts where the decline starts, so a creeping plateau is not left out
+    assert rates.plateau([0, 4, 8, 12, 24, 36, 48], [1, 10, 100, 1000, 990, 980, 1010]) == (12, 48)

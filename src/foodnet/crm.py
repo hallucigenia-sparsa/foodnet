@@ -131,8 +131,7 @@ def majority(units: list) -> str:
 
     def rank(unit):
         head = unit.split(" ", 1)[0].casefold()
-        kind = GROWTH_TECHNIQUES.index(head) if head in GROWTH_TECHNIQUES else len(GROWTH_TECHNIQUES)
-        return kind, 0 if unit.endswith("(strain)") else 1        # by technique, then a per-strain curve first
+        return GROWTH_TECHNIQUES.index(head) if head in GROWTH_TECHNIQUES else len(GROWTH_TECHNIQUES)
     return min(set(units), key=lambda u: (-units.count(u), rank(u), u))
 
 
@@ -158,6 +157,8 @@ def summarize_declines(found: list, source: str) -> dict:
             "n_experiments": len({f.get("experiment") for f in found}),
             "phase": "death" if 2 * deaths > len(values) else "plateau", "death_replicates": deaths,
             "replicates_to_zero": sum(1 for f in found if f.get("to_zero")),
+            "fit_r2": (statistics.median(r2s) if (r2s := [f["r2"] for f in found if f.get("r2") is not None])
+                       else None),
             "start_h": statistics.mean(f["start"] for f in found), "end_h": statistics.mean(f["end"] for f in found),
             "source": source, "studies": sorted({f["study"] for f in found}),
             "technique": "; ".join(sorted({f.get("technique", "") for f in found})),
@@ -207,7 +208,7 @@ def _mean_biomass(times, values, start: float, end: float) -> float:
 
 
 def maintenance(value_cultures, limit: float, limits: dict | None = None,
-                spike_factor: float = SPIKE_FACTOR, dropped=frozenset()) -> tuple:
+                spike_factor: float = SPIKE_FACTOR, dropped=frozenset(), fraction: float = 0.9) -> tuple:
     """({taxon: {metabolite: summary}}, skipped): the Pirt maintenance coefficient, a separate characteristic
     for a fit to use or not (Karoline, 2026-10-09): what each culture took up of a compound per unit of biomass
     per hour while it sat on its growth plateau (`rates.plateau`). Per culture: the compound's fall over the
@@ -225,7 +226,7 @@ def maintenance(value_cultures, limit: float, limits: dict | None = None,
         if c.growth is None or getattr(c, "not_grown", False) or spike(c.growth["values"], spike_factor):
             continue
         try:
-            start, end = rates.plateau(c.growth["times"], c.growth["values"])
+            start, end = rates.plateau(c.growth["times"], c.growth["values"], fraction)
         except rates.RateUnavailable as e:
             skipped.append((c.label, f"no maintenance coefficient: {e}"))
             continue
@@ -234,12 +235,9 @@ def maintenance(value_cultures, limit: float, limits: dict | None = None,
             by_taxon[c.taxon["id"]].append((c, start, end, biomass))
     found = defaultdict(lambda: defaultdict(list))
     for taxon, plateaus in by_taxon.items():
-        unit = majority([_curve_unit(c.growth) for c, *_ in plateaus])
+        # every culture with its own unit: summarize_maintenance keeps the taxon's majority unit and counts the rest
         for c, start, end, biomass in plateaus:
-            if _curve_unit(c.growth) != unit:
-                skipped.append((c.label, f"no maintenance coefficient: its growth curve is in {_curve_unit(c.growth)}, "
-                                         f"and most of the taxon's are in {unit}"))
-                continue
+            unit = _curve_unit(c.growth)
             samples = sum(1 for t in c.growth["times"] if start <= t <= end)
             for mid, met in c.metabolites.items():
                 series = met["series"]
@@ -279,7 +277,9 @@ def summarize_maintenance(found: dict) -> dict:
                 # how many replicates had the compound below the detection limit when the plateau began (used
                 # up, or never there): their 0 measures no demand (a review: one flag from the mean hid a
                 # culture that took it up)
-                "below_limit_replicates": gone, "cultures": entries}
+                "below_limit_replicates": gone,
+                # cultures of this compound in another unit than the taxon's (or genus's) one (a review)
+                "other_units_left_out": len(entries) - len(same), "cultures": entries}
     return out
 
 

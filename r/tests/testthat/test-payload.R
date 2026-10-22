@@ -210,3 +210,28 @@ test_that("a technique mismatch is printed, and a taxon without a decline says w
     expect_equal(d$source[d$taxon == "B"], "no growth curve of it in this medium")
     expect_equal(d$replicates[d$taxon == "B"], 0)
 })
+
+test_that("crm_write writes the download's columns for growth rates, declines and maintenance", {
+    # the same headers as foodnet's own files (tests/test_decline.py checks these strings against foodnet's)
+    p <- example_payload()
+    p$growth_rate_detail <- list(A = list(rate = 0.4, n = 3, source = "s", studies = list("S1"), method = "m",
+                                          fit_start_h = 0, fit_end_h = 8, technique = "fc (strain)",
+                                          other_techniques_left_out = 0))
+    p$decline_rates <- list(0.01, NULL)
+    p$decline_rate_detail <- list(A = list(rate = 0.01, n = 3))
+    p$maintenance <- list(list(taxon = "A", resource = "glucose", coefficient = 1e-5, unit = "u", n = 3,
+                               biomass_unit = "fc", studies = list("S1")))
+    dir <- tempfile()
+    crm_write(foodnet:::as_foodnet_crm(p), dir)
+    header <- function(f) readLines(file.path(dir, f), n = 1)
+    expect_equal(header("growth_rates.csv"), paste0('"taxon","growth_rate","unit","replicates","source","studies",',
+                                                    '"method","fit_start_h","fit_end_h","technique",',
+                                                    '"other_techniques_left_out"'))
+    expect_equal(header("decline_rates.csv"), paste0('"taxon","decline_rate","unit","se","sd","replicates",',
+                                                     '"experiments","phase","death_replicates","replicates_to_zero",',
+                                                     '"start_h","end_h","source","studies","technique",',
+                                                     '"other_techniques_left_out","fit_r2"'))
+    expect_equal(header("maintenance.csv"), paste0('"taxon","resource","maintenance","unit","se","sd","replicates",',
+                                                   '"experiments","start_h","end_h","plateau_samples","start_mM",',
+                                                   '"below_limit_replicates","other_units_left_out","studies"'))
+})

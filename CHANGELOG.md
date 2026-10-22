@@ -22,14 +22,17 @@ semantic versioning.
   a replicate), what only ChEBI gives (formula and charge), what foodnet computes from them, and the studies
   read with their uploadedAt.
 - CRM mode gives each taxon's decline rate (`decline_rates.csv`, `decline_rates` and `decline_rate_detail` in
-  `crm.json`, `crm$decline_rates` in R): the loss of log abundance per hour from the end of growth (the first
-  sample at 90% of the rise) to the last sample, the mean over the replicates of one technique, with the scatter between
-  replicates, the number of experiments, the window, and whether the curves leave the plateau or fall to zero
-  (death) or stay on it. Absent, not 0, where there is no usable decline.
+  `crm.json`, `crm$decline_rates` in R): the loss of natural-log abundance per hour from the end of growth (the
+  first sample at 90% of the linear rise) to the last sample, the mean over the replicates of one technique,
+  with the scatter between replicates, the number of experiments, the window, how well a line fits (fit_r2),
+  and whether the curves leave the plateau or fall to zero (death) or stay on it. Absent, not 0, where there
+  is no usable decline.
 - CRM mode gives the Pirt maintenance coefficient as a separate characteristic (`maintenance.csv`,
   `maintenance` in `crm.json`, `crm$maintenance` in R), which nothing else uses: each taxon's uptake of each
-  compound per unit of biomass per hour on its growth plateau, with its scatter, experiments, window, the
-  compound's concentration at the plateau's start and how many replicates had it below the detection limit at the plateau's start.
+  compound per unit of biomass per hour on its growth plateau (from where the decline starts), with its
+  scatter, experiments, window, the
+  compound's concentration at the plateau's start and how many replicates had it below the detection limit
+  then.
 
 ### Fixed
 

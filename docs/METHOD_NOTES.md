@@ -388,6 +388,10 @@ with metabolite data."
     the mean hid a culture that took the compound up); of a duplicate pair, the copy with the richer growth
     curve gives all its compounds and the other only those the pair does not share. Per viable biomass the
     coefficient bounds m_s from above; per counted biomass with dead cells in it, it is lower.
+    Fourth round, Karoline 2026-10-22: the plateau starts where the decline starts ("Where the decline starts";
+    from the highest sample, one noisy point moved the window and every curve whose highest sample was its last
+    was left out), to the last sample in the band; no separate mean over the replicates that still had the
+    compound ("No, as it is"). Cultures in another unit than the taxon's are counted (other_units_left_out).
 
 ## Known limits
 
