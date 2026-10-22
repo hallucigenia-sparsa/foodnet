@@ -98,16 +98,21 @@ def report_text(result: dict) -> str:
         for tid, r in sorted(result["rates"].items(), key=lambda kv: names.get(kv[0], kv[0])):
             fitted = (f", fitted over {r['fit_start_h']:.3g} h to {r['fit_end_h']:.3g} h"
                       if r.get("fit_start_h") is not None else "")
+            fitted += f", {r['technique']}" if r.get("technique") else ""
             lines.append(f"  {names.get(tid, tid)}: {r['rate']:.3f} (median of {r['n']}, from {r['source']}, "
                          f"{r['method']}{fitted})")
         for tid, why in result["without_a_rate"].items():
             lines.append(f"  {names.get(tid, tid)}: none, {why}")
+        from .matrix import technique_mismatch
+        if technique_mismatch(result):
+            lines += ["", technique_mismatch(result)]
         lines += ["", "Decline rates after the growth peak (1/h; loss of log abundance from the peak to the last "
                   "sample; death: the curve leaves its plateau, plateau: a lower bound on death):"]
         for tid, r in sorted((result.get("declines") or {}).items(), key=lambda kv: names.get(kv[0], kv[0])):
             scatter = f" +/- {r['se']:.2g} SE" if r["se"] is not None else ""
             lines.append(f"  {names.get(tid, tid)}: {r['rate']:.3g}{scatter} (n {r['n']}, {r['phase']}, "
-                         f"{r['start_h']:.3g} h to {r['end_h']:.3g} h, from {r['source']})")
+                         f"{r['start_h']:.3g} h to {r['end_h']:.3g} h, from {r['source']}"
+                         + (f", {r['technique']}" if r.get("technique") else "") + ")")
         for tid, why in (result.get("without_a_decline") or {}).items():
             lines.append(f"  {names.get(tid, tid)}: none, {why}")
         found = result.get("maintenance") or {}

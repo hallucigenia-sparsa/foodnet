@@ -15,6 +15,9 @@ semantic versioning.
   replicate's whole growth curve, by the rate method's own interval, not the phase or time window of the values.
 - `growth_rates.csv` (and the report, crm.json's `growth_rate_detail` and R's `crm_write()`) gives `fit_start_h`
   and `fit_end_h`: the replicates' mean first and last hour of the stretch each growth rate was fitted over.
+- `growth_rates.csv` and `decline_rates.csv` name the growth curve's technique (technique, unit, strain or
+  culture), and the CRM README and the report warn when taxa rest on different techniques: a cell count can
+  fall where optical density stays flat.
 - Both downloads' README says where the numbers come from: which mGrowthDB records (and which growth curve of
   a replicate), what only ChEBI gives (formula and charge), what foodnet computes from them, and the studies
   read with their uploadedAt.

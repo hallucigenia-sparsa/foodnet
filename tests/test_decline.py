@@ -89,3 +89,16 @@ def test_the_maintenance_coefficient_is_uptake_per_biomass_per_hour_on_the_plate
     # B's glucose does not change on its plateau (16 h to 24 h): a measured 0, not absent
     B = "ncbi:2"
     assert r["maintenance"][B][GLC]["coefficient"] == 0
+
+
+def test_rates_name_the_growth_curve_technique_and_warn_when_taxa_differ(client):
+    # Karoline, 2026-10-22: "the measurement technique, to prevent mismatches across techniques"; the fixture's
+    # A is counted by flow cytometry, B and C read by OD (a window of 3 gives every taxon a rate)
+    r = run(client, report_rates=True, rate_window=3)
+    A, B = "ncbi:1", "ncbi:2"
+    assert r["rates"][A]["technique"].startswith("fc") and r["rates"][B]["technique"].startswith("od")
+    assert matrix.rates_csv(r).splitlines()[0].endswith(",technique")
+    assert matrix.declines_csv(r).splitlines()[0].endswith(",technique")
+    warning = matrix.technique_mismatch(r)
+    assert warning.startswith("Growth curves of different techniques: fc") and "od for" in warning
+    assert warning in matrix.readme(r, "crm")

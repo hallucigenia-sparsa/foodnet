@@ -557,7 +557,8 @@ def _genus_rates(found, missing, taxa):
         by_genus[d.genus_of(taxa, tid)].append(r)
     out = {g: {**rs[0], "rate": statistics.median(r["rate"] for r in rs), "n": sum(r["n"] for r in rs),
                "fit_start_h": statistics.mean(r["fit_start_h"] for r in rs),
-               "fit_end_h": statistics.mean(r["fit_end_h"] for r in rs)}
+               "fit_end_h": statistics.mean(r["fit_end_h"] for r in rs),
+               "technique": "; ".join(sorted({x for r in rs for x in r["technique"].split("; ")}))}
            for g, rs in by_genus.items()}
     gone = {d.genus_of(taxa, tid): why for tid, why in missing.items() if d.genus_of(taxa, tid) not in out}
     return out, gone

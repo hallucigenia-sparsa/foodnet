@@ -273,9 +273,9 @@ def test_each_growth_rate_says_over_which_hours_it_was_fitted(client):
     assert (start, end) == (0, 12)
     r = run(client, report_rates=True, rate_window=3)
     table = matrix.rates_csv(r).splitlines()
-    assert table[0].endswith("method,fit_start_h,fit_end_h")
+    assert "method,fit_start_h,fit_end_h," in table[0]
     alpha = next(row for row in table if row.startswith("Alpha alpha A1")).split(",")
-    assert (float(alpha[-2]), float(alpha[-1])) == (0, 12)
+    assert (float(alpha[7]), float(alpha[8])) == (0, 12)
     from foodnet.report import report_text
     assert "fitted over 0 h to 12 h" in report_text(r)
 

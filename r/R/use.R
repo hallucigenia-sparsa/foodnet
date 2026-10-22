@@ -598,6 +598,10 @@ crm_write <- function(x, dir) {
     }, numeric(1), USE.NAMES = FALSE)
     put(data.frame(taxon = x$taxa, growth_rate = unname(x$growth_rates), unit = x$growth_rate_unit,
                    fit_start_h = fit_hours("fit_start_h"), fit_end_h = fit_hours("fit_end_h"),
+                   technique = vapply(x$taxa, function(t) {
+                       v <- x$growth_rate_detail[[t]]$technique
+                       if (is.null(v)) NA_character_ else as.character(v)
+                   }, character(1), USE.NAMES = FALSE),
                    stringsAsFactors = FALSE), "growth_rates.csv")
     if (!is.null(x$decline_rates)) {
         detail <- function(field) vapply(x$taxa, function(t) {
@@ -608,6 +612,7 @@ crm_write <- function(x, dir) {
                        se = as.numeric(detail("se")), sd = as.numeric(detail("sd")),
                        replicates = as.integer(detail("n")), phase = detail("phase"),
                        start_h = as.numeric(detail("start_h")), end_h = as.numeric(detail("end_h")),
+                       technique = detail("technique"),
                        stringsAsFactors = FALSE), "decline_rates.csv")
     }
     if (!is.null(x$maintenance)) put(x$maintenance, "maintenance.csv")

@@ -32,8 +32,16 @@ FROM_METABOLITE_REPLICATES = "the replicates with metabolite data"
 FROM_SAME_MEDIUM = "another monoculture in the same medium"
 
 
+def technique(growth: dict) -> str:
+    """The measurement a growth curve is: technique and unit, and whether it counts the strain or the whole
+    culture ("fc Cells/mL (strain)", "od (culture)"), so rates and biomass from different techniques are not
+    mixed up (Karoline, 2026-10-22: "the measurement technique, to prevent mismatches across techniques")."""
+    level = "strain" if growth.get("level") == "strain" else "culture"
+    return f"{_curve_unit(growth)} ({level})"
+
+
 def _rate_values(cultures, method: str, spike_factor: float, skipped: list) -> list:
-    """[(rate, first hour, last hour the fit used)] of the cultures' growth curves."""
+    """[(rate, first hour, last hour the fit used, technique)] of the cultures' growth curves."""
     feature = rates.fitted(method)
     values = []
     for c in cultures:
@@ -48,7 +56,7 @@ def _rate_values(cultures, method: str, spike_factor: float, skipped: list) -> l
             skipped.append((c.label, f"no growth rate: {e}"))
             continue
         if value > 0:
-            values.append((value, start, end))
+            values.append((value, start, end, technique(c.growth)))
         else:
             skipped.append((c.label, f"non-positive growth rate ({value:g})"))
     return values
@@ -80,10 +88,11 @@ def growth_rates(taxa, value_cultures, other_cultures, value_keys, ignore_media:
         if values:
             # the hours the fits used, the replicates' mean, to set beside the values' intervals (Karoline,
             # 2026-10-22: "add fit_start_h and fit_end_h")
-            found[taxon] = {"rate": statistics.median(v for v, _, _ in values), "unit": "1/h", "n": len(values),
+            found[taxon] = {"rate": statistics.median(v[0] for v in values), "unit": "1/h", "n": len(values),
                             "source": source, "studies": sorted({c.study for c in used}), "method": method,
-                            "fit_start_h": statistics.mean(a for _, a, _ in values),
-                            "fit_end_h": statistics.mean(b for _, _, b in values)}
+                            "fit_start_h": statistics.mean(v[1] for v in values),
+                            "fit_end_h": statistics.mean(v[2] for v in values),
+                            "technique": "; ".join(sorted({v[3] for v in values}))}
         elif by_taxon.get(taxon) or others.get(taxon):
             missing[taxon] = "its growth curves in this medium give no rate (see the report)"
         else:
@@ -97,7 +106,8 @@ def _declines(cultures, spike_factor: float, skipped: list) -> list:
         if c.growth is None or spike(c.growth["values"], spike_factor):
             continue                                    # a spiking curve is already named for its growth rate
         try:
-            found.append({**rates.decline(c.growth["times"], c.growth["values"]), "study": c.study})
+            found.append({**rates.decline(c.growth["times"], c.growth["values"]), "study": c.study,
+                          "technique": technique(c.growth)})
         except rates.RateUnavailable as e:
             skipped.append((c.label, f"no decline rate: {e}"))
     return found
@@ -115,7 +125,8 @@ def summarize_declines(found: list, source: str) -> dict:
             "se": None if sd is None else sd / math.sqrt(len(values)), "n": len(values),
             "phase": "death" if 2 * deaths > len(values) else "plateau", "death_replicates": deaths,
             "start_h": statistics.mean(f["start"] for f in found), "end_h": statistics.mean(f["end"] for f in found),
-            "source": source, "studies": sorted({f["study"] for f in found}), "replicates": found}
+            "source": source, "studies": sorted({f["study"] for f in found}),
+            "technique": "; ".join(sorted({f.get("technique", "") for f in found})), "replicates": found}
 
 
 def decline_rates(taxa, value_cultures, other_cultures, value_keys, ignore_media: bool = False,

@@ -338,12 +338,12 @@ def rates_csv(result: dict) -> str:
         if r:
             hours = [NA if r.get(k) is None else f"{r[k]:.6g}" for k in ("fit_start_h", "fit_end_h")]
             rows.append([t.name, f"{r['rate']:.6g}", r["unit"], r["n"], r["source"], " ".join(r["studies"]),
-                         r["method"], *hours])
+                         r["method"], *hours, r.get("technique", "")])
         else:
-            rows.append([t.name, NA, "1/h", 0, result["without_a_rate"].get(t.id, ""), "", "", NA, NA])
+            rows.append([t.name, NA, "1/h", 0, result["without_a_rate"].get(t.id, ""), "", "", NA, NA, ""])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "growth_rate", "unit", "replicates", "source", "studies", "method", "fit_start_h",
-                 "fit_end_h"], rows)
+                 "fit_end_h", "technique"], rows)
 
 
 def declines_csv(result: dict) -> str:
@@ -356,12 +356,13 @@ def declines_csv(result: dict) -> str:
         if r:
             rows.append([t.name, f"{r['rate']:.6g}", r["unit"], NA if r["se"] is None else f"{r['se']:.6g}",
                          NA if r["sd"] is None else f"{r['sd']:.6g}", r["n"], r["phase"], r["death_replicates"],
-                         f"{r['start_h']:.6g}", f"{r['end_h']:.6g}", r["source"], " ".join(r["studies"])])
+                         f"{r['start_h']:.6g}", f"{r['end_h']:.6g}", r["source"], " ".join(r["studies"]),
+                         r.get("technique", "")])
         else:
-            rows.append([t.name, NA, "1/h", NA, NA, 0, "", "", NA, NA, missing.get(t.id, ""), ""])
+            rows.append([t.name, NA, "1/h", NA, NA, 0, "", "", NA, NA, missing.get(t.id, ""), "", ""])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "decline_rate", "unit", "se", "sd", "replicates", "phase", "death_replicates",
-                 "start_h", "end_h", "source", "studies"], rows)
+                 "start_h", "end_h", "source", "studies", "technique"], rows)
 
 
 def maintenance_csv(result: dict) -> str:
@@ -565,6 +566,24 @@ def provenance_lines(meta: dict) -> list:
     return lines
 
 
+def technique_mismatch(result: dict) -> str:
+    """A warning when the growth rates or decline rates rest on growth curves of more than one technique, across
+    taxa or within one, which a model would compare as if they were alike; empty otherwise."""
+    names = result.get("names") or {}
+    used = {}
+    for kind in ("rates", "declines"):
+        for tid, r in (result.get(kind) or {}).items():
+            for t in (r.get("technique") or "").split("; "):
+                if t:
+                    used.setdefault(t.rsplit(" (", 1)[0], set()).add(names.get(tid, tid))
+    if len(used) < 2:
+        return ""
+    return ("Growth curves of different techniques: " + "; ".join(
+        f"{t} for {', '.join(sorted(taxa))}" for t, taxa in sorted(used.items()))
+        + ". Growth and decline rates and biomass from different techniques can differ manyfold (a cell count "
+          "falls where optical density stays flat); the technique columns say which each rests on.")
+
+
 def sources_lines(result: dict, which: str = "matrices") -> list:
     """Where each number comes from: which mGrowthDB records, which ChEBI fields, and what foodnet computes from
     them (Karoline, 2026-10-22: "is it clear how the other information in the crm output was obtained from
@@ -703,7 +722,9 @@ def readme(result: dict, which: str = "matrices") -> str:
                   "phase or time window the values cover; then the median over the replicates whose metabolites "
                   "gave the values, or else over another monoculture in the same medium. growth_rates.csv says "
                   "which, per taxon, the method, and fit_start_h and fit_end_h, the replicates' mean first and last "
-                  "hour of the stretch the fit used, to set beside intervals.csv. A taxon without a rate needs one "
+                  "hour of the stretch the fit used, to set beside intervals.csv, and technique, the growth curve's "
+                  "measurement (technique, unit, and whether it counts the strain or the whole culture): rates from "
+                  "different techniques can differ manyfold. A taxon without a rate needs one "
                   "from elsewhere. crm.json also "
                   "holds each taxon's mean growth rate over the CRM's own phase (phase_growth_rates, from "
                   "biomass.csv); a maximum rate below it means the fit took in the plateau.",
@@ -802,6 +823,9 @@ def readme(result: dict, which: str = "matrices") -> str:
                   "measured biomass and makes its measured by-products; crm_backcheck() simulates each taxon alone "
                   "and says how close it comes. foodnet measures no Monod constants, and miaSim's uptake of each "
                   "resource follows them: choose them, and check them with crm_backcheck().", ""]
+    mixed = technique_mismatch(result)
+    if which == "crm" and mixed:
+        lines += [mixed, ""]
     lines += sources_lines(result, which)
     return "\n".join(lines).rstrip() + "\n"
 
