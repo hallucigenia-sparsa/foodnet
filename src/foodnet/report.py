@@ -123,11 +123,12 @@ def report_text(result: dict) -> str:
                             if r.get("other_techniques_left_out") else "") + ")")
         for tid, why in (result.get("without_a_decline") or {}).items():
             lines.append(f"  {names.get(tid, tid)}: none, {why}")
-        short = [f"{names.get(tid, tid)} ({b['start_left_out']} of {b['n']})"
-                 for tid, b in sorted((result.get("biomass") or {}).items()) if b and b.get("start_left_out")]
-        if short:
-            lines += ["", "Left out of biomass_start (nothing at or before biomass_start_h: a 0 there, or no sample "
-                      "by then): " + ", ".join(short)]
+        for ph, by_taxon in sorted((result.get("biomass_by_phase") or {"": result.get("biomass") or {}}).items()):
+            short = [f"{names.get(tid, tid)} ({b['start_left_out']} of {b['n']})"
+                     for tid, b in sorted((by_taxon or {}).items()) if b and b.get("start_left_out")]
+            if short:
+                lines += ["", f"Left out of biomass_start{' (' + ph + ')' if ph else ''} (no value at "
+                          "biomass_start_h: a 0 there or beside it, or no sample by then): " + ", ".join(short)]
         found = result.get("maintenance") or {}
         if found:
             lines += ["", "Maintenance on the growth plateau (Pirt coefficient; uptake per biomass unit per hour, "

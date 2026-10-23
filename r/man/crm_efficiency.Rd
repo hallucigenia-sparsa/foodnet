@@ -10,7 +10,7 @@ crm_efficiency(x, scale = c("miasim", "shares", "none"), na = c("stop", "zero"),
 \item{scale}{\code{"miasim"}, \code{"shares"} or \code{"none"}, as above.}
 \item{na}{\code{"stop"} or \code{"zero"}, as above.}
 \item{allow}{Caveats to accept: \code{"mixed_media"}, \code{"stationary_phase"}.}
-\item{growth}{\code{"measured"} (the default): the growth rates as foodnet fitted them. \code{"phase_floor"}: at least the mean rate each taxon's own curves show over the phase (see \code{\link{crm_scale}}).}
+\item{growth}{\code{"measured"} (the default): the growth rates as foodnet fitted them. \code{"phase_floor"}: the mean rate each taxon's own curves show over the phase where it is more than 10\% above the fitted rate (see \code{\link{crm_scale}}).}
 }
 \value{A numeric matrix, taxa by resources.}
 \description{

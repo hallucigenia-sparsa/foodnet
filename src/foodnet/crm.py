@@ -406,15 +406,22 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         for f in same:
             by_exp_starts.setdefault(f["experiment"], []).append(f["window_start"])
         at_h = statistics.median(statistics.median(v) for v in by_exp_starts.values())
-        logs, ends, end_logs, exact = {}, {}, {}, set()
+        logs, ends, end_logs, start_logs, exact = {}, {}, {}, {}, set()
         for f in same:
             x = _log_at(f["series"], at_h)
-            y = _log_at(f["series"], f["window_start"] + f["hours"])
-            if x is not None and y is not None:
-                logs.setdefault(f["experiment"], []).append(x)
-                ends.setdefault(f["experiment"], []).append(f["window_start"] + f["hours"])
+            if x is None:
+                continue
+            # biomass_start: every culture with a start (a review: a culture dying to 0 by its window's end was
+            # dropped from the start, which it had)
+            logs.setdefault(f["experiment"], []).append(x)
+            exact |= {v for u, v in f["series"] if u == at_h and v > 0}
+            end_h = f["window_start"] + f["hours"]
+            y = _log_at(f["series"], end_h)
+            # the length and the rate: cultures whose window ends after that hour, with a value there
+            if end_h > at_h and y is not None:
+                ends.setdefault(f["experiment"], []).append(end_h)
                 end_logs.setdefault(f["experiment"], []).append(y)
-                exact |= {v for u, v in f["series"] if u == at_h and v > 0}
+                start_logs.setdefault(f["experiment"], []).append(x)
         flat = [x for v in logs.values() for x in v]
         if not flat:
             common = None
@@ -430,7 +437,7 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         # slopes and hours apart overstated B. thetaiotaomicron's growth by 19%; the start plus the per-window
         # change ended stationary phases far from the measured end, once below zero)
         end_log = statistics.mean(statistics.mean(v) for v in end_logs.values()) if end_logs else None
-        start_log = statistics.mean(statistics.mean(v) for v in logs.values()) if logs else None
+        start_log = statistics.mean(statistics.mean(v) for v in start_logs.values()) if start_logs else None
         phase_rate = ((end_log - start_log) / hours
                       if end_log is not None and start_log is not None and hours and hours > 0 else None)
         out[taxon] = {"change": change, "start": common, "start_h": at_h, "unit": unit, "hours": hours,
@@ -449,21 +456,25 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
 
 def _log_at(series, t: float):
     """The natural log of a growth curve's abundance at hour t, interpolated on the log scale between the samples
-    around it (after the last sample, the last); None where it reads 0 at t, or has no positive sample at or before
-    t (a measured 0 has no log, and a later sample does not replace it; a review)."""
-    if any(u == t and v <= 0 for u, v in series):
-        return None
-    positive = [(u, math.log(v)) for u, v in series if v > 0]
-    if not positive or t < positive[0][0]:
+    around it (after the last sample, the last); None before the first sample, and where t falls on or next to a
+    measured 0 (it has no log, and a neighbor does not replace it; reviews)."""
+    if not series or t < series[0][0]:
         return None           # nothing at or before t: a later, denser sample does not stand in (a review)
-    if t == positive[0][0]:
-        return positive[0][1]
-    if t >= positive[-1][0]:
-        return positive[-1][1]
-    for (t0, y0), (t1, y1) in zip(positive, positive[1:], strict=False):
+    if t >= series[-1][0]:
+        return math.log(series[-1][1]) if series[-1][1] > 0 else None
+    for (t0, v0), (t1, v1) in zip(series, series[1:], strict=False):
         if t0 <= t <= t1:
+            if t == t0:
+                return math.log(v0) if v0 > 0 else None
+            if t == t1:
+                return math.log(v1) if v1 > 0 else None
+            # between two samples, on the log scale; a measured 0 on either side has no log (a review: the
+            # interpolation stepped over a 0 between samples)
+            if v0 <= 0 or v1 <= 0:
+                return None
+            y0, y1 = math.log(v0), math.log(v1)
             return y0 if t1 == t0 else y0 + (y1 - y0) * (t - t0) / (t1 - t0)
-    return positive[-1][1]
+    return None
 
 
 def culture_changes(rows, cultures, limit: float, limits: dict | None = None) -> dict:

@@ -476,10 +476,11 @@ while the constants lie well below the resource concentrations, so <code>crm_bac
 them, search the same taxa with the exponential phase (switch the window off in Advanced settings) and check
 there. A ratio that stays put as the constants fall toward 0 is not theirs to fix: the taxon then grows as fast
 as the data let it, and what is left lies in the data. Its growth rate may be below its phase's own mean rate
-(<code>print(crm)</code> says so; <code>growth = "phase_floor"</code>, given to <code>crm_backcheck()</code> and
-<code>as_miasim()</code> alike, uses the phase's rate there), or part of its uptake may come after the growth rate
-fell (still_changing, which the warnings name). It takes <code>crm</code> itself and builds the efficiency matrix;
-<code>na = "zero"</code> counts NA cells as 0 and says how many of each kind.</li>
+(more than 10% below: <code>print(crm)</code> says so, and <code>growth = "phase_floor"</code>, given to
+<code>crm_backcheck()</code> and <code>as_miasim()</code> alike, uses the phase's rate there; a smaller shortfall
+is kept, and compounds over the phase, so a ratio near 0.6 can remain), or part of its uptake may come after
+the growth rate fell (still_changing, which the warnings name). It takes <code>crm</code> itself and builds the
+efficiency matrix; <code>na = "zero"</code> counts NA cells as 0 and says how many of each kind.</li>
 <li>Simulate the community with the parameters and the arguments you checked in step 4 (the same
 <code>monod_constant</code>, and <code>growth</code> if you set it): <code>args &lt;- as_miasim(crm, x0 =
 crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")</code>, then <code>tse &lt;-

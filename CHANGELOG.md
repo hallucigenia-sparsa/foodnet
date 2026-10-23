@@ -38,9 +38,9 @@ semantic versioning.
 
 - `biomass_start`, the starting abundance a simulation takes, averaged abundances read at different hours (E.
   coli LF82: 1.26e7, where its cultures held 2.9e5 at 0 h, so a simulation started it about 40 times too high).
-  It is now every culture read at a single hour, `biomass_start_h` (the median of the experiments' window starts), on the
-  log scale, and averaged as logs; the phase's length and mean growth rate run from that hour, so a simulation
-  from `biomass_start` follows the measured growth, and `biomass_change` stays over each culture's window.
+  It is now every culture with a value at a single hour, `biomass_start_h` (the median of the experiments'
+  window starts), read on the log scale and averaged as logs; the phase's length and mean growth rate run from that hour, so a simulation
+  from `biomass_start` follows the measured growth at the phase's rate, and `biomass_change` stays over each culture's window.
 - Growth rates, declines, maintenance and biomass now take the cultures of the technique, unit and gate most of
   a taxon's use, and count the rest (other_techniques_left_out, other_units_left_out): an ungated count beside
   live-gated ones is left out.

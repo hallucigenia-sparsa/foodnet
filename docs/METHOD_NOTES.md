@@ -408,7 +408,7 @@ with metabolite data."
     abundance at its own window start, so cultures starting at 0 h and at 4 h mixed an inoculum with a culture
     100 times denser (E. coli LF82: 1.26e7 against 2.9e5 at 0 h), and as_miasim's x0 started E. coli about 40
     times too high. Now every culture is read at a single hour, biomass_start_h, the median of the experiments'
-    window starts, interpolated on the log scale (a culture with nothing at or before it is left out), and the
+    window starts, interpolated on the log scale (a culture with no value there, a 0 at or beside it or no sample by then, is left out), and the
     logs are averaged per experiment and then over experiments. phase_hours runs from that hour to the cultures'
     mean window end and phase_growth_rates is the log rise from biomass_start to the cultures' abundance at their
     windows' ends (logs averaged alike) over phase_hours, so x0, the rate and the length describe one trajectory

@@ -101,8 +101,9 @@ crm_resources <- function(x, missing = NULL) {
 #' @param scale `"miasim"`, `"shares"` or `"none"`, as above.
 #' @param na `"stop"` or `"zero"`, as above.
 #' @param allow Caveats to accept: `"mixed_media"`, `"stationary_phase"`.
-#' @param growth `"measured"` (the default): the growth rates as foodnet fitted them. `"phase_floor"`: at
-#'   least the mean rate each taxon's own curves show over the phase (see [crm_scale()]).
+#' @param growth `"measured"` (the default): the growth rates as foodnet fitted them. `"phase_floor"`: the
+#'   mean rate each taxon's own curves show over the phase where it is more than 10% above the fitted rate (see
+#'   [crm_scale()]).
 #' @return A numeric matrix, taxa by resources.
 #' @examples
 #' \dontrun{
@@ -221,8 +222,9 @@ amounts <- function(x, na = "stop", booleans_ok = FALSE) {
 #' grow at its measured rate with its measured yield. Divide starting abundances by it ([as_miasim()] does)
 #' and multiply simulated ones by it ([crm_unscale()]).
 #'
-#' The growth rate in it is foodnet's fitted maximum rate, or with `growth = "phase_floor"` at least the
-#' mean rate the taxon's own curves show over the phase. A maximum below that mean cannot be right: it comes
+#' The growth rate in it is foodnet's fitted maximum rate, or with `growth = "phase_floor"` the mean rate the
+#' taxon's own curves show over the phase where that is more than 10% higher (a smaller shortfall is kept, and
+#' compounds over the phase: 9% below over 20 h gives about 0.6 of the growth). A maximum below that mean cannot be right: it comes
 #' from a fitting window that took in the plateau of a fast, sparsely sampled curve (E. coli LF82: 0.375
 #' fitted against about 1.0 per hour over its phase), and it would grow the taxon too slowly. Such taxa are named in
 #' a warning.
@@ -753,8 +755,11 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     # one simulation starts every taxon at one time: biomass_start read at different hours does not (a review:
     # in the stationary phase 8 to 36 h for five taxa)
     # only where x0 is foodnet's own biomass_start (a review: the warnings fired for an x0 the user gave)
-    own_x0 <- isTRUE(all.equal(unname(as.numeric(x0)), unname(as.numeric(x$biomass_start))))
-    hours <- unique(stats::na.omit(unname(x$biomass_start_h)))
+    # taxon by taxon: an x0 the user completed still holds foodnet's starts for the others (a review)
+    same <- !is.na(x0) & !is.na(x$biomass_start) & abs(as.numeric(x0) - as.numeric(x$biomass_start)) <=
+        1e-9 * pmax(abs(as.numeric(x$biomass_start)), 1)
+    own_x0 <- any(same)
+    hours <- unique(stats::na.omit(unname(x$biomass_start_h[same])))
     if (own_x0 && length(hours) > 1) {
         warning("x$biomass_start is read at different hours for these taxa (",
                 paste(sprintf("%s %g h", names(x$biomass_start_h), x$biomass_start_h)[!is.na(x$biomass_start_h)],

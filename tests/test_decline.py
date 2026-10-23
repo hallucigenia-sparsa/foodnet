@@ -670,3 +670,43 @@ def test_the_phase_rate_runs_from_the_start_to_the_measured_end():
     ends = (math.log(2.5e8) + math.log(2e8)) / 2
     starts = (math.log(math.sqrt(1e9 * 5e8)) + math.log(math.sqrt(8e8 * 4e8))) / 2
     assert b["start_h"] == start_h and b["phase_rate"] == pytest.approx((ends - starts) / 15)
+
+
+def _bio(windows, curves):
+    import types
+    cultures = [(i, types.SimpleNamespace(growth={"times": t, "values": v, "technique": "fc", "unit": ""},
+                                          taxon={"id": "t"}, experiment=f"E{i}")) for i, (t, v) in enumerate(curves)]
+    rows = [{"culture": i, "phase": "stationary", "change": -1.0, "start": a, "end": b, "cautions": []}
+            for i, (a, b) in enumerate(windows)]
+    return crm.biomass_changes(cultures, rows, "stationary")["t"]
+
+
+def test_a_culture_dying_to_zero_keeps_its_start_and_the_rate_ends_at_the_window_end():
+    import math
+    times = [0, 10, 20, 30, 40]
+    b = _bio([(10, 30), (10, 30)], [(times, [1e9, 1e9, 1e8, 1e7, 1e9]), (times, [1e9, 1e9, 1e8, 0, 0])])
+    # both cultures have a start at 10 h; only the first a value at its window end (30 h), not at the last sample
+    assert b["start_left_out"] == 0 and b["start"] == pytest.approx(1e9)
+    assert b["phase_rate"] == pytest.approx((math.log(1e7) - math.log(1e9)) / 20)
+
+
+def test_a_zero_beside_the_hour_gives_no_log_and_a_window_ending_before_it_no_length():
+    from foodnet.crm import _log_at
+    assert _log_at([(0, 1e5), (2, 0), (4, 1e7)], 1) is None and _log_at([(0, 1e5), (2, 0)], 2) is None
+    b = _bio([(0, 1), (10, 11), (10, 11)], [([0, 1, 10, 11], [1, 2, 4, 8])] * 3)
+    assert b["hours"] == pytest.approx(1) and b["start_h"] == 10
+
+
+def test_biomass_falls_against_the_abundance_the_change_runs_from(client):
+    # A's flow cytometry counts stay at 1000 after 12 h, B's OD at 0.5: neither falls in the stationary phase
+    r = run(client, report_rates=True, phase="both")
+    assert matrix.crm_payload(r)["other_phases"]["stationary"]["biomass_falls"] == []
+    assert all(b["window_start_abundance"] for b in r["biomass"].values())
+
+
+def test_biomass_csv_writes_the_start_hour(client):
+    r = run(client, report_rates=True)
+    header, *rows = matrix.biomass_csv(r).splitlines()
+    names = header.split(",")
+    alpha = next(row.split(",") for row in rows if row.startswith("Alpha alpha A1"))
+    assert alpha[names.index("biomass_start_h")] == "0"
