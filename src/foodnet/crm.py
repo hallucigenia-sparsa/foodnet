@@ -47,6 +47,10 @@ def _rate_values(cultures, method: str, spike_factor: float, skipped: list) -> l
     for c in cultures:
         if c.growth is None:
             continue
+        if getattr(c, "not_grown", False):
+            # as for declines and maintenance (Karoline, 2026-10-22: "growth rates should follow the same rules")
+            skipped.append((c.label, "the culture did not grow; no growth rate from it"))
+            continue
         if spike(c.growth["values"], spike_factor):
             skipped.append((c.label, "growth curve spikes; no growth rate from it"))
             continue
@@ -250,15 +254,29 @@ def maintenance(value_cultures, limit: float, limits: dict | None = None,
                     fall = 0.0
                 found[taxon][mid].append({"value": fall / biomass / (end - start), "unit": unit, "start": start,
                                           "end": end, "study": c.study, "experiment": c.experiment,
+                                          "culture": c.label,
                                           "samples": samples, "at_start": at_start, "limit": lim})
+    for by_met in found.values():
+        unit = _taxon_unit(by_met)
+        for culture, other in sorted({(e["culture"], e["unit"]) for entries in by_met.values() for e in entries}):
+            if other != unit:
+                skipped.append((culture, f"no maintenance coefficient: its growth curve is in {other}, and most of "
+                                         f"the taxon's cultures are in {unit}"))
     return summarize_maintenance(found), skipped
+
+
+def _taxon_unit(by_met: dict) -> str:
+    """The unit most of a taxon's cultures use, each culture counted once whatever it measured (a review: counted
+    per compound, two OD cultures measuring twelve compounds outvoted three qPCR cultures)."""
+    per_culture = {e.get("culture", id(e)): e["unit"] for entries in by_met.values() for e in entries}
+    return majority(list(per_culture.values()))
 
 
 def summarize_maintenance(found: dict) -> dict:
     """{taxon: {metabolite: summary}} from {taxon: {metabolite: [per-culture entries]}} (see `maintenance`)."""
     out = {}
     for taxon, by_met in found.items():
-        unit = majority([e["unit"] for entries in by_met.values() for e in entries])
+        unit = _taxon_unit(by_met)
         for mid, entries in by_met.items():
             same = [e for e in entries if e["unit"] == unit]
             if not same:

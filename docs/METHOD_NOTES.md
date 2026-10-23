@@ -392,6 +392,8 @@ with metabolite data."
     from the highest sample, one noisy point moved the window and every curve whose highest sample was its last
     was left out), to the last sample in the band; no separate mean over the replicates that still had the
     compound ("No, as it is"). Cultures in another unit than the taxon's are counted (other_units_left_out).
+    Fifth round: the taxon's unit is the one most of its cultures use, each culture counted once whatever it
+    measured; growth rates, like declines and maintenance, take nothing from a culture that did not grow.
 
 ## Known limits
 

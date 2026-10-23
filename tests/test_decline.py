@@ -376,3 +376,39 @@ def test_r_writes_the_same_columns_as_foodnet(client):
 def test_a_curve_whose_highest_sample_is_its_last_still_has_a_plateau():
     # Karoline, 2026-10-22: the plateau starts where the decline starts, so a creeping plateau is not left out
     assert rates.plateau([0, 4, 8, 12, 24, 36, 48], [1, 10, 100, 1000, 990, 980, 1010]) == (12, 48)
+
+
+def test_a_taxons_maintenance_unit_is_the_one_most_of_its_cultures_use_whatever_they_measured():
+    # a review: two OD cultures measuring many compounds outvoted three qPCR cultures measuring one
+    many = _plateau_culture("E1", (2.0, 1.0), technique="od")
+    many.metabolites.update({f"m{i}": {"series": [(0, 10), (12, 2.0), (24, 1.0)]} for i in range(10)})
+    few = [_plateau_culture(f"E{i}", (2.0, 1.0), technique="qpcr") for i in (2, 3)]
+    for c in few:
+        c.label = c.experiment
+    found, skipped = crm.maintenance([many] + few, 0.2)
+    assert found["ncbi:9"]["glc"]["biomass_unit"] == "qpcr" and "m0" not in found["ncbi:9"]
+    assert any("in od" in why for _, why in skipped)
+
+
+def test_the_fraction_setting_moves_the_maintenance_plateau():
+    curve = _plateau_culture("E1", (2.0, 1.0))
+    curve.growth = {"times": [0, 4, 8, 12, 24], "values": [1, 10, 100, 800, 1000], "technique": "fc", "unit": "",
+                    "level": "culture"}
+    early, _ = crm.maintenance([curve], 0.2, fraction=0.7)
+    late, _ = crm.maintenance([curve], 0.2, fraction=0.9)
+    assert early["ncbi:9"]["glc"]["start_h"] == 12 and "ncbi:9" not in late
+
+
+def test_fit_r2_is_one_for_a_clean_exponential_decline():
+    d = rates.decline([0, 4, 8, 12, 24, 36, 48], [1, 10, 100, 1000, 500, 250, 125])
+    assert d["r2"] == pytest.approx(1.0)
+
+
+def test_growth_rates_leave_out_cultures_that_did_not_grow(client):
+    # Karoline, 2026-10-22: growth rates "should follow the same rules"; B's mMCB cultures read OD without
+    # growth, beside its WC cultures that grew
+    for rep in ("b2", "b2b"):
+        client.contexts[client.bioreplicates[rep]["measurementContexts"][0]["id"]] = \
+            [(0, 0.5), (8, 0.52), (16, 0.55), (24, 0.56)]
+    r = run(client, ignore_media=True, report_rates=True, rate_window=3)
+    assert r["rates"]["ncbi:2"]["n"] == 2
