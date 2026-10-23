@@ -18,7 +18,8 @@ per cell with a phase column, \code{chemistry.csv} and \code{electron_balance.cs
 and \code{\link{crm_electron_balance}}, the latter with a phase column), and \code{README.txt}, which opens with the phase. After \code{\link{crm_phase}} the
 phase's files are named for it (\code{consumed_stationary.csv}, \code{intervals_stationary.csv},
 \code{README_stationary.txt}, ...), so both phases can be written to one folder; the growth rates and the
-medium are the same in both. The tables hold what the parameters in R hold: growth_rates.csv, decline_rates.csv
-and maintenance.csv have the download's columns, with NA where the download writes a reason or a 0 for a taxon
-without a rate; the others have fewer columns (no value-medium header cell).
+medium are the same in both. The tables hold what the parameters in R hold: growth_rates.csv, decline_rates.csv,
+maintenance.csv and biomass.csv have the download's columns (for a taxon without a growth rate the source is NA
+where the download gives the reason, and some counts are NA where it writes 0); initial_concentrations.csv has
+the resource and its initial mM only; the matrices have no value-medium header cell.
 }

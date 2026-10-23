@@ -340,7 +340,7 @@ def rates_csv(result: dict) -> str:
             rows.append([t.name, f"{r['rate']:.6g}", r["unit"], r["n"], r["source"], " ".join(r["studies"]),
                          r["method"], *hours, r.get("technique", ""), r.get("other_techniques_left_out", 0)])
         else:
-            rows.append([t.name, NA, "1/h", 0, result["without_a_rate"].get(t.id, ""), "", "", NA, NA, "", ""])
+            rows.append([t.name, NA, "1/h", 0, result["without_a_rate"].get(t.id, ""), "", "", NA, NA, "", 0])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "growth_rate", "unit", "replicates", "source", "studies", "method", "fit_start_h",
                  "fit_end_h", "technique", "other_techniques_left_out"], rows)
@@ -621,7 +621,8 @@ MAINTENANCE_TEXT = (
     "biomass (plate counts, CFU; a live-gated count counts membrane-intact cells, which outlast culturable ones) "
     "the coefficient of an uptake bounds Pirt's m_s from above where growth and death balance; per counted "
     "biomass that includes dead cells (optical density, total counts, qPCR, 16S) it is lower by their share, so "
-    "it bounds m_s in neither direction. Where the "
+    "it bounds m_s in neither direction; per a flow cytometry count without a recorded gate it is undetermined "
+    "which. Where the "
     "taxon's decline is a death phase, the plateau is not balanced: biomass_relative_change says how much the "
     "biomass changed over the window (end over start, minus 1), and uptake then also feeds overflow and recycling of "
     "lysed cells. below_limit_by_end counts the replicates whose compound fell below the detection limit "
@@ -1089,6 +1090,9 @@ def _phase_block(result: dict, phase: str) -> dict:
         "consumed_lower": consumed_lower, "consumed_upper": consumed_upper,
         "produced_lower": produced_lower, "produced_upper": produced_upper,
         "biomass_change": [None if b is None else b["change"] for b in biomass],
+        # how many replicates the biomass rests on, and how many of another unit it leaves out (a review)
+        "biomass_replicates": [None if b is None else b["n"] for b in biomass],
+        "biomass_other_units_left_out": [None if b is None else b.get("other_units_left_out", 0) for b in biomass],
         "biomass_start": [None if b is None else b["start"] for b in biomass],
         "biomass_unit": [None if b is None else b["unit"] for b in biomass],
         "phase_hours": [None if b is None else b["hours"] for b in biomass],

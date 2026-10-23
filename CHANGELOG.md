@@ -40,7 +40,7 @@ semantic versioning.
   a taxon's use, and count the rest (other_techniques_left_out, other_units_left_out): an ungated count beside
   live-gated ones is left out.
 - The figure, the matrices download and the page failed on a merged genus whose taxa were all inconclusive
-  (also in 0.4.0); its note now says no taxon gives a value.
+  (also in 0.4.0); its note names the inconclusive taxa.
 - A count of dead cells (a flow cytometry gate) could become a culture's growth curve when the others failed; it
   never does now. The gate of a count (live, total) is part of its technique in every table, and a count
   deposited without a gate whose series is identical to a gated count of the same replicate is named for that

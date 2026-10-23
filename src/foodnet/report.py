@@ -99,6 +99,8 @@ def report_text(result: dict) -> str:
             fitted = (f", fitted over {r['fit_start_h']:.3g} h to {r['fit_end_h']:.3g} h"
                       if r.get("fit_start_h") is not None else "")
             fitted += f", {r['technique']}" if r.get("technique") else ""
+            fitted += (f", {r['other_techniques_left_out']} of another technique left out"
+                       if r.get("other_techniques_left_out") else "")
             lines.append(f"  {names.get(tid, tid)}: {r['rate']:.3f} (median of {r['n']}, from {r['source']}, "
                          f"{r['method']}{fitted})")
         for tid, why in result["without_a_rate"].items():
@@ -116,7 +118,9 @@ def report_text(result: dict) -> str:
             lines.append(f"  {names.get(tid, tid)}: {r['rate']:.3g}{scatter} (n {r['n']} from "
                          f"{r.get('n_experiments', '?')} experiment(s), {r['phase']}, {r['start_h']:.3g} h to "
                          f"{r['end_h']:.3g} h, from {r['source']}"
-                         + (f", {r['technique']}" if r.get("technique") else "") + ")")
+                         + (f", {r['technique']}" if r.get("technique") else "")
+                         + (f", {r['other_techniques_left_out']} of another technique left out"
+                            if r.get("other_techniques_left_out") else "") + ")")
         for tid, why in (result.get("without_a_decline") or {}).items():
             lines.append(f"  {names.get(tid, tid)}: none, {why}")
         found = result.get("maintenance") or {}
@@ -129,6 +133,10 @@ def report_text(result: dict) -> str:
                     scatter = f" +/- {m['se']:.2g} SE" if m["se"] is not None else ""
                     gone = (f", below the detection limit at the plateau's start in {m['below_limit_replicates']} "
                             f"of {m['n']}" if m.get("below_limit_replicates") else "")
+                    gone += (f", below it by the window's end in {m['below_limit_by_end']} of {m['n']}"
+                             if m.get("below_limit_by_end") else "")
+                    gone += (f", biomass {m['biomass_relative_change']:+.0%} over the window"
+                             if m.get("biomass_relative_change") is not None else "")
                     lines.append(f"  {names.get(tid, tid)}, {names.get(mid, mid)}: {m['coefficient']:.3g}{scatter} "
                                  f"{m['unit']} (n {m['n']}, {m['start_h']:.3g} h to {m['end_h']:.3g} h{gone})")
     if result["initial"]:

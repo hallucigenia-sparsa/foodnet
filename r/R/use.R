@@ -411,7 +411,8 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
     for (name in PHASE_MATRICES) {
         if (!is.null(x[[name]])) x[[name]] <- x[[name]][keep_t, keep_r, drop = FALSE]
     }
-    for (name in c("growth_rates", "decline_rates", PHASE_VECTORS)) {
+    for (name in c("growth_rates", "decline_rates", "biomass_replicates", "biomass_other_units_left_out",
+                   PHASE_VECTORS)) {
         if (!is.null(x[[name]])) x[[name]] <- x[[name]][keep_t]
     }
     if (!is.null(x$maintenance)) {
@@ -477,13 +478,10 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
         mark <- "(for the whole search) "
         left <- ifelse(startsWith(left, mark), left, paste0(mark, left))
         x$caveats$warnings <- if (length(left)) left else character(0)
-        # the technique warning names taxa too: drop it when it names one left out, else mark it (a review)
-        tm <- x$caveats$technique_mismatch %||% ""
-        if (nzchar(tm)) {
-            x$caveats$technique_mismatch <- if (names_any(tm)) "" else
-                if (startsWith(tm, mark)) tm else paste0(mark, tm)
-        }
     }
+    # the technique warning, rebuilt over the taxa kept, as foodnet builds it (reviews: dropped while it still held,
+    # or kept naming a taxon left out)
+    if (!is.null(x$caveats$technique_mismatch)) x$caveats$technique_mismatch <- technique_warning(x)
     for (name in c("cautions", "inconclusive")) {
         rows <- x$caveats[[name]]
         if (NROW(rows)) x$caveats[[name]] <- rows[rows$taxon %in% kept & rows$resource %in% x$resources, , drop = FALSE]
@@ -568,9 +566,10 @@ crm_readme <- function(x, print = TRUE) {
 #' and [crm_electron_balance()], the latter with a phase column), and `README.txt`, which opens with the phase. After [crm_phase()] the
 #' phase's files are named for it (`consumed_stationary.csv`, `intervals_stationary.csv`,
 #' `README_stationary.txt`, ...), so both phases can be written to one folder; the growth rates and the
-#' medium are the same in both. The tables hold what the parameters in R hold: growth_rates.csv, decline_rates.csv
-#' and maintenance.csv have the download's columns, with NA where the download writes a reason or a 0 for a taxon
-#' without a rate; the others have fewer columns (no value-medium header cell).
+#' medium are the same in both. The tables hold what the parameters in R hold: growth_rates.csv, decline_rates.csv,
+#' maintenance.csv and biomass.csv have the download's columns (for a taxon without a growth rate the source is NA
+#' where the download gives the reason, and some counts are NA where it writes 0); initial_concentrations.csv has
+#' the resource and its initial mM only; the matrices have no value-medium header cell.
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param dir Directory to write into. It is created when it does not exist.
@@ -642,9 +641,13 @@ crm_write <- function(x, dir) {
     if (!is.null(x$maintenance)) put(x$maintenance[setdiff(names(x$maintenance), "biomass_unit")], "maintenance.csv")
     put(data.frame(resource = x$resources, initial_mM = unname(x$initial), stringsAsFactors = FALSE),
         "initial_concentrations.csv")
+    # the replicate counts belong to the CRM's own phase: after a switch, NA
+    counts <- function(v) if (own && !is.null(v)) unname(v) else rep(NA_real_, length(x$taxa))
     put(data.frame(taxon = x$taxa, biomass_start = unname(x$biomass_start),
                    biomass_change = unname(x$biomass_change), unit = unname(x$biomass_unit),
-                   phase_hours = unname(x$phase_hours), stringsAsFactors = FALSE), "biomass.csv")
+                   phase_hours = unname(x$phase_hours), replicates = counts(x$biomass_replicates),
+                   other_units_left_out = counts(x$biomass_other_units_left_out), stringsAsFactors = FALSE),
+        "biomass.csv")
     cells <- expand.grid(i = seq_along(x$taxa), j = seq_along(x$resources))
     # a second-window compound was measured over that window, which the files say, as the download's do
     column_phase <- if (is.null(x$resource_phases)) rep(x$phase, length(x$resources)) else
@@ -1114,3 +1117,29 @@ crm_electron_balance <- function(x) {
 
 # a count foodnet writes as 0 where there is no value (decline_rates.csv: replicates, experiments)
 zero_if_none <- function(v) ifelse(is.na(v), 0L, as.integer(v))
+
+# "Growth curves of different techniques: ..." over x's taxa, from the techniques of their growth and decline rates
+# and their biomass unit (foodnet.matrix.technique_mismatch); "" when they share one
+technique_warning <- function(x) {
+    used <- list()
+    add <- function(technique, taxon) {
+        if (is.null(technique) || is.na(technique) || !nzchar(technique)) return()
+        for (t in strsplit(technique, "; ", fixed = TRUE)[[1]]) {
+            key <- sub(" \\((strain|culture)\\)$", "", t)
+            used[[key]] <<- union(used[[key]], taxon)
+        }
+    }
+    for (taxon in x$taxa) {
+        add(x$growth_rate_detail[[taxon]]$technique, taxon)
+        add(x$decline_rate_detail[[taxon]]$technique, taxon)
+        if (!is.null(x$biomass_unit)) add(unname(x$biomass_unit[taxon]), taxon)
+    }
+    if (length(used) < 2) return("")
+    keys <- sort(names(used))
+    paste0("Growth curves of different techniques: ",
+           paste(vapply(keys, function(k) paste0(k, " for ", paste(sort(used[[k]]), collapse = ", ")),
+                        character(1)), collapse = "; "),
+           ". Growth and decline rates and biomass from different techniques can differ manyfold (a live count ",
+           "falls where a total count or optical density stays flat); the technique columns say which each rests ",
+           "on.")
+}

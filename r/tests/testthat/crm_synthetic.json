@@ -872,6 +872,16 @@
     0.0,
     null
    ],
+   "biomass_replicates": [
+    3,
+    2,
+    null
+   ],
+   "biomass_other_units_left_out": [
+    0,
+    0,
+    null
+   ],
    "biomass_start": [
     1000.0,
     0.5,

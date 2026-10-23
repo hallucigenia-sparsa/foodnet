@@ -368,7 +368,7 @@ def test_r_writes_the_same_columns_as_foodnet(client):
     r = run(client, report_rates=True)
     rtest = (pathlib.Path(__file__).parents[1] / "r" / "tests" / "testthat" / "test-payload.R").read_text()
     written = ",".join(re.findall(r'"([A-Za-z0-9_]+)"', rtest[rtest.index("writes the download's columns"):]))
-    for table in (matrix.rates_csv, matrix.declines_csv, matrix.maintenance_csv):
+    for table in (matrix.rates_csv, matrix.declines_csv, matrix.maintenance_csv, matrix.biomass_csv):
         names = table(r).splitlines()[0].split(",")
         assert ",".join(names) in written, names
 
@@ -527,3 +527,37 @@ def test_a_studys_ungated_counts_take_the_gate_its_authors_named():
     od = {"times": [0, 4], "values": [0.1, 0.4], "gate": "", "technique": "od"}
     reading.name_gates([fc, od], [], reading.KNOWN_GATES["SMGDB00000002"])
     assert fc["gate"] == "live" and od["gate"] == ""
+
+
+def test_a_known_gate_reaches_a_searchs_technique(client, monkeypatch):
+    # pins the wiring of KNOWN_GATES through reading a replicate (a review: only name_gates was tested)
+    from foodnet import reading
+    monkeypatch.setitem(reading.KNOWN_GATES, "SMGDB00000001", {"fc": "live"})
+    r = run(client, report_rates=True, rate_window=3)
+    assert r["rates"]["ncbi:1"]["technique"] == "fc live (culture)"
+
+
+def test_an_identical_gated_copy_outranks_a_known_gate():
+    from foodnet import reading
+    total = {"times": [0, 4], "values": [1, 10], "gate": "total", "technique": "fc"}
+    copy = {"times": [0, 4], "values": [1, 10], "gate": "", "technique": "fc"}
+    reading.name_gates([copy, total], [], {"fc": "live"})
+    assert copy["gate"] == "total"
+
+
+def test_biomass_counts_the_cultures_of_another_unit_it_leaves_out():
+    import types
+    cultures = [(i, types.SimpleNamespace(growth={"times": [0, 12], "values": [1, 100], "technique": tech, "unit": ""},
+                                          taxon={"id": "t"}, experiment=f"E{i}"))
+                for i, tech in enumerate(("fc", "fc", "od"))]
+    rows = [{"culture": i, "phase": "exponential", "change": -1.0, "start": 0, "end": 12, "cautions": []}
+            for i in range(3)]
+    b = crm.biomass_changes(cultures, rows, "exponential")["t"]
+    assert (b["unit"], b["n"], b["other_units_left_out"]) == ("fc", 2, 1)
+
+
+def test_merged_genera_name_the_cultures_their_maintenance_leaves_out():
+    many = {"glc": [{"unit": "fc live", "culture": "A1"}, {"unit": "fc live", "culture": "A2"},
+                    {"unit": "fc", "culture": "B1"}]}
+    assert crm.unit_skips({"G": many}) == [("B1", "no maintenance coefficient: its growth curve is in fc, and most "
+                                                   "of the cultures of its taxon (or genus) are in fc live")]

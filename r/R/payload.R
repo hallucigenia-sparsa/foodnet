@@ -228,6 +228,10 @@ as_foodnet_crm <- function(payload) {
              biomass_unit = units,
              phase_hours = per_taxon("phase_hours"),
              phase_growth_rates = per_taxon("phase_growth_rates"),
+             # how many replicates the biomass of the CRM's own phase rests on, and how many of another unit it
+             # leaves out (from the release after foodnet 0.4.0; NA before)
+             biomass_replicates = per_taxon("biomass_replicates"),
+             biomass_other_units_left_out = per_taxon("biomass_other_units_left_out"),
              phase = chr(payload$phase),
              other_phases = lapply(payload$other_phases, as_phase_block, taxa = taxa, resources = resources),
              values = chr(payload$values, "mM"),

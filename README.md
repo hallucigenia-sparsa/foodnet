@@ -174,7 +174,7 @@ sample (negative where it still creeps up), the mean over its replicates in one 
 between replicates, the number of experiments they come from, the window, and whether the curves leave the
 plateau band or fall to zero (death) or stay on it (plateau). For total counts, optical density, qPCR and 16S it
 bounds death from below, since they keep dead cells until they lyse; for a flow cytometry count without a
-recorded gate it is undetermined. Without a usable decline it is
+recorded gate it is undetermined (study SMGDB00000002's are taken as live counts, as its authors say). Without a usable decline it is
 NA, not 0. Separately, it gives the Pirt maintenance coefficient (`maintenance.csv`), which nothing else uses:
 what each taxon took up of each compound per unit of biomass per hour on its growth plateau (from where the
 decline starts), with its scatter, experiments, window, the compound's concentration at the plateau's start, how

@@ -235,4 +235,17 @@ test_that("crm_write writes the download's columns for growth rates, declines an
                                                    '"experiments","start_h","end_h","plateau_samples","start_mM",',
                                                    '"below_limit_replicates","below_limit_by_end","biomass_relative_change",',
                                                    '"other_units_left_out","studies"'))
+    expect_equal(header("biomass.csv"), paste0('"taxon","biomass_start","biomass_change","unit","phase_hours",',
+                                               '"replicates","other_units_left_out"'))
+})
+
+test_that("crm_subset rebuilds the technique warning over the taxa it keeps", {
+    p <- example_payload()
+    p$growth_rate_detail <- list(A = list(technique = "fc Cells/mL live (strain)"),
+                                 B = list(technique = "od (culture)"))
+    p$biomass_unit <- list("fc Cells/mL live", "od")
+    p$caveats$technique_mismatch <- "Growth curves of different techniques: fc Cells/mL live for A; od for B."
+    x <- foodnet:::as_foodnet_crm(p)
+    expect_match(crm_subset(x, taxa = c("A", "B"))$caveats$technique_mismatch, "fc Cells/mL live for A; od for B")
+    expect_equal(crm_subset(x, taxa = "A")$caveats$technique_mismatch, "")
 })

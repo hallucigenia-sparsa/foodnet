@@ -216,7 +216,8 @@ def _mean_biomass(times, values, start: float, end: float) -> float:
 
 
 def maintenance(value_cultures, limit: float, limits: dict | None = None,
-                spike_factor: float = SPIKE_FACTOR, dropped=frozenset(), fraction: float = 0.9) -> tuple:
+                spike_factor: float = SPIKE_FACTOR, dropped=frozenset(), fraction: float = 0.9,
+                name_units: bool = True) -> tuple:
     """({taxon: {metabolite: summary}}, skipped): the Pirt maintenance coefficient, a separate characteristic
     for a fit to use or not (Karoline, 2026-10-09): what each culture took up of a compound per unit of biomass
     per hour while it sat on its growth plateau (`rates.plateau`). Per culture: the compound's fall over the
@@ -266,13 +267,22 @@ def maintenance(value_cultures, limit: float, limits: dict | None = None,
                                           "culture": c.label, "samples": samples, "at_start": at_start,
                                           "limit": lim, "gone_by_end": at_start >= lim > at_end,
                                           "biomass_relative_change": change})
+    if name_units:
+        skipped += unit_skips(found)
+    return summarize_maintenance(found), skipped
+
+
+def unit_skips(found: dict) -> list:
+    """The cultures each taxon (or genus) leaves out of its maintenance for their unit, as report lines (a review:
+    with merged genera, a strain's cultures left out at genus level went unnamed)."""
+    lines = []
     for by_met in found.values():
         unit = _taxon_unit(by_met)
         for culture, other in sorted({(e["culture"], e["unit"]) for entries in by_met.values() for e in entries}):
             if other != unit:
-                skipped.append((culture, f"no maintenance coefficient: its growth curve is in {other}, and most of "
-                                         f"the taxon's cultures are in {unit}"))
-    return summarize_maintenance(found), skipped
+                lines.append((culture, f"no maintenance coefficient: its growth curve is in {other}, and most of the "
+                                       f"cultures of its taxon (or genus) are in {unit}"))
+    return lines
 
 
 def _taxon_unit(by_met: dict) -> str:

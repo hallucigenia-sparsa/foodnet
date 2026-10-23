@@ -452,7 +452,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         # kept one did not measure (a review: R. intestinalis lost the formate only RI_WC measured)
         maint, maint_skips = crm.maintenance(
             [cultures[i] for i in sorted(chosen) if id(cultures[i]) not in unphased], s["detection_limit"], limits,
-            s["spike_factor"], maint_dropped, s["fraction"])
+            s["spike_factor"], maint_dropped, s["fraction"], not s["merge_genera"])
         skipped += maint_skips
         for t in whole_taxa:
             maint.pop(t, None)              # growth curves judged unusable give no plateau either (a review)
@@ -464,6 +464,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
                 for mid, m in by_met.items():
                     merged[d.genus_of(taxa, tid)][mid] += m["cultures"]
             maint = crm.summarize_maintenance(merged)
+            skipped += crm.unit_skips(merged)
         net.meta["growth_rates"] = {"method": rates.method_name(s["rate_method"], s["rate_window"]),
                                     "rates": organism_rates, "without_a_rate": without_rate}
     initial = crm.initial_concentrations([cultures[i] for i in sorted(chosen)],
