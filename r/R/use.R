@@ -752,12 +752,15 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     x0 <- if (!is.null(names(x0)) && all(x$taxa %in% names(x0))) x0[x$taxa] else x0
     # one simulation starts every taxon at one time: biomass_start read at different hours does not (a review:
     # in the stationary phase 8 to 36 h for five taxa)
+    # only where x0 is foodnet's own biomass_start (a review: the warnings fired for an x0 the user gave)
+    own_x0 <- isTRUE(all.equal(unname(as.numeric(x0)), unname(as.numeric(x$biomass_start))))
     hours <- unique(stats::na.omit(unname(x$biomass_start_h)))
-    if (length(hours) > 1) {
+    if (own_x0 && length(hours) > 1) {
         warning("x$biomass_start is read at different hours for these taxa (",
                 paste(sprintf("%s %g h", names(x$biomass_start_h), x$biomass_start_h)[!is.na(x$biomass_start_h)],
                       collapse = ", "), "); one simulation starts them all at its time 0", call. = FALSE)
-    } else if (!is.null(x$biomass_start_h) && all(is.na(x$biomass_start_h)) && !all(is.na(x$biomass_start))) {
+    } else if (own_x0 && !is.null(x$biomass_start_h) && all(is.na(x$biomass_start_h)) &&
+               !all(is.na(x$biomass_start))) {
         warning("these parameters come from a foodnet before 0.5.0, whose biomass_start averages abundances read at ",
                 "different hours; give x0 yourself or read the parameters with a newer foodnet", call. = FALSE)
     }

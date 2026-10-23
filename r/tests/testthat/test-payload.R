@@ -33,7 +33,12 @@ test_that("every value carries the hours it was measured over", {
     expect_equal(unname(x$interval_end["B", "butyrate"]), 10)
     expect_true(is.na(x$interval_end["A", "butyrate"]))
     # a payload from before 0.2.0 has none: NA, never an error
-    old <- foodnet:::as_foodnet_crm(example_payload())
+    q <- example_payload()
+    q$growth_rates <- list(0.4, 0.5)
+    q$caveats$without_a_rate <- list()
+    q$biomass_start_h <- NULL
+    old <- foodnet:::as_foodnet_crm(q)
+    old$biomass_start_h <- c(A = NA_real_, B = NA_real_)
     expect_true(all(is.na(old$interval_start)))
     expect_equal(length(old$other_phases), 0)
 })
@@ -268,4 +273,25 @@ test_that("a genus result without biomass says why, not to update foodnet", {
     out <- paste(capture.output(print(foodnet:::as_foodnet_crm(p))), collapse = "\n")
     expect_match(out, "merged to genus")
     expect_false(grepl("update foodnet", out))
+})
+
+test_that("as_miasim warns when foodnet's starts lie at different hours or predate them, not for the user's own", {
+    skip_if_not_installed("miaSim")
+    p <- example_payload()
+    p$growth_rates <- list(0.4, 0.5)
+    p$caveats$without_a_rate <- list()
+    p$biomass_start_h <- list(0, 4)
+    x <- foodnet:::as_foodnet_crm(p)
+    expect_warning(try(as_miasim(x, x0 = x$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero"),
+                       silent = TRUE), "different hours")
+    q <- example_payload()
+    q$growth_rates <- list(0.4, 0.5)
+    q$caveats$without_a_rate <- list()
+    old <- foodnet:::as_foodnet_crm(q)
+    expect_warning(try(as_miasim(old, x0 = old$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero"),
+                       silent = TRUE), "before 0.5.0")
+    seen <- character(0)
+    withCallingHandlers(try(as_miasim(x, x0 = c(1, 1), monod_constant = 1, missing_resource = 0, na = "zero"),
+                            silent = TRUE), warning = function(w) { seen <<- c(seen, conditionMessage(w)); invokeRestart("muffleWarning") })
+    expect_false(any(grepl("different hours", seen)))
 })

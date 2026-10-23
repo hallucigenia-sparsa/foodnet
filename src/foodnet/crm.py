@@ -406,24 +406,29 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         for f in same:
             by_exp_starts.setdefault(f["experiment"], []).append(f["window_start"])
         at_h = statistics.median(statistics.median(v) for v in by_exp_starts.values())
-        logs, slopes, ends = {}, {}, {}
+        logs, ends, exact = {}, {}, set()
         for f in same:
             x = _log_at(f["series"], at_h)
-            y = _log_at(f["series"], f["window_start"] + f["hours"])
             if x is not None:
                 logs.setdefault(f["experiment"], []).append(x)
-                end_h = f["window_start"] + f["hours"]
-                ends.setdefault(f["experiment"], []).append(end_h)
-                if y is not None and end_h > at_h:
-                    slopes.setdefault(f["experiment"], []).append((y - x) / (end_h - at_h))
-        common = (math.exp(statistics.mean(statistics.mean(v) for v in logs.values())) if logs else None)
-        # the phase on one trajectory from that hour: its length to the cultures' mean end, and its mean specific
-        # growth rate, each culture's log rise from biomass_start_h to its window's end (a review: the start had
-        # moved to 0 h while the rate and the length still came from starts at 0 h and at 4 h, so a simulation
-        # from biomass_start grew E. coli LF82 to 1% of its measured biomass)
+                ends.setdefault(f["experiment"], []).append(f["window_start"] + f["hours"])
+                exact |= {v for u, v in f["series"] if u == at_h and v > 0}
+        flat = [x for v in logs.values() for x in v]
+        if not flat:
+            common = None
+        elif max(flat) == min(flat) and len(exact) == 1:
+            common = exact.pop()        # one sampled value: itself, not exp(log(x)) (a review: 999.9999 for 1000)
+        else:
+            common = math.exp(statistics.mean(statistics.mean(v) for v in logs.values()))
+        # the phase's length from that hour to the cultures' mean window end (a review: the start had moved to 0 h
+        # while the length still came from starts at 0 h and at 4 h)
         if ends:
             hours = statistics.mean(statistics.mean(v) for v in ends.values()) - at_h
-        phase_rate = (statistics.mean(statistics.mean(v) for v in slopes.values()) if slopes else None)
+        # the rate that takes biomass_start to biomass_start + biomass_change in phase_hours, so the three are one
+        # trajectory by construction (a review: averaging slopes and hours apart overstated B. thetaiotaomicron's
+        # growth by 19% and flagged it slow on an averaging choice)
+        phase_rate = (math.log((common + change) / common) / hours
+                      if common and common + change > 0 and hours and hours > 0 else None)
         out[taxon] = {"change": change, "start": common, "start_h": at_h, "unit": unit, "hours": hours,
                       "n": len(same),
                       # cultures whose curve gives nothing at biomass_start_h (a 0 there, or no sample by then)

@@ -606,9 +606,26 @@ def test_biomass_start_is_every_culture_at_one_hour_averaged_as_logs():
     assert b["start_h"] == 2 and b["start"] == pytest.approx(math.exp((e1 + e2) / 2))
     # the phase on one trajectory from that hour: length to the mean end, rate the mean log rise over it
     assert b["hours"] == pytest.approx(6)
-    rise = [(math.log(1e9) - math.log(1e6)) / 6, (math.log(4e9) - math.log(4e6)) / 6,
-            (math.log(9e8) - math.log(9e6)) / 6]
-    assert b["phase_rate"] == pytest.approx(((rise[0] + rise[1]) / 2 + rise[2]) / 2)
+    # and the rate that takes biomass_start to biomass_start + biomass_change in that time (one trajectory)
+    assert b["phase_rate"] == pytest.approx(math.log((b["start"] + b["change"]) / b["start"]) / 6)
+
+
+def test_the_start_hour_is_the_median_over_experiments_and_a_zero_there_is_left_out():
+    import types
+
+    def culture(experiment, values, times=(0, 4, 8, 12)):
+        return types.SimpleNamespace(growth={"times": list(times), "values": values, "technique": "fc", "unit": ""},
+                                     taxon={"id": "t"}, experiment=experiment)
+    # experiment E1 has three cultures starting at 0 h, E2 and E3 one each starting at 4 h: per experiment the
+    # medians are 0, 4 and 4, so the hour is 4 (over all five cultures it would be 0, and the minimum 0)
+    cultures = list(enumerate([culture("E1", [1e5, 1e7, 1e9, 1e9]) for _ in range(3)]
+                              + [culture("E2", [2e5, 2e7, 2e9, 2e9]), culture("E3", [0, 0, 1e9, 1e9])]))
+    starts = (0, 0, 0, 4, 4)
+    rows = [{"culture": i, "phase": "exponential", "change": -1.0, "start": st, "end": 12, "cautions": []}
+            for i, st in enumerate(starts)]
+    b = crm.biomass_changes(cultures, rows, "exponential")["t"]
+    assert b["start_h"] == 4 and b["start_left_out"] == 1                # E3 reads 0 at 4 h: no log, left out
+    assert b["hours"] == pytest.approx(8)
 
 
 def test_a_culture_with_nothing_at_the_start_hour_is_left_out_of_biomass_start():
