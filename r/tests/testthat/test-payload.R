@@ -260,3 +260,12 @@ test_that("biomass replicate counts reach R and its written biomass.csv, in eith
     b <- utils::read.csv(file.path(dir, "biomass.csv"))
     expect_equal(b$replicates[!is.na(b$biomass_change)], unname(x$biomass_replicates[!is.na(x$biomass_change)]))
 })
+
+test_that("a genus result without biomass says why, not to update foodnet", {
+    p <- example_payload()
+    p$biomass_change <- list(NULL, NULL)
+    p$settings <- list(merge_genera = TRUE)
+    out <- paste(capture.output(print(foodnet:::as_foodnet_crm(p))), collapse = "\n")
+    expect_match(out, "merged to genus")
+    expect_false(grepl("update foodnet", out))
+})

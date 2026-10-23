@@ -445,8 +445,11 @@ print.foodnet_crm <- function(x, ...) {
         cat("   * the search asked for both phases; a CRM describes growth, so these are the exponential phase.\n")
     }
     if (all(is.na(x$biomass_change))) {
+        # merged to genus, foodnet gives no biomass by design: an update would not bring it (a review)
+        why <- if (isTRUE(x$settings$merge_genera)) "taxa were merged to genus, whose strains grow in units that do not average" else
+            "update foodnet for miaSim's yields"
         cat("   * no biomass changes came with these parameters, so crm_efficiency() can build only its\n")
-        cat("     \"shares\" and \"none\" scales (update foodnet for miaSim's yields).\n")
+        cat(sprintf("     \"shares\" and \"none\" scales (%s).\n", why))
     }
     cat("   * the cells are measured amounts (net changes), not efficiencies: crm_efficiency(x) turns them\n")
     cat("     into miaSim's E (yields per mM taken up, by-products per unit of growth); crm_backcheck()\n")
