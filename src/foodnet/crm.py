@@ -217,7 +217,7 @@ def _mean_biomass(times, values, start: float, end: float) -> float:
 
 def maintenance(value_cultures, limit: float, limits: dict | None = None,
                 spike_factor: float = SPIKE_FACTOR, dropped=frozenset(), fraction: float = 0.9,
-                name_units: bool = True) -> tuple:
+                name_units: bool = True, raw: bool = False) -> tuple:
     """({taxon: {metabolite: summary}}, skipped): the Pirt maintenance coefficient, a separate characteristic
     for a fit to use or not (Karoline, 2026-10-09): what each culture took up of a compound per unit of biomass
     per hour while it sat on its growth plateau (`rates.plateau`). Per culture: the compound's fall over the
@@ -269,6 +269,10 @@ def maintenance(value_cultures, limit: float, limits: dict | None = None,
                                           "biomass_relative_change": change})
     if name_units:
         skipped += unit_skips(found)
+    if raw:
+        # every culture's own entry, for a merge to genus to pool before choosing its unit (a review: a strain's
+        # culture whose compound had no entry in the strain's unit never reached the genus)
+        return found, skipped
     return summarize_maintenance(found), skipped
 
 

@@ -249,3 +249,14 @@ test_that("crm_subset rebuilds the technique warning over the taxa it keeps", {
     expect_match(crm_subset(x, taxa = c("A", "B"))$caveats$technique_mismatch, "fc Cells/mL live for A; od for B")
     expect_equal(crm_subset(x, taxa = "A")$caveats$technique_mismatch, "")
 })
+
+test_that("biomass replicate counts reach R and its written biomass.csv, in either phase", {
+    x <- foodnet_crm(test_path("crm_synthetic.json"))
+    expect_true(all(!is.na(x$biomass_replicates[!is.na(x$biomass_change)])))
+    s <- crm_phase(x, "stationary")
+    expect_true(all(!is.na(s$biomass_replicates[!is.na(s$biomass_change)])))
+    dir <- tempfile()
+    crm_write(x, dir)
+    b <- utils::read.csv(file.path(dir, "biomass.csv"))
+    expect_equal(b$replicates[!is.na(b$biomass_change)], unname(x$biomass_replicates[!is.na(x$biomass_change)]))
+})

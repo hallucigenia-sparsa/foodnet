@@ -561,3 +561,25 @@ def test_merged_genera_name_the_cultures_their_maintenance_leaves_out():
                     {"unit": "fc", "culture": "B1"}]}
     assert crm.unit_skips({"G": many}) == [("B1", "no maintenance coefficient: its growth curve is in fc, and most "
                                                    "of the cultures of its taxon (or genus) are in fc live")]
+
+
+def test_crm_json_carries_the_biomass_counts_of_the_crms_own_phase(client):
+    # a review: they reached only other_phases, so R read NA for every taxon
+    p = matrix.crm_payload(run(client, report_rates=True, phase="both"))
+    a = p["taxa"].index("Alpha alpha A1")
+    assert p["biomass_replicates"][a] == 3 and p["biomass_other_units_left_out"][a] == 0
+    assert p["other_phases"]["stationary"]["biomass_replicates"][a] == 3
+
+
+def test_merged_genera_pool_every_strains_cultures_before_choosing_the_unit(client, monkeypatch):
+    # a review: a strain's culture whose compound had no entry in the strain's own unit never reached the genus
+    from foodnet import search
+    seen = {}
+    real = search.crm.maintenance
+
+    def spy(*a, **k):
+        seen["raw"] = k.get("raw")
+        return real(*a, **k)
+    monkeypatch.setattr(search.crm, "maintenance", spy)
+    run(client, report_rates=True, merge_genera=True)
+    assert seen["raw"] is True

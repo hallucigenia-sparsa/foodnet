@@ -574,6 +574,16 @@
   0.24450143783925912,
   null
  ],
+ "biomass_replicates": [
+  3,
+  2,
+  null
+ ],
+ "biomass_other_units_left_out": [
+  0,
+  0,
+  null
+ ],
  "caveats": {
   "presence_only": [
    {

@@ -133,7 +133,7 @@ def report_text(result: dict) -> str:
                     scatter = f" +/- {m['se']:.2g} SE" if m["se"] is not None else ""
                     gone = (f", below the detection limit at the plateau's start in {m['below_limit_replicates']} "
                             f"of {m['n']}" if m.get("below_limit_replicates") else "")
-                    gone += (f", below it by the window's end in {m['below_limit_by_end']} of {m['n']}"
+                    gone += (f", fell below it by the window's end in {m['below_limit_by_end']} of {m['n']}"
                              if m.get("below_limit_by_end") else "")
                     gone += (f", biomass {m['biomass_relative_change']:+.0%} over the window"
                              if m.get("biomass_relative_change") is not None else "")

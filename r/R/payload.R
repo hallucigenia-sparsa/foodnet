@@ -87,6 +87,8 @@ as_phase_block <- function(b, taxa, resources) {
          biomass_unit = units,
          phase_hours = taxon_numbers(b, "phase_hours", taxa),
          phase_growth_rates = taxon_numbers(b, "phase_growth_rates", taxa),
+         biomass_replicates = taxon_numbers(b, "biomass_replicates", taxa),
+         biomass_other_units_left_out = taxon_numbers(b, "biomass_other_units_left_out", taxa),
          # in the order crm_phase() builds a phase in, so switching there and back gives the same object
          culture_changes = culture_matrices(b$culture_changes, taxa, resources),
          dropped = NULL,

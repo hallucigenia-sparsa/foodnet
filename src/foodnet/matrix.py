@@ -1184,6 +1184,10 @@ def crm_payload(result: dict) -> dict:
         "biomass_unit": [None if b is None else b["unit"] for b in biomass],
         "phase_hours": [None if b is None else b["hours"] for b in biomass],
         "phase_growth_rates": [None if b is None else b.get("phase_rate") for b in biomass],
+        # how many replicates the biomass rests on, and how many of another unit it leaves out (a review: at first
+        # only in other_phases, so R read NA)
+        "biomass_replicates": [None if b is None else b["n"] for b in biomass],
+        "biomass_other_units_left_out": [None if b is None else b.get("other_units_left_out", 0) for b in biomass],
         "caveats": {"presence_only": block["presence_only"], "conflicts": conflicts(result),
                     "duplicates": list(result["duplicates"]),
                     "without_a_rate": [pair["taxa"][i] for i, t in enumerate(taxa) if t.id not in result["rates"]],

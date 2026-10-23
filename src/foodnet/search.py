@@ -452,17 +452,18 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
         # kept one did not measure (a review: R. intestinalis lost the formate only RI_WC measured)
         maint, maint_skips = crm.maintenance(
             [cultures[i] for i in sorted(chosen) if id(cultures[i]) not in unphased], s["detection_limit"], limits,
-            s["spike_factor"], maint_dropped, s["fraction"], not s["merge_genera"])
+            s["spike_factor"], maint_dropped, s["fraction"], not s["merge_genera"], raw=s["merge_genera"])
         skipped += maint_skips
         for t in whole_taxa:
             maint.pop(t, None)              # growth curves judged unusable give no plateau either (a review)
         if s["merge_genera"]:
             organism_rates, without_rate = _genus_rates(organism_rates, without_rate, taxa)
             declines, without_decline = _genus_declines(declines, without_decline, taxa)
+            # every strain's cultures, pooled before the genus's unit is chosen (maint holds them raw here)
             merged = defaultdict(lambda: defaultdict(list))
             for tid, by_met in maint.items():
-                for mid, m in by_met.items():
-                    merged[d.genus_of(taxa, tid)][mid] += m["cultures"]
+                for mid, entries in by_met.items():
+                    merged[d.genus_of(taxa, tid)][mid] += entries
             maint = crm.summarize_maintenance(merged)
             skipped += crm.unit_skips(merged)
         net.meta["growth_rates"] = {"method": rates.method_name(s["rate_method"], s["rate_window"]),
