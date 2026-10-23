@@ -556,7 +556,12 @@
  ],
  "biomass_start": [
   1.0,
-  0.01,
+  0.010000000000000005,
+  null
+ ],
+ "biomass_start_h": [
+  0.0,
+  0.0,
   null
  ],
  "biomass_unit": [
@@ -893,8 +898,13 @@
     null
    ],
    "biomass_start": [
-    1000.0,
-    0.5,
+    999.9999999999998,
+    0.49999999999999994,
+    null
+   ],
+   "biomass_start_h": [
+    12.0,
+    16.0,
     null
    ],
    "biomass_unit": [

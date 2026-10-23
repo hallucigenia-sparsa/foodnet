@@ -348,7 +348,7 @@ def initial_concentrations(value_cultures, dropped=frozenset()) -> dict:
 
 
 def biomass_changes(value_cultures, rows, phase: str) -> dict:
-    """{taxon: {"change", "start", "unit", "hours", "n"}}: the growth of each taxon over `phase`, from the
+    """{taxon: {"change", "start", "start_h", "unit", "hours", "n"}}: the growth of each taxon over `phase`, from the
     value-set cultures' growth curves, interpolated at the start and end of the window their metabolite
     values cover (the window most of the culture's compounds share, since they can end at different
     samples), averaged over the cultures of each experiment and then over the experiments. A taxon whose curves come in
@@ -382,7 +382,8 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         # the unit is the technique and its unit together: qPCR gene copies and flow cytometry events can both
         # be "Cells/mL" and still measure different things (DNA from lysed cells counts in one, not the other)
         by_taxon[c.taxon["id"]].append({"unit": _curve_unit(c.growth), "experiment": c.experiment,
-                                        "start": x0, "change": x1 - x0, "hours": end - start})
+                                        "start": x0, "change": x1 - x0, "hours": end - start,
+                                        "window_start": start, "series": series})
     out = {}
     for taxon, found in by_taxon.items():
         units = [f["unit"] for f in found]
@@ -396,14 +397,43 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
                 by_exp.setdefault(f["experiment"], []).append(f[key])
             return statistics.mean(statistics.mean(v) for v in by_exp.values())
         start, change, hours = per_experiment("start"), per_experiment("change"), per_experiment("hours")
-        out[taxon] = {"change": change, "start": start, "unit": unit, "hours": hours, "n": len(same),
+        # the starting abundance a simulation takes: every culture read at one hour, the median of its window's
+        # start, and averaged on the log scale (Karoline, 2026-10-23: "fix biomass_start first"; a review: an
+        # arithmetic mean of abundances read at 0 h and at 4 h gave E. coli LF82 1.26e7 where its cultures held
+        # 2.9e5 at 0 h, so a simulation started it about 40 times too high)
+        at_h = statistics.median(f["window_start"] for f in same)
+        logs = {}
+        for f in same:
+            x = _log_at(f["series"], at_h)
+            if x is not None:
+                logs.setdefault(f["experiment"], []).append(x)
+        common = (math.exp(statistics.mean(statistics.mean(v) for v in logs.values())) if logs else None)
+        out[taxon] = {"change": change, "start": common, "start_h": at_h, "unit": unit, "hours": hours,
+                      "n": len(same),
                       # cultures of another unit, left out (a review: B. thetaiotaomicron's ungated copy, whose
                       # values the amounts hold, was left out of its biomass without a word)
                       "other_units_left_out": len(found) - len(same),
                       # the mean specific growth rate over the phase: a maximum rate below it cannot be right
+                      # (over each culture's own window, as the change is)
                       "phase_rate": (math.log((start + change) / start) / hours
                                      if start > 0 and start + change > 0 and hours > 0 else None)}
     return out
+
+
+def _log_at(series, t: float):
+    """The natural log of a growth curve's abundance at hour t, interpolated on the log scale between the samples
+    around it (the nearest sample outside them); None without a positive sample there."""
+    positive = [(u, math.log(v)) for u, v in series if v > 0]
+    if not positive:
+        return None
+    if t <= positive[0][0]:
+        return positive[0][1]
+    if t >= positive[-1][0]:
+        return positive[-1][1]
+    for (t0, y0), (t1, y1) in zip(positive, positive[1:], strict=False):
+        if t0 <= t <= t1:
+            return y0 if t1 == t0 else y0 + (y1 - y0) * (t - t0) / (t1 - t0)
+    return positive[-1][1]
 
 
 def culture_changes(rows, cultures, limit: float, limits: dict | None = None) -> dict:

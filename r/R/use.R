@@ -493,7 +493,8 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
 PHASE_MATRICES <- c("consumed", "produced", "evidence_consumed", "evidence_produced", "interval_start",
                     "interval_end", "consumed_lower", "consumed_upper", "produced_lower", "produced_upper",
                     "phase_start")
-PHASE_VECTORS <- c("biomass_change", "biomass_start", "biomass_unit", "phase_hours", "phase_growth_rates",
+PHASE_VECTORS <- c("biomass_change", "biomass_start", "biomass_start_h", "biomass_unit", "phase_hours",
+                   "phase_growth_rates",
                    "biomass_replicates", "biomass_other_units_left_out")
 PHASE_CAVEATS <- c("cautions", "inconclusive", "presence_only", "whole_run", "biomass_falls")
 
@@ -645,7 +646,8 @@ crm_write <- function(x, dir) {
     put(data.frame(taxon = x$taxa, biomass_start = unname(x$biomass_start),
                    biomass_change = unname(x$biomass_change), unit = unname(x$biomass_unit),
                    phase_hours = unname(x$phase_hours), replicates = counts(x$biomass_replicates),
-                   other_units_left_out = counts(x$biomass_other_units_left_out), stringsAsFactors = FALSE),
+                   other_units_left_out = counts(x$biomass_other_units_left_out),
+                   biomass_start_h = counts(x$biomass_start_h), stringsAsFactors = FALSE),
         "biomass.csv")
     cells <- expand.grid(i = seq_along(x$taxa), j = seq_along(x$resources))
     # a second-window compound was measured over that window, which the files say, as the download's do
@@ -702,7 +704,8 @@ crm_write <- function(x, dir) {
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param x0 Starting abundances of the taxa, one per taxon in the order of `x$taxa` (or named), each in the
-#'   unit of that taxon's growth curve (`x$biomass_unit`); `x$biomass_start` is each taxon's own start. With
+#'   unit of that taxon's growth curve (`x$biomass_unit`); `x$biomass_start` is each taxon's abundance at
+#'   `x$biomass_start_h`, the hour a simulation from it begins. With
 #'   your own `E`, they are passed as given.
 #' @param monod_constant Monod constants in mM: one number for all, or a taxa by resources matrix.
 #' @param E An efficiency matrix, by default [crm_efficiency()] of `x`.

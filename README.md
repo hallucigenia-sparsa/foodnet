@@ -201,6 +201,7 @@ crm <- foodnet_listen()                      # and press Send to R on the page
 # NA cells (never assayed, seen only elsewhere, inconclusive) are refused unless you say how: here, as 0
 E <- crm_efficiency(crm, na = "zero")                      # miaSim's E, in each taxon's own unit
 crm_backcheck(crm, monod_constant = 1, na = "zero")        # each taxon alone against its own monoculture
+# x0: each taxon's abundance at crm$biomass_start_h (0 h here), the hour the simulation starts from
 args <- as_miasim(crm, x0 = crm$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero")
 tse <- do.call(miaSim::simulateConsumerResource, c(args, list(t_end = 48, t_store = 480)))
 abundance <- crm_unscale(crm, SummarizedExperiment::assay(tse), args = args)   # back in each growth curve's unit

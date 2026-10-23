@@ -429,11 +429,12 @@ def biomass_csv(result: dict, phase: str | None = None) -> str:
     rows = []
     for t in taxa_rows(net, result):
         b = _biomass(result, phase).get(t.id)
-        rows.append([t.name, *(["NA", "NA", "", "NA", 0, 0] if b is None else
-                               [f"{b['start']:.6g}", f"{b['change']:.6g}", b["unit"], f"{b['hours']:.6g}", b["n"],
-                                b.get("other_units_left_out", 0)])])
+        rows.append([t.name, *(["NA", "NA", "", "NA", 0, 0, "NA"] if b is None else
+                               [NA if b["start"] is None else f"{b['start']:.6g}", f"{b['change']:.6g}", b["unit"],
+                                f"{b['hours']:.6g}", b["n"], b.get("other_units_left_out", 0),
+                                NA if b.get("start_h") is None else f"{b['start_h']:.6g}"])])
     return _csv(["taxon", "biomass_start", "biomass_change", "unit", "phase_hours", "replicates",
-                 "other_units_left_out"], rows)
+                 "other_units_left_out", "biomass_start_h"], rows)
 
 
 def crm_phase(result: dict) -> str:
@@ -829,7 +830,10 @@ def readme(result: dict, which: str = "matrices") -> str:
                   "Initial concentrations: each metabolite's concentration at the first sample of the value-medium "
                   "cultures, averaged (initial_concentrations.csv), in mM.",
                   "Biomass: each taxon's growth over the same phase, from its growth curve, in that curve's unit "
-                  "(biomass.csv), with the phase's length in hours, from the cultures whose curves are of the "
+                  "(biomass.csv), with the phase's length in hours; biomass_start is the abundance at one hour, "
+                  "biomass_start_h (the median of the cultures' window starts), read from each growth curve on the "
+                  "log scale and averaged as logs, the starting abundance of a simulation from that hour; from "
+                  "the cultures whose curves are of the "
                   "technique, unit and gate most of the taxon's use (other_units_left_out counts the rest, which "
                   "the amounts may still hold). A simulation's starting abundance for a taxon must be in the same "
                   "unit.",
@@ -1094,6 +1098,8 @@ def _phase_block(result: dict, phase: str) -> dict:
         "biomass_replicates": [None if b is None else b["n"] for b in biomass],
         "biomass_other_units_left_out": [None if b is None else b.get("other_units_left_out", 0) for b in biomass],
         "biomass_start": [None if b is None else b["start"] for b in biomass],
+        # the hour biomass_start holds the abundance at: a simulation from it begins there
+        "biomass_start_h": [None if b is None else b.get("start_h") for b in biomass],
         "biomass_unit": [None if b is None else b["unit"] for b in biomass],
         "phase_hours": [None if b is None else b["hours"] for b in biomass],
         "phase_growth_rates": [None if b is None else b.get("phase_rate") for b in biomass],
@@ -1181,6 +1187,8 @@ def crm_payload(result: dict) -> dict:
         # miaSim's yields (crm_efficiency in the R package); a simulation's starting abundance is in that unit
         "biomass_change": [None if b is None else b["change"] for b in biomass],
         "biomass_start": [None if b is None else b["start"] for b in biomass],
+        # the hour biomass_start holds the abundance at: a simulation from it begins there
+        "biomass_start_h": [None if b is None else b.get("start_h") for b in biomass],
         "biomass_unit": [None if b is None else b["unit"] for b in biomass],
         "phase_hours": [None if b is None else b["hours"] for b in biomass],
         "phase_growth_rates": [None if b is None else b.get("phase_rate") for b in biomass],

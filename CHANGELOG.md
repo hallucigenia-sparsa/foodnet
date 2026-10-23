@@ -36,6 +36,10 @@ semantic versioning.
 
 ### Fixed
 
+- `biomass_start`, the starting abundance a simulation takes, averaged abundances read at different hours (E.
+  coli LF82: 1.26e7, where its cultures held 2.9e5 at 0 h, so a simulation started it about 40 times too high).
+  It is now every culture read at one hour, `biomass_start_h` (the median of their windows' starts), on the log
+  scale, and averaged as logs; `biomass_change` and the phase's own growth rate stay over each culture's window.
 - Growth rates, declines, maintenance and biomass now take the cultures of the technique, unit and gate most of
   a taxon's use, and count the rest (other_techniques_left_out, other_units_left_out): an ungated count beside
   live-gated ones is left out.

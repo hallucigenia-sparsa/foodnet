@@ -236,7 +236,7 @@ test_that("crm_write writes the download's columns for growth rates, declines an
                                                    '"below_limit_replicates","below_limit_by_end","biomass_relative_change",',
                                                    '"other_units_left_out","studies"'))
     expect_equal(header("biomass.csv"), paste0('"taxon","biomass_start","biomass_change","unit","phase_hours",',
-                                               '"replicates","other_units_left_out"'))
+                                               '"replicates","other_units_left_out","biomass_start_h"'))
 })
 
 test_that("crm_subset rebuilds the technique warning over the taxa it keeps", {

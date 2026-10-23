@@ -583,3 +583,15 @@ def test_merged_genera_pool_every_strains_cultures_before_choosing_the_unit(clie
     monkeypatch.setattr(search.crm, "maintenance", spy)
     run(client, report_rates=True, merge_genera=True)
     assert seen["raw"] is True
+
+
+def test_biomass_start_is_every_culture_at_one_hour_averaged_as_logs():
+    # Karoline, 2026-10-23: "fix biomass_start first": cultures whose windows start at 0 h and at 4 h are all read
+    # at 0 h (the median start), not averaged as they stood at their own starts
+    import types
+    curve = {"times": [0, 4, 8, 12], "values": [3e5, 3e7, 3e8, 4e8], "technique": "fc", "unit": ""}
+    cultures = [(i, types.SimpleNamespace(growth=dict(curve), taxon={"id": "t"}, experiment="E1")) for i in range(3)]
+    rows = [{"culture": i, "phase": "exponential", "change": -1.0, "start": s, "end": 12, "cautions": []}
+            for i, s in enumerate((0, 0, 4))]
+    b = crm.biomass_changes(cultures, rows, "exponential")["t"]
+    assert b["start_h"] == 0 and b["start"] == pytest.approx(3e5)

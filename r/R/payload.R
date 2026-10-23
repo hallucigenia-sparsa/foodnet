@@ -84,6 +84,7 @@ as_phase_block <- function(b, taxa, resources) {
          phase_start = hours_matrix(b$phase_start_mM, taxa, resources),
          biomass_change = taxon_numbers(b, "biomass_change", taxa),
          biomass_start = taxon_numbers(b, "biomass_start", taxa),
+         biomass_start_h = taxon_numbers(b, "biomass_start_h", taxa),
          biomass_unit = units,
          phase_hours = taxon_numbers(b, "phase_hours", taxa),
          phase_growth_rates = taxon_numbers(b, "phase_growth_rates", taxa),
@@ -227,6 +228,8 @@ as_foodnet_crm <- function(payload) {
              initial = initial,
              biomass_change = per_taxon("biomass_change"),
              biomass_start = per_taxon("biomass_start"),
+             # the hour biomass_start is read at (from the release after foodnet 0.4.0)
+             biomass_start_h = per_taxon("biomass_start_h"),
              biomass_unit = units,
              phase_hours = per_taxon("phase_hours"),
              phase_growth_rates = per_taxon("phase_growth_rates"),

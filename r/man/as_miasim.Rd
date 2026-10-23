@@ -7,7 +7,7 @@ as_miasim(x, x0, monod_constant, E = NULL, missing_rate = NULL, missing_resource
 }
 \arguments{
 \item{x}{CRM parameters from \code{\link{foodnet_listen}} or \code{\link{foodnet_crm}}.}
-\item{x0}{Starting abundances of the taxa, one per taxon in the order of \code{x$taxa} (or named), each in the unit of that taxon's growth curve (\code{x$biomass_unit}); \code{x$biomass_start} is each taxon's own start. With your own \code{E}, they are passed as given.}
+\item{x0}{Starting abundances of the taxa, one per taxon in the order of \code{x$taxa} (or named), each in the unit of that taxon's growth curve (\code{x$biomass_unit}); \code{x$biomass_start} is each taxon's abundance at \code{x$biomass_start_h}, the hour a simulation from it begins. With your own \code{E}, they are passed as given.}
 \item{monod_constant}{Monod constants in mM: one number for all, or a taxa by resources matrix.}
 \item{E}{An efficiency matrix, by default \code{\link{crm_efficiency}} of \code{x}.}
 \item{missing_rate}{A growth rate for the taxa that have none, or \code{NULL} to stop when any does.}
