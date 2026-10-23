@@ -365,7 +365,7 @@ drift or a dead inoculum never becomes an arc. A time window in
 Advanced settings replaces the phases. The growth curve is a per-strain count when the replicate has one, else
 the culture's own (cell counts before optical density); a curve that gives no boundary gives way to the
 replicate's next one. A flow cytometry count's gate (live, total) is part of its technique; a dead count is never
-a growth curve; a per-strain count deposited without a gate that repeats a gated one takes that gate's name.</p>
+a growth curve; a count deposited without a gate that repeats a gated one takes that gate's name.</p>
 <p>A metabolite series shorter than 24 h is still used, and its values carry the caution short_record; the page
 warns about it above the result.</p>
 <h2 id="values">Values, media and presence</h2>
@@ -525,8 +525,8 @@ file of the zips on its own. The network JSON (<code>--format json</code>) also 
 versions and, in CRM mode, the growth rates and initial concentrations.</p>
 {_cli_files()}
 <h3>Every command and option</h3>
-<p>The options <code>{_e(COMMAND)} derive --help</code> (and <code>--help</code> after any other command) prints,
-with their defaults.
+<p>The options <code>{_e(COMMAND)} derive --help</code> (and <code>--help</code> after any other command) prints;
+here each also shows its default.
 <code>{_e(COMMAND)} --version</code> prints the version.</p>
 {_cli_options()}
 <p>Problems and questions: <a href="{ISSUES}">{_e(ISSUES)}</a>.</p>"""

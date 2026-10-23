@@ -477,6 +477,12 @@ crm_subset <- function(x, taxa = x$taxa, resources = x$resources) {
         mark <- "(for the whole search) "
         left <- ifelse(startsWith(left, mark), left, paste0(mark, left))
         x$caveats$warnings <- if (length(left)) left else character(0)
+        # the technique warning names taxa too: drop it when it names one left out, else mark it (a review)
+        tm <- x$caveats$technique_mismatch %||% ""
+        if (nzchar(tm)) {
+            x$caveats$technique_mismatch <- if (names_any(tm)) "" else
+                if (startsWith(tm, mark)) tm else paste0(mark, tm)
+        }
     }
     for (name in c("cautions", "inconclusive")) {
         rows <- x$caveats[[name]]
@@ -563,8 +569,8 @@ crm_readme <- function(x, print = TRUE) {
 #' phase's files are named for it (`consumed_stationary.csv`, `intervals_stationary.csv`,
 #' `README_stationary.txt`, ...), so both phases can be written to one folder; the growth rates and the
 #' medium are the same in both. The tables hold what the parameters in R hold: growth_rates.csv, decline_rates.csv
-#' and maintenance.csv have the download's columns; the others have fewer (no value-medium header cell, and for a
-#' taxon without a growth rate no reason).
+#' and maintenance.csv have the download's columns, with NA where the download writes a reason or a 0 for a taxon
+#' without a rate; the others have fewer columns (no value-medium header cell).
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
 #' @param dir Directory to write into. It is created when it does not exist.

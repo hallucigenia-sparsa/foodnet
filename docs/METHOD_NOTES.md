@@ -380,7 +380,7 @@ with metabolite data."
     Confirmed by Karoline on 2026-10-22, with every measured compound reported (the user picks the substrates)
     and only the unit most of a taxon's cultures use.
     After a review, Karoline 2026-10-22 ("Keep 0, add start conc. + flag"): each compound's concentration at the
-    plateau's start and depleted_at_start (below the detection limit), since a 0 where the compound was already
+    plateau's start and below_limit_replicates (below the detection limit), since a 0 where the compound was already
     gone measures no demand. The unit is chosen once per taxon (over all its plateau cultures), ties going to
     the preferred technique; cultures that did not grow, a duplicate deposit's (experiment, compound) pairs and
     taxa whose growth curves give no end of exponential growth give none.
@@ -397,9 +397,9 @@ with metabolite data."
     Karoline, 2026-10-22, on flow cytometry gates (mGrowthDB's techniqueCellType): a dead-cell count is never a
     growth curve ("Never"); the order of the curves stays, with the gate named ("As now, gate named"; study
     SMGDB00000007's per-strain counts repeat its live counts, so its rates rest on live-stained cells, whose
-    decline measures loss of viability, 0.051 per hour for B. thetaiotaomicron against 0.0008 for its total
+    decline measures the loss of membrane-intact cells, 0.051 per hour for B. thetaiotaomicron against 0.0008 for its total
     count); the gate is part of what counts as one technique ("Yes, gate in the key"); no rates over the halves
-    of the decline window ("No, fit_r2 is enough"). Maintenance adds biomass_change over its window and
+    of the decline window ("No, fit_r2 is enough"). Maintenance adds biomass_relative_change over its window and
     below_limit_by_end, and crm.json the per-replicate values.
 
 ## Known limits

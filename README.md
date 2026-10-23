@@ -167,16 +167,18 @@ value and has no expected side of 1: unmeasured substrates, unmeasured products 
 so 1 minus it is no biomass yield; it is withheld when a resource the taxon consumed or produced has no
 degree of reduction, when what it took up is within the assays' detection limits (it then says what the
 share is at least), or when it lies outside its own cultures' range.
-CRM mode also gives each taxon's decline rate (`decline_rates.csv`): the loss of log abundance per hour from
-the end of its growth (the first sample at 90% of the rise, the rule that ends exponential growth) to the last
+CRM mode also gives each taxon's decline rate (`decline_rates.csv`): the loss of natural-log abundance per hour
+from the end of its growth (the first sample at or above the fraction setting, 0.9 by default, of the linear rise,
+without the growth-rate rule) to the last
 sample (negative where it still creeps up), the mean over its replicates in one technique, with the scatter
 between replicates, the number of experiments they come from, the window, and whether the curves leave the
-plateau band or fall to zero (death) or stay on it (plateau). For anything but a viable or live-gated count it
-bounds death from below: optical density and total counts keep dead cells until they lyse. Without a usable decline it is
+plateau band or fall to zero (death) or stay on it (plateau). For total counts, optical density, qPCR and 16S it
+bounds death from below, since they keep dead cells until they lyse; for a flow cytometry count without a
+recorded gate it is undetermined. Without a usable decline it is
 NA, not 0. Separately, it gives the Pirt maintenance coefficient (`maintenance.csv`), which nothing else uses:
 what each taxon took up of each compound per unit of biomass per hour on its growth plateau (from where the
 decline starts), with its scatter, experiments, window, the compound's concentration at the plateau's start, how
-many replicates had it below the detection limit then (used up, or never there: their 0 measures no demand) and
+many replicates had it below the detection limit then (used up, or never there: their 0 says nothing about maintenance demand) and
 by the window's end, and the biomass's relative change over the window (a death phase makes it fall). Of a
 duplicate deposit, the copy with the richer growth curve gives the growth rate, decline and maintenance. A flow
 cytometry count's gate (live, total) is part of its technique, and a dead count is never a growth curve.

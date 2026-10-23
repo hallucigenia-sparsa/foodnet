@@ -383,6 +383,9 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
             return statistics.mean(statistics.mean(v) for v in by_exp.values())
         start, change, hours = per_experiment("start"), per_experiment("change"), per_experiment("hours")
         out[taxon] = {"change": change, "start": start, "unit": unit, "hours": hours, "n": len(same),
+                      # cultures of another unit, left out (a review: B. thetaiotaomicron's ungated copy, whose
+                      # values the amounts hold, was left out of its biomass without a word)
+                      "other_units_left_out": len(found) - len(same),
                       # the mean specific growth rate over the phase: a maximum rate below it cannot be right
                       "phase_rate": (math.log((start + change) / start) / hours
                                      if start > 0 and start + change > 0 and hours > 0 else None)}

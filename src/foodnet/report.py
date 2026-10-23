@@ -109,7 +109,8 @@ def report_text(result: dict) -> str:
         rise = f"{s.get('fraction', 0.9):.0%}"
         lines += ["", f"Decline rates (1/h; loss of log abundance from the end of growth, {rise} of the rise, to the "
                   "last sample; death: the curve leaves its plateau band or falls to zero, plateau: it stays; for "
-                  "anything but a viable or live-gated count, a lower bound on death):"]
+                  "total counts, optical density, qPCR and 16S, a lower bound on death; for a count without a recorded "
+                  "gate, undetermined):"]
         for tid, r in sorted((result.get("declines") or {}).items(), key=lambda kv: names.get(kv[0], kv[0])):
             scatter = f" +/- {r['se']:.2g} SE between replicates" if r["se"] is not None else ""
             lines.append(f"  {names.get(tid, tid)}: {r['rate']:.3g}{scatter} (n {r['n']} from "

@@ -36,11 +36,15 @@ semantic versioning.
 
 ### Fixed
 
+- Growth rates, declines, maintenance and biomass now take the cultures of the technique, unit and gate most of
+  a taxon's use, and count the rest (other_techniques_left_out, other_units_left_out): an ungated count beside
+  live-gated ones is left out, so B. thetaiotaomicron's biomass rests on 5 replicates where 0.4.0 used 8.
 - The figure, the matrices download and the page failed on a merged genus whose taxa were all inconclusive
   (also in 0.4.0); its note now says no taxon gives a value.
 - A count of dead cells (a flow cytometry gate) could become a culture's growth curve when the others failed; it
-  never does now. The gate of a count (live, total) is part of its technique in every table, and a per-strain
-  count that repeats a gated one is named for that gate: study SMGDB00000007's per-strain counts are live counts.
+  never does now. The gate of a count (live, total) is part of its technique in every table, and a count
+  deposited without a gate whose series is identical to a gated count of the same replicate is named for that
+  gate: study SMGDB00000007's per-strain counts are live counts.
 - A duplicate deposit, counted once in the matrices, was counted twice in the growth rates' replicates (and so
   their n and median), in the biomass and in the initial concentrations: it now counts once, and the copy
   with the richer growth curve gives the growth rate.
@@ -50,8 +54,8 @@ semantic versioning.
   others are.
 - On macOS foodnet checks mGrowthDB's and ChEBI's certificates against the system's trust store, through
   truststore 0.10.5 or later, now its one runtime dependency (macOS only), with a context per thread. With a
-  Python uv put on a Mac, which lacks the root mGrowthDB's certificate chains to, `uv tool install foodnet`
-  failed at the first search.
+  Python uv put on a Mac, which lacks the root certificate that mGrowthDB's chain leads to, `uv tool install
+  foodnet` failed at the first search.
 
 ## [0.4.0] (2026-10-09)
 

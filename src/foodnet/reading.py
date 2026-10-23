@@ -233,8 +233,9 @@ def cultures_of_experiment(client, exp: dict, identities: dict, excluded_metabol
             if (context.get("techniqueCellType") or "").casefold() == "dead":
                 try:
                     dead.append(_series(client, context["id"], factor))
-                except Exception:  # noqa: BLE001 - a dead count is only compared against, never used
-                    pass
+                except Exception as e:  # noqa: BLE001 - said, so a copy of it is not taken for a growth curve unseen
+                    skipped.append((f"{label}: {rep}", f"{UNREAD} its dead-cell count, so a copy of it among the "
+                                                       f"growth curves cannot be recognized: {e}"))
         culture.curves = name_gates(culture.curves, dead)
         culture.growth = culture.curves[0] if culture.curves else None
         if with_metabolites:

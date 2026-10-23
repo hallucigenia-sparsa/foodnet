@@ -19,6 +19,6 @@ and \code{\link{crm_electron_balance}}, the latter with a phase column), and \co
 phase's files are named for it (\code{consumed_stationary.csv}, \code{intervals_stationary.csv},
 \code{README_stationary.txt}, ...), so both phases can be written to one folder; the growth rates and the
 medium are the same in both. The tables hold what the parameters in R hold: growth_rates.csv, decline_rates.csv
-and maintenance.csv have the download's columns; the others have fewer (no value-medium header cell, and for a
-taxon without a growth rate no reason).
+and maintenance.csv have the download's columns, with NA where the download writes a reason or a 0 for a taxon
+without a rate; the others have fewer columns (no value-medium header cell).
 }

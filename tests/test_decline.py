@@ -492,3 +492,29 @@ def test_crm_json_keeps_each_replicates_decline_rate(client):
     p = matrix.crm_payload(run(client, report_rates=True))
     rates_ = p["decline_rate_detail"]["Alpha alpha A1"]["replicate_rates"]
     assert len(rates_) == 3 and sum(rates_) / 3 == pytest.approx(p["decline_rates"][p["taxa"].index("Alpha alpha A1")])
+
+
+def test_an_untagged_copy_of_a_dead_count_never_becomes_a_growth_curve_in_a_search(client):
+    # pins the wiring of the dead-copy rule through reading a replicate (a review: the unit test alone let it go)
+    rising = [(0, 1), (4, 50), (8, 300), (12, 2000), (24, 2400)]
+    for n, rep in enumerate(("a1", "a2", "a3")):
+        dead_id, copy_id = 9000 + 2 * n, 9001 + 2 * n
+        client.contexts[dead_id] = client.contexts[copy_id] = rising
+        client.bioreplicates[rep]["measurementContexts"] += [
+            {"id": dead_id, "techniqueType": "fc", "techniqueUnits": "", "techniqueCellType": "Dead",
+             "subject": {"type": "bioreplicate", "name": rep}},
+            {"id": copy_id, "techniqueType": "fc", "techniqueUnits": "", "subject": {"type": "strain", "name": rep}}]
+    r = run(client, report_rates=True, rate_window=3)
+    assert r["rates"]["ncbi:1"]["technique"] == "fc (culture)"
+
+
+def test_a_genus_of_inconclusive_taxa_says_so_once():
+    from foodnet import derive
+    taxa = {"t1": {"genus": "G", "name": "G one"}}
+    cells = {("t1", "m", "exponential"): {"mean": 1.0, "sd": None, "n": 2, "n_experiments": 1, "values": [],
+                                          "state": "inconclusive", "direction": None, "cautions": ["inconclusive"],
+                                          "notes": [], "experiments": ["E1"], "studies": ["S1"], "media": ["m"],
+                                          "start": 0.0, "end": 8.0, "initial": 5.0}}
+    merged = derive.merge_genus_cells(cells, taxa)
+    notes = next(iter(merged.values()))["notes"]
+    assert notes == ["inconclusive, so not counted: G one"]

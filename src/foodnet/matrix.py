@@ -429,9 +429,11 @@ def biomass_csv(result: dict, phase: str | None = None) -> str:
     rows = []
     for t in taxa_rows(net, result):
         b = _biomass(result, phase).get(t.id)
-        rows.append([t.name, *(["NA", "NA", "", "NA", 0] if b is None else
-                               [f"{b['start']:.6g}", f"{b['change']:.6g}", b["unit"], f"{b['hours']:.6g}", b["n"]])])
-    return _csv(["taxon", "biomass_start", "biomass_change", "unit", "phase_hours", "replicates"], rows)
+        rows.append([t.name, *(["NA", "NA", "", "NA", 0, 0] if b is None else
+                               [f"{b['start']:.6g}", f"{b['change']:.6g}", b["unit"], f"{b['hours']:.6g}", b["n"],
+                                b.get("other_units_left_out", 0)])])
+    return _csv(["taxon", "biomass_start", "biomass_change", "unit", "phase_hours", "replicates",
+                 "other_units_left_out"], rows)
 
 
 def crm_phase(result: dict) -> str:
@@ -594,9 +596,9 @@ DECLINE_TEXT = (
     "plate counts and CFU count cells that divide, and a live-gated flow cytometry count (technique ... live) "
     "cells whose membranes exclude the stain: their decline measures the loss of membrane-intact cells "
     "(stained dead, or lysed), which may stay in the vessel; optical density, total flow cytometry counts, "
-    "qPCR and 16S keep dead cells until they lyse (a flow cytometry count without a recorded gate may be either: "
-    "study SMGDB00000007's per-strain ones are live counts), so for them the rate is a loss of counted biomass, "
-    "which bounds death from below, and on a plateau birth and death are "
+    "qPCR and 16S keep dead cells until they lyse, so for them the rate is a loss of counted biomass, "
+    "which bounds death from below (a flow cytometry count without a recorded gate, technique without live or "
+    "total, may be either, so its decline is undetermined), and on a plateau birth and death are "
     "confounded as well. fit_r2 is the median share of each replicate's log abundance the line explains; it means "
     "something only where the decline is clearly not 0 (beyond its se): there it falls both with curvature (a "
     "crash, then a slower fall, which the rate averages) and with the scatter of the samples; on a flat plateau "
@@ -615,7 +617,7 @@ MAINTENANCE_TEXT = (
     "a culture's plateau holds). Positive "
     "is uptake, negative release; a change within the detection limit is 0. start_mM is the compound's median "
     "concentration at the plateau's start, and below_limit_replicates how many replicates had it below the "
-    "detection limit then (used up, or never there): their 0 measures no maintenance demand. Per viable "
+    "detection limit then (used up, or never there): their 0 says nothing about maintenance demand. Per viable "
     "biomass (plate counts, CFU; a live-gated count counts membrane-intact cells, which outlast culturable ones) "
     "the coefficient of an uptake bounds Pirt's m_s from above where growth and death balance; per counted "
     "biomass that includes dead cells (optical density, total counts, qPCR, 16S) it is lower by their share, so "
@@ -627,7 +629,10 @@ MAINTENANCE_TEXT = (
     "biomass is in the unit of the growth curves most of the taxon's cultures use (unit: mM per hour per that "
     "unit; per cells/mL it is micromoles per cell per hour); cultures in another unit, cultures that did not "
     "grow or whose values span the whole run, and of a duplicate deposit the copy with the poorer growth curve "
-    "(for the compounds both copies measured) give none; other_units_left_out counts the cultures in another unit.")
+    "(for the compounds both copies measured) give none; other_units_left_out counts the cultures in another "
+    "unit, and a compound only those measured has no row (the report names the cultures). crm.json also holds "
+    "each replicate's own coefficient (replicate_values), as decline_rate_detail holds each replicate's rate "
+    "(replicate_rates).")
 
 
 def decline_text(fraction: float = 0.9) -> str:
@@ -676,15 +681,16 @@ def sources_lines(result: dict, which: str = "matrices") -> list:
              "them (other concentration units converted by foodnet, anything else left out), and its growth curve.",
              "  * The growth curve of a replicate: a per-strain measurement before the culture-level one, and cell "
              "counts before optical density (flow cytometry, qPCR, plate counts, CFU, 16S in absolute units, then "
-             "OD); for a culture with metabolites, the first that gives an end of exponential growth is used, for "
-             "a monoculture without them (a growth rate's fallback) the first in that order. A flow cytometry "
-             "count's gate (live, total) is part of its technique; a dead count is never a growth curve; a per-strain "
-             "count deposited without a gate that repeats a gated one takes that gate's name. The curve sets the "
-             "growth phases and is the unit of the biomass.",
+             "OD); the first that gives an end of exponential growth is used. A flow cytometry "
+             "count's gate (live, total) is part of its technique; a dead count is never a growth curve; a count "
+             "deposited without a gate whose series is identical to a gated count of the same replicate takes that "
+             "gate's name. The curve sets the "
+             "growth phases" + (" and is the unit of the biomass." if which == "crm" else "."),
              "  * Compounds are mGrowthDB's metabolite records; an acid and its conjugate base (acetic acid and "
              "acetate) are joined as one pool under the base's ChEBI id.",
              "  * Computed by foodnet from the metabolite series, over the phase the growth curve sets (or the time "
-             "window): the amounts and their evidence, cautions.csv"
+             "window): the amounts and their evidence, cautions.csv" + (", signed.csv and matrices.svg"
+                                                                          if which != "crm" else "")
              + (", intervals.csv, bounds.csv and initial_concentrations.csv (each culture's first sample)."
                 if which == "crm" else ".")]
     if which == "crm":
@@ -747,7 +753,8 @@ def readme(result: dict, which: str = "matrices") -> str:
     lines += [f"Values: {values}.",
               f"Detection limit: a mean change below {s['detection_limit']:g} mM counts as no change{spread}{own}.",
               "Rows are taxa, columns metabolites. In consumed.csv and produced.csv every number is a magnitude, "
-              "never negative; in the signed matrix a produced compound is positive and a consumed one negative, "
+              "never negative; in the signed matrix (signed.csv, in the matrices download) a produced compound is "
+              "positive and a consumed one negative, "
               "the opposite of a consumer-resource model's efficiency matrix (miaSim's E is positive for a "
               "resource taken up), which the R package builds from consumed.csv and produced.csv. "
               "The first header cell names the medium the values come from.",
@@ -820,8 +827,10 @@ def readme(result: dict, which: str = "matrices") -> str:
                   "Initial concentrations: each metabolite's concentration at the first sample of the value-medium "
                   "cultures, averaged (initial_concentrations.csv), in mM.",
                   "Biomass: each taxon's growth over the same phase, from its growth curve, in that curve's unit "
-                  "(biomass.csv), with the phase's length in hours. A simulation's starting abundance for a taxon "
-                  "must be in the same unit.",
+                  "(biomass.csv), with the phase's length in hours, from the cultures whose curves are of the "
+                  "technique, unit and gate most of the taxon's use (other_units_left_out counts the rest, which "
+                  "the amounts may still hold). A simulation's starting abundance for a taxon must be in the same "
+                  "unit.",
                   *(["Intervals: the hours each value was measured over, cell by cell (intervals.csv; in crm.json "
                      "interval_start_h and interval_end_h): the first and last sample the change is taken between, "
                      "the mean over its experiments. A second-window compound has its own window, and a replicate "

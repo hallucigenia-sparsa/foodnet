@@ -140,7 +140,7 @@ def tooltip(result: dict, taxon, met, phase: str, direction: str, evidence: str,
         if evidence == "inconclusive":
             # a merged genus whose taxa are all inconclusive has no mean (a review: the figure, the matrices zip
             # and the page crashed on it, as in 0.4.0)
-            mean = "none" if cell["mean"] is None else f"{cell['mean']:+.3g} mM"
+            mean = "none over the genus" if cell["mean"] is None else f"{cell['mean']:+.3g} mM"
             lines.append(f"inconclusive: mean {mean}"
                          + ("" if cell["sd"] is None else f" \u00b1 {cell['sd']:.2g}")
                          + f", {cell['n']} replicate(s){experiments}; they do not agree on a change beyond "

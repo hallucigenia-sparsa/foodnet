@@ -974,10 +974,10 @@ def merge_genus_cells(cells: dict, taxa: dict, limit: float = DETECTION_LIMIT, l
         means = [c["mean"] for _, c in voting]
         mean = statistics.median(means) if means else None
         cautions = set().union(*(c["cautions"] for _, c in members)) - {"conflict", "inconclusive"}
+        # with no taxon voting, the "inconclusive, so not counted" note below says why (a review: "median over 0
+        # taxon(s): " with nothing after it)
         notes = ([f"median over {len(means)} taxon(s): " + ", ".join(sorted(taxa[t]["name"] for t, _ in voting))]
-                 if voting else
-                 # a review: "median over 0 taxon(s): " with nothing after it
-                 ["no taxon gives a value: " + ", ".join(sorted({taxa[t]["name"] for t, _ in members}))])
+                 if voting else [])
         # what the genus value misses, built as the value is: the median over the voting taxa, 0 for a taxon that
         # misses nothing (a review: a mean over the still-changing ones alone overstated it); within the limit, the
         # genus is not still changing, whatever one of its taxa did (a review: "+0.00 mM more")
