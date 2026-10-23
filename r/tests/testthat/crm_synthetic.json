@@ -146,6 +146,13 @@
    "plateau_samples": 2,
    "start_mM": 4.0,
    "below_limit_replicates": 0,
+   "below_limit_by_end": 0,
+   "biomass_change": 0.0,
+   "replicate_values": [
+    -7.500000000000003e-05,
+    -8.333333333333337e-05,
+    -6.666666666666666e-05
+   ],
    "other_units_left_out": 0
   },
   {
@@ -164,8 +171,15 @@
     "SMGDB00000001"
    ],
    "plateau_samples": 2,
-   "start_mM": 2.0000000000000004,
+   "start_mM": 2.0,
    "below_limit_replicates": 0,
+   "below_limit_by_end": 0,
+   "biomass_change": 0.0,
+   "replicate_values": [
+    8.333333333333344e-05,
+    9.166666666666664e-05,
+    7.5e-05
+   ],
    "other_units_left_out": 0
   },
   {
@@ -186,6 +200,12 @@
    "plateau_samples": 2,
    "start_mM": 3.0,
    "below_limit_replicates": 0,
+   "below_limit_by_end": 0,
+   "biomass_change": 0.0,
+   "replicate_values": [
+    0.0,
+    0.0
+   ],
    "other_units_left_out": 0
   },
   {
@@ -206,6 +226,12 @@
    "plateau_samples": 2,
    "start_mM": 4.0,
    "below_limit_replicates": 0,
+   "below_limit_by_end": 0,
+   "biomass_change": 0.0,
+   "replicate_values": [
+    0.0,
+    0.0
+   ],
    "other_units_left_out": 0
   }
  ],
@@ -627,7 +653,7 @@
    "not_detected_in_value_medium": 3
   },
   "biomass_falls": [],
-  "technique_mismatch": "Growth curves of different techniques: fc for Alpha alpha A1; od for Beta beta B1. Growth and decline rates and biomass from different techniques can differ manyfold (a cell count falls where optical density stays flat); the technique columns say which each rests on.",
+  "technique_mismatch": "Growth curves of different techniques: fc for Alpha alpha A1; od for Beta beta B1. Growth and decline rates and biomass from different techniques can differ manyfold (a live count falls where a total count or optical density stays flat); the technique columns say which each rests on.",
   "without_a_decline": {
    "Alpha alpha A1": "its growth curves in this medium give no usable decline (see the report)",
    "Beta beta B1": "its growth curves in this medium give no usable decline (see the report)",

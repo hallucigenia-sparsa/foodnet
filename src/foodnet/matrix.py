@@ -381,11 +381,13 @@ def maintenance_csv(result: dict) -> str:
                          NA if m["se"] is None else f"{m['se']:.6g}", NA if m["sd"] is None else f"{m['sd']:.6g}",
                          m["n"], m["n_experiments"], f"{m['start_h']:.6g}", f"{m['end_h']:.6g}",
                          m["plateau_samples"], f"{m['start_mM']:.6g}", m["below_limit_replicates"],
+                         m.get("below_limit_by_end", 0),
+                         NA if m.get("biomass_change") is None else f"{m['biomass_change']:.3g}",
                          m.get("other_units_left_out", 0), " ".join(m["studies"])])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "resource", "maintenance", "unit", "se", "sd", "replicates", "experiments", "start_h",
-                 "end_h", "plateau_samples", "start_mM", "below_limit_replicates", "other_units_left_out",
-                 "studies"], rows)
+                 "end_h", "plateau_samples", "start_mM", "below_limit_replicates", "below_limit_by_end",
+                 "biomass_change", "other_units_left_out", "studies"], rows)
 
 
 def maintenance_payload(result: dict) -> list:
@@ -589,12 +591,15 @@ DECLINE_TEXT = (
     "(within a tenth of the curve's log rise below its maximum) before the last sample, or fall to zero "
     "(replicates_to_zero, fitted up to the zero, so the fall itself is not in the slope and it bounds the "
     "decline from below), else plateau. What it measures depends on the technique: "
-    "only plate counts and CFU count living cells; optical density, flow cytometry (unless live-stained), qPCR and "
-    "16S keep dead cells until they lyse, so for them the rate is a loss of counted biomass, which bounds death "
-    "from below, and on a plateau birth and death are "
+    "plate counts and CFU count cells that divide, and a live-gated flow cytometry count (technique ... live) "
+    "cells whose membranes exclude the stain: their decline measures loss of viability directly, though the "
+    "cells may stay in the vessel; optical density, total or ungated flow cytometry counts, qPCR and 16S keep "
+    "dead cells until they lyse, so for them the rate is a loss of counted biomass, which bounds death from "
+    "below, and on a plateau birth and death are "
     "confounded as well. fit_r2 is the median share of each replicate's log abundance the line explains; it means "
-    "something only where the decline is clearly not 0 (beyond its se): there a low one says the curve is no "
-    "single exponential decline (a crash, then a plateau), while on a flat plateau it is low by construction. "
+    "something only where the decline is clearly not 0 (beyond its se): there a value below about 0.9 says the "
+    "curve is no single exponential decline (a crash, then a slower fall), and the rate averages the two; on a "
+    "flat plateau it is low by construction. "
     "start_h and end_h are the "
     "replicates' mean start and end. A taxon without a usable "
     "decline (fewer than three "
@@ -607,16 +612,20 @@ MAINTENANCE_TEXT = (
     "replicates with metabolite data, with sd and se between replicates (each treated as independent), "
     "experiments, the replicates' mean start and end of the plateau, plateau_samples (the fewest growth samples "
     "a culture's plateau holds). Positive "
-    "is uptake, negative release; a change within the detection limit is 0. start_mM is the compound's mean "
+    "is uptake, negative release; a change within the detection limit is 0. start_mM is the compound's median "
     "concentration at the plateau's start, and below_limit_replicates how many replicates had it below the "
     "detection limit then (used up, or never there): their 0 measures no maintenance demand. Per viable "
-    "biomass (plate counts, CFU) the coefficient bounds Pirt's m_s from above (growth and death may balance on a "
-    "plateau); per counted biomass that includes dead cells (optical density, flow cytometry unless live-"
-    "stained, qPCR, 16S) it is lower by their share, so it bounds m_s in neither direction. The biomass is in "
-    "the unit of the growth curves most of the taxon's cultures use (unit: mM per hour per that unit; per "
-    "cells/mL it is micromoles per cell per hour); cultures in another unit, cultures that did not grow or whose "
-    "values span the whole run, and of a duplicate deposit the copy with the poorer growth curve (for the "
-    "compounds both copies measured) give none; other_units_left_out counts the cultures in another unit.")
+    "biomass (plate counts, CFU, live-gated counts) the coefficient of an uptake bounds Pirt's m_s from above "
+    "where growth and death balance; per counted biomass that includes dead cells (optical density, total or "
+    "ungated counts, qPCR, 16S) it is lower by their share, so it bounds m_s in neither direction. Where the "
+    "taxon's decline is a death phase, the plateau is not balanced: biomass_change says how much the biomass "
+    "changed over the window (end over start, minus 1), and uptake then also feeds overflow and recycling of "
+    "lysed cells. below_limit_by_end counts the replicates whose compound fell below the detection limit "
+    "inside the window, where the coefficient averages the uptake over hours with nothing left to take up. The "
+    "biomass is in the unit of the growth curves most of the taxon's cultures use (unit: mM per hour per that "
+    "unit; per cells/mL it is micromoles per cell per hour); cultures in another unit, cultures that did not "
+    "grow or whose values span the whole run, and of a duplicate deposit the copy with the poorer growth curve "
+    "(for the compounds both copies measured) give none; other_units_left_out counts the cultures in another unit.")
 
 
 def decline_text(fraction: float = 0.9) -> str:
@@ -630,21 +639,23 @@ def technique_mismatch(result: dict) -> str:
     taxa or within one, which a model would compare as if they were alike; empty otherwise."""
     names = result.get("names") or {}
     used = {}
-    # the technique alone: a log-slope rate does not depend on the unit's scale (Cells/mL against Cells/uL)
+    # the technique, its unit and its cell gate (live, total); whether it counts the strain or the culture is a
+    # label (Karoline, 2026-10-22: "Yes, gate in the key"; a review: a live and an ungated count were pooled)
     for kind in ("rates", "declines"):
         for tid, r in (result.get(kind) or {}).items():
             for t in (r.get("technique") or "").split("; "):
                 if t:
-                    used.setdefault(t.split(" ", 1)[0], set()).add(names.get(tid, tid))
+                    used.setdefault(t.rsplit(" (", 1)[0], set()).add(names.get(tid, tid))
     for tid, b in (result.get("biomass") or {}).items():
         if b and b.get("unit"):
-            used.setdefault(b["unit"].split(" ", 1)[0], set()).add(names.get(tid, tid))
+            used.setdefault(b["unit"], set()).add(names.get(tid, tid))
     if len(used) < 2:
         return ""
     return ("Growth curves of different techniques: " + "; ".join(
         f"{t} for {', '.join(sorted(taxa))}" for t, taxa in sorted(used.items()))
-        + ". Growth and decline rates and biomass from different techniques can differ manyfold (a cell count "
-          "falls where optical density stays flat); the technique columns say which each rests on.")
+        + ". Growth and decline rates and biomass from different techniques can differ manyfold (a live count "
+          "falls where a total count or optical density stays flat); the technique columns say which each rests "
+          "on.")
 
 
 def sources_lines(result: dict, which: str = "matrices") -> list:
@@ -1123,8 +1134,11 @@ def crm_payload(result: dict) -> dict:
         # the decline after each taxon's growth peak (1/h; None: no usable decline), a biomass loss rate for a
         # fit, with its scatter, n, phase (death, or plateau: a lower bound) and window (Karoline, 2026-10-09)
         "decline_rates": [(result.get("declines") or {}).get(t.id, {}).get("rate") for t in taxa],
-        "decline_rate_detail": {pair["taxa"][i]: {k: v for k, v in result["declines"][t.id].items()
-                                                  if k != "replicates"}
+        "decline_rate_detail": {pair["taxa"][i]: {**{k: v for k, v in result["declines"][t.id].items()
+                                                     if k != "replicates"},
+                                                  # each replicate's own rate, to see the spread (a review)
+                                                  "replicate_rates": [f["rate"] for f in result["declines"][t.id]
+                                                                      ["replicates"][:result["declines"][t.id]["n"]]]}
                                 for i, t in enumerate(taxa) if t.id in (result.get("declines") or {})},
         # the Pirt maintenance coefficient on the growth plateau per taxon and compound, a separate
         # characteristic nothing else uses (mM per biomass unit per h; positive: uptake)

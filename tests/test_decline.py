@@ -412,3 +412,31 @@ def test_growth_rates_leave_out_cultures_that_did_not_grow(client):
             [(0, 0.5), (8, 0.52), (16, 0.55), (24, 0.56)]
     r = run(client, ignore_media=True, report_rates=True, rate_window=3)
     assert r["rates"]["ncbi:2"]["n"] == 2
+
+
+def test_a_dead_cell_count_is_never_a_growth_curve_and_a_repeated_gate_is_named():
+    from foodnet import reading
+    dead = {"subject": {"type": "bioreplicate"}, "techniqueType": "fc", "techniqueCellType": "dead"}
+    live = {"subject": {"type": "bioreplicate"}, "techniqueType": "fc", "techniqueCellType": "live"}
+    assert reading._growth_rank(dead) is None and reading._growth_rank(live) is not None
+
+
+def test_the_cell_gate_is_part_of_the_technique():
+    g = {"technique": "fc", "unit": "Cells/mL", "level": "strain", "gate": "live"}
+    assert crm.technique(g) == "fc Cells/mL live (strain)"
+    found = [{"rate": r, "start": 12.0, "end": 48.0, "points": 4, "death": True, "study": "S", "experiment": e,
+              "technique": t} for r, e, t in ((0.05, "E1", "fc Cells/mL live (strain)"),
+                                              (0.05, "E2", "fc Cells/mL live (strain)"),
+                                              (0.002, "E3", "fc Cells/mL (culture)"))]
+    s = crm.summarize_declines(found, crm.FROM_METABOLITE_REPLICATES)
+    assert s["n"] == 2 and s["other_techniques_left_out"] == 1
+
+
+def test_maintenance_says_how_much_the_biomass_changed_and_when_a_compound_ran_out_in_the_window():
+    c = _plateau_culture("E1", (2.0, 0.1))
+    c.growth["values"] = [1, 10, 100, 1000, 600]
+    c.growth["times"] = [0, 4, 8, 12, 24]
+    found, _ = crm.maintenance([c], 0.2, fraction=0.9)
+    m = found["ncbi:9"]["glc"]
+    assert m["biomass_change"] == pytest.approx(-0.4) and m["below_limit_by_end"] == 1
+    assert m["replicate_values"] == [pytest.approx(m["coefficient"])]

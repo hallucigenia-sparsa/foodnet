@@ -121,7 +121,8 @@ def report_text(result: dict) -> str:
         found = result.get("maintenance") or {}
         if found:
             lines += ["", "Maintenance on the growth plateau (Pirt coefficient; uptake per biomass unit per hour, "
-                      "positive: uptake; a separate characteristic; per viable biomass an upper bound on Pirt's m_s):"]
+                      "positive: uptake; a separate characteristic; for an uptake, per viable biomass, an upper "
+                      "bound on Pirt's m_s where growth and death balance):"]
             for tid, by_met in sorted(found.items(), key=lambda kv: names.get(kv[0], kv[0])):
                 for mid, m in sorted(by_met.items(), key=lambda kv: names.get(kv[0], kv[0])):
                     scatter = f" +/- {m['se']:.2g} SE" if m["se"] is not None else ""

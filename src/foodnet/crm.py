@@ -200,8 +200,11 @@ def decline_rates(taxa, value_cultures, other_cultures, value_keys, ignore_media
 
 
 def _curve_unit(growth: dict) -> str:
+    """The technique, its unit and its cell gate where it has one ("fc Cells/mL live"): live, total and ungated
+    counts are different measures (Karoline, 2026-10-22: "Yes, gate in the key")."""
     technique, curve_unit = growth.get("technique") or "", growth.get("unit") or ""
-    return technique if curve_unit.casefold() in ("", technique.casefold()) else f"{technique} {curve_unit}"
+    named = technique if curve_unit.casefold() in ("", technique.casefold()) else f"{technique} {curve_unit}"
+    return f"{named} {growth['gate']}" if growth.get("gate") else named
 
 
 def _mean_biomass(times, values, start: float, end: float) -> float:
@@ -243,19 +246,25 @@ def maintenance(value_cultures, limit: float, limits: dict | None = None,
         for c, start, end, biomass in plateaus:
             unit = _curve_unit(c.growth)
             samples = sum(1 for t in c.growth["times"] if start <= t <= end)
+            curve = list(zip(c.growth["times"], c.growth["values"], strict=True))
+            first_x = value_at(curve, start)[0]
+            # how much the biomass changed over the window: a "plateau" in a death phase falls (a review)
+            change = value_at(curve, end)[0] / first_x - 1 if first_x > 0 else None
             for mid, met in c.metabolites.items():
                 series = met["series"]
                 if (c.experiment, mid) in dropped or not series or series[0][0] > start or series[-1][0] < end:
                     continue
                 at_start = value_at(series, start)[0]
-                fall = at_start - value_at(series, end)[0]
+                at_end = value_at(series, end)[0]
+                fall = at_start - at_end
                 lim = (limits or {}).get(mid, limit)
                 if abs(fall) < lim:
                     fall = 0.0
                 found[taxon][mid].append({"value": fall / biomass / (end - start), "unit": unit, "start": start,
                                           "end": end, "study": c.study, "experiment": c.experiment,
-                                          "culture": c.label,
-                                          "samples": samples, "at_start": at_start, "limit": lim})
+                                          "culture": c.label, "samples": samples, "at_start": at_start,
+                                          "limit": lim, "gone_by_end": at_start >= lim > at_end,
+                                          "biomass_change": change})
     for by_met in found.values():
         unit = _taxon_unit(by_met)
         for culture, other in sorted({(e["culture"], e["unit"]) for entries in by_met.values() for e in entries}):
@@ -283,7 +292,7 @@ def summarize_maintenance(found: dict) -> dict:
                 continue
             values = [e["value"] for e in same]
             sd = statistics.stdev(values) if len(values) > 1 else None
-            at_start = statistics.mean(e["at_start"] for e in same)
+            at_start = statistics.median(e["at_start"] for e in same)
             gone = sum(1 for e in same if e["at_start"] < e["limit"])
             out.setdefault(taxon, {})[mid] = {
                 "coefficient": statistics.mean(values), "unit": f"mM h-1 per ({unit or 'biomass unit'})",
@@ -296,6 +305,11 @@ def summarize_maintenance(found: dict) -> dict:
                 # up, or never there): their 0 measures no demand (a review: one flag from the mean hid a
                 # culture that took it up)
                 "below_limit_replicates": gone,
+                "below_limit_by_end": sum(1 for e in same if e["gone_by_end"]),
+                "biomass_change": (statistics.mean(ch) if (ch := [e["biomass_change"] for e in same
+                                                                  if e["biomass_change"] is not None]) else None),
+                # each replicate's own coefficient, so a spread set by the window's placement can be seen
+                "replicate_values": [e["value"] for e in same],
                 # cultures of this compound in another unit than the taxon's (or genus's) one (a review)
                 "other_units_left_out": len(entries) - len(same), "cultures": entries}
     return out
@@ -350,9 +364,7 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         x1, _ = value_at(series, end)
         # the unit is the technique and its unit together: qPCR gene copies and flow cytometry events can both
         # be "Cells/mL" and still measure different things (DNA from lysed cells counts in one, not the other)
-        technique, curve_unit = c.growth.get("technique") or "", c.growth.get("unit") or ""
-        unit = technique if curve_unit.casefold() in ("", technique.casefold()) else f"{technique} {curve_unit}"
-        by_taxon[c.taxon["id"]].append({"unit": unit, "experiment": c.experiment,
+        by_taxon[c.taxon["id"]].append({"unit": _curve_unit(c.growth), "experiment": c.experiment,
                                         "start": x0, "change": x1 - x0, "hours": end - start})
     out = {}
     for taxon, found in by_taxon.items():

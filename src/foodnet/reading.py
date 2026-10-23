@@ -15,7 +15,8 @@ Rules worth stating, because each is a choice:
     replicate holds several curves of the same kind (study SMGDB00000007 records three culture-level flow
     cytometry traces), the per-strain one decides. Every usable curve is kept in that order, and the first
     that gives an end of exponential growth is the one used (a short or spiked curve gives way to the next).
-    A 16S curve in relative units is no growth curve: in a monoculture it is about 100% throughout.
+    A 16S curve in relative units is no growth curve: in a monoculture it is about 100% throughout, and nor is
+    a count of dead cells (a flow cytometry gate); a curve's gate (live, total) is kept and named.
   * Times are converted to hours, concentrations to mM (`foodnet.compounds`). A series in a unit that is
     not a concentration is left out and reported.
   * Experiments that are not batch (chemostat, serial dilution) are left out and reported: production and
@@ -141,6 +142,9 @@ def _growth_rank(context: dict) -> tuple | None:
         return None
     if technique == "16s" and _relative((context.get("techniqueUnits") or "").casefold()):
         return None        # a share of the reads: about 100% throughout in a monoculture, so no growth curve
+    if (context.get("techniqueCellType") or "").casefold() == "dead":
+        return None        # dead cells are no growth curve (Karoline, 2026-10-22: "Never"; a review: a dead count
+        #                    that climbed gave a growth rate)
     level = 0 if subject.get("type") == "strain" else 1
     kind = GROWTH_TECHNIQUES.index(technique) if technique in GROWTH_TECHNIQUES else len(GROWTH_TECHNIQUES)
     return (level, kind)
@@ -204,7 +208,15 @@ def cultures_of_experiment(client, exp: dict, identities: dict, excluded_metabol
                 culture.curves.append({"times": [t for t, _ in points], "values": [v for _, v in points],
                                        "technique": context.get("techniqueType") or "",
                                        "level": (context.get("subject") or {}).get("type", ""),
-                                       "unit": context.get("techniqueUnits") or context.get("techniqueType") or ""})
+                                       "unit": context.get("techniqueUnits") or context.get("techniqueType") or "",
+                                       "gate": (context.get("techniqueCellType") or "").casefold()})
+        # a curve deposited without its cell gate that repeats a gated one is that gate (study SMGDB00000007's
+        # per-strain counts are its live counts; Karoline, 2026-10-22: "As now, gate named")
+        for curve in culture.curves:
+            if not curve["gate"]:
+                same = [g["gate"] for g in culture.curves if g["gate"] and g["values"] == curve["values"]
+                        and g["times"] == curve["times"]]
+                curve["gate"] = same[0] if same else ""
         culture.growth = culture.curves[0] if culture.curves else None
         if with_metabolites:
             for context in bio.get("measurementContexts", []):

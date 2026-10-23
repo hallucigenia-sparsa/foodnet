@@ -233,5 +233,6 @@ test_that("crm_write writes the download's columns for growth rates, declines an
                                                      '"other_techniques_left_out","fit_r2"'))
     expect_equal(header("maintenance.csv"), paste0('"taxon","resource","maintenance","unit","se","sd","replicates",',
                                                    '"experiments","start_h","end_h","plateau_samples","start_mM",',
-                                                   '"below_limit_replicates","other_units_left_out","studies"'))
+                                                   '"below_limit_replicates","below_limit_by_end","biomass_change",',
+                                                   '"other_units_left_out","studies"'))
 })

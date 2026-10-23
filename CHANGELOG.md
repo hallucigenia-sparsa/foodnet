@@ -36,6 +36,9 @@ semantic versioning.
 
 ### Fixed
 
+- A count of dead cells (a flow cytometry gate) could become a culture's growth curve when the others failed; it
+  never does now. The gate of a count (live, total) is part of its technique in every table, and a per-strain
+  count that repeats a gated one is named for that gate: study SMGDB00000007's per-strain counts are live counts.
 - A duplicate deposit, counted once in the matrices, was counted twice in the growth rates' replicates (and so
   their n and median), in the biomass and in the initial concentrations: it now counts once, and the copy
   with the richer growth curve gives the growth rate.

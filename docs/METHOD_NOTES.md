@@ -394,6 +394,13 @@ with metabolite data."
     compound ("No, as it is"). Cultures in another unit than the taxon's are counted (other_units_left_out).
     Fifth round: the taxon's unit is the one most of its cultures use, each culture counted once whatever it
     measured; growth rates, like declines and maintenance, take nothing from a culture that did not grow.
+    Karoline, 2026-10-22, on flow cytometry gates (mGrowthDB's techniqueCellType): a dead-cell count is never a
+    growth curve ("Never"); the order of the curves stays, with the gate named ("As now, gate named"; study
+    SMGDB00000007's per-strain counts repeat its live counts, so its rates rest on live-stained cells, whose
+    decline measures loss of viability, 0.051 per hour for B. thetaiotaomicron against 0.0008 for its total
+    count); the gate is part of what counts as one technique ("Yes, gate in the key"); no rates over the halves
+    of the decline window ("No, fit_r2 is enough"). Maintenance adds biomass_change over its window and
+    below_limit_by_end, and crm.json the per-replicate values.
 
 ## Known limits
 
