@@ -401,6 +401,8 @@ with metabolite data."
     count); the gate is part of what counts as one technique ("Yes, gate in the key"); no rates over the halves
     of the decline window ("No, fit_r2 is enough"). Maintenance adds biomass_relative_change over its window and
     below_limit_by_end, and crm.json the per-replicate values.
+    Karoline, 2026-10-23: "FC counts in study 2 are live counts; this still needs to be specified in mGrowthDB but
+    you can treat them as such" (reading.KNOWN_GATES; to go once mGrowthDB records the gate).
 
 ## Known limits
 

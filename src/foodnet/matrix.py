@@ -684,7 +684,8 @@ def sources_lines(result: dict, which: str = "matrices") -> list:
              "OD); the first that gives an end of exponential growth is used. A flow cytometry "
              "count's gate (live, total) is part of its technique; a dead count is never a growth curve; a count "
              "deposited without a gate whose series is identical to a gated count of the same replicate takes that "
-             "gate's name. The curve sets the "
+             "gate's name, and study SMGDB00000002's flow cytometry counts are taken as live counts, as its "
+             "authors say (mGrowthDB does not record their gate yet). The curve sets the "
              "growth phases" + (" and is the unit of the biomass." if which == "crm" else "."),
              "  * Compounds are mGrowthDB's metabolite records; an acid and its conjugate base (acetic acid and "
              "acetate) are joined as one pool under the base's ChEBI id.",

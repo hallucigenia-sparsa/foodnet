@@ -518,3 +518,12 @@ def test_a_genus_of_inconclusive_taxa_says_so_once():
     merged = derive.merge_genus_cells(cells, taxa)
     notes = next(iter(merged.values()))["notes"]
     assert notes == ["inconclusive, so not counted: G one"]
+
+
+def test_a_studys_ungated_counts_take_the_gate_its_authors_named():
+    # Karoline, 2026-10-23: "FC counts in study 2 are live counts"
+    from foodnet import reading
+    fc = {"times": [0, 4], "values": [1, 10], "gate": "", "technique": "fc"}
+    od = {"times": [0, 4], "values": [0.1, 0.4], "gate": "", "technique": "od"}
+    reading.name_gates([fc, od], [], reading.KNOWN_GATES["SMGDB00000002"])
+    assert fc["gate"] == "live" and od["gate"] == ""

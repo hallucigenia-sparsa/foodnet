@@ -150,10 +150,20 @@ def _growth_rank(context: dict) -> tuple | None:
     return (level, kind)
 
 
-def name_gates(curves: list, dead: list) -> list:
+# the gate of counts a study deposited without one, where its authors said which it is; each entry is to go once
+# mGrowthDB records the gate itself
+KNOWN_GATES = {
+    # Karoline, 2026-10-23: "FC counts in study 2 are live counts; this still needs to be specified in mGrowthDB
+    # but you can treat them as such"
+    "SMGDB00000002": {"fc": "live"},
+}
+
+
+def name_gates(curves: list, dead: list, known: dict | None = None) -> list:
     """The growth curves with their cell gates named: a curve deposited without a gate that repeats a gated one
     is that gate (study SMGDB00000007's per-strain counts are its live counts; Karoline, 2026-10-22: "As now, gate
-    named"), and one that repeats a dead count (`dead`: its [(time, value)] series) is no growth curve, as a
+    named"); one its study's authors named (`known`, by technique: KNOWN_GATES) takes that gate; and one that
+    repeats a dead count (`dead`: its [(time, value)] series) is no growth curve, as a
     dead-gated one is not (Karoline: "Never"; a review: an untagged copy of a dead count slipped through)."""
     dead_series = [([t for t, _ in d], [v for _, v in d]) for d in dead]
     kept = []
@@ -163,7 +173,7 @@ def name_gates(curves: list, dead: list) -> list:
                 continue
             same = [g["gate"] for g in curves if g["gate"] and g["values"] == curve["values"]
                     and g["times"] == curve["times"]]
-            curve["gate"] = same[0] if same else ""
+            curve["gate"] = same[0] if same else (known or {}).get((curve.get("technique") or "").casefold(), "")
         kept.append(curve)
     return kept
 
@@ -236,7 +246,7 @@ def cultures_of_experiment(client, exp: dict, identities: dict, excluded_metabol
                 except Exception as e:  # noqa: BLE001 - said, so a copy of it is not taken for a growth curve unseen
                     skipped.append((f"{label}: {rep}", f"{UNREAD} its dead-cell count, so a copy of it among the "
                                                        f"growth curves cannot be recognized: {e}"))
-        culture.curves = name_gates(culture.curves, dead)
+        culture.curves = name_gates(culture.curves, dead, KNOWN_GATES.get(culture.study, {}))
         culture.growth = culture.curves[0] if culture.curves else None
         if with_metabolites:
             for context in bio.get("measurementContexts", []):

@@ -365,7 +365,9 @@ drift or a dead inoculum never becomes an arc. A time window in
 Advanced settings replaces the phases. The growth curve is a per-strain count when the replicate has one, else
 the culture's own (cell counts before optical density); a curve that gives no boundary gives way to the
 replicate's next one. A flow cytometry count's gate (live, total) is part of its technique; a dead count is never
-a growth curve; a count deposited without a gate that repeats a gated one takes that gate's name.</p>
+a growth curve; a count deposited without a gate whose series is identical to a gated count of the same
+replicate takes that gate's name, and study SMGDB00000002's flow cytometry counts are taken as live counts
+(mGrowthDB does not record their gate yet).</p>
 <p>A metabolite series shorter than 24 h is still used, and its values carry the caution short_record; the page
 warns about it above the result.</p>
 <h2 id="values">Values, media and presence</h2>
