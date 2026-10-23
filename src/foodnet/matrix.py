@@ -431,7 +431,8 @@ def biomass_csv(result: dict, phase: str | None = None) -> str:
         b = _biomass(result, phase).get(t.id)
         rows.append([t.name, *(["NA", "NA", "", "NA", 0, 0, "NA"] if b is None else
                                [NA if b["start"] is None else f"{b['start']:.6g}", f"{b['change']:.6g}", b["unit"],
-                                f"{b['hours']:.6g}", b["n"], b.get("other_units_left_out", 0),
+                                NA if b["hours"] is None else f"{b['hours']:.6g}", b["n"],
+                                b.get("other_units_left_out", 0),
                                 NA if b.get("start_h") is None else f"{b['start_h']:.6g}"])])
     return _csv(["taxon", "biomass_start", "biomass_change", "unit", "phase_hours", "replicates",
                  "other_units_left_out", "biomass_start_h"], rows)
@@ -821,7 +822,7 @@ def readme(result: dict, which: str = "matrices") -> str:
                   "different techniques can differ manyfold. A taxon without a rate needs one "
                   "from elsewhere. crm.json also "
                   "holds each taxon's mean growth rate over the CRM's own phase (phase_growth_rates, from "
-                  "biomass.csv); a maximum rate below it means the fit took in the plateau.",
+                  "biomass_start_h to the windows' ends); a maximum rate below it means the fit took in the plateau.",
                   *(["Entries seen only in another medium were set to TRUE in the matrices; a CRM needs amounts, "
                      "so they are missing here (their evidence says presence_only)."]
                     if presence_entries(result) == "true" else []),
@@ -834,8 +835,8 @@ def readme(result: dict, which: str = "matrices") -> str:
                   "biomass_start_h (the median of the experiments' window starts), read from each growth curve on "
                   "the log scale and averaged as logs (a culture with nothing at or before that hour is left out), "
                   "the starting abundance of a simulation from that hour; phase_hours runs from that hour to the "
-                  "cultures' mean window end, and crm.json's phase_growth_rates is the rate that takes biomass_start "
-                  "to biomass_start + biomass_change in that time; "
+                  "cultures' mean window end, and crm.json's phase_growth_rates is the log rise from biomass_start "
+                  "to the cultures' abundance at their windows' ends over that time; "
                   "biomass_change stays each culture's growth over its own window, as the amounts are; from "
                   "the cultures whose curves are of the "
                   "technique, unit and gate most of the taxon's use (other_units_left_out counts the rest, which "
@@ -1119,7 +1120,10 @@ def _phase_block(result: dict, phase: str) -> dict:
         "presence_only": presence,
         "whole_run": whole_run_taxa(result) if phase == crm_phase(result) else [],
         "biomass_falls": [pair["taxa"][i] for i, b in enumerate(biomass)
-                          if b is not None and b["start"] > 0 and b["change"] < -FALL_SHARE * b["start"]],
+                          # against the abundance at the windows' own starts, which the change runs from (a
+                          # review: biomass_start can be None, and is read at another hour)
+                          if b is not None and (b.get("window_start_abundance") or 0) > 0
+                          and b["change"] < -FALL_SHARE * b["window_start_abundance"]],
         "cautions": [{"taxon": names.get(t, t), "resource": names.get(m, m), "cautions": list(c["cautions"]),
                       "notes": list(c["notes"])}
                      for (t, m, p), c in sorted(result["cells"].items())

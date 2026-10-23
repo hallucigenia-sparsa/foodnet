@@ -283,7 +283,14 @@ test_that("as_miasim warns when foodnet's starts lie at different hours or preda
     p$biomass_start_h <- list(0, 4)
     x <- foodnet:::as_foodnet_crm(p)
     expect_warning(try(as_miasim(x, x0 = x$biomass_start, monod_constant = 1, missing_resource = 0, na = "zero"),
-                       silent = TRUE), "different hours")
+                       silent = TRUE), "read at different hours for these taxa")
+    one <- x
+    one$biomass_start_h[] <- 0
+    quiet <- character(0)
+    withCallingHandlers(try(as_miasim(one, x0 = one$biomass_start, monod_constant = 1, missing_resource = 0,
+                                      na = "zero"), silent = TRUE),
+                        warning = function(w) { quiet <<- c(quiet, conditionMessage(w)); invokeRestart("muffleWarning") })
+    expect_false(any(grepl("different hours|before 0.5.0", quiet)))
     q <- example_payload()
     q$growth_rates <- list(0.4, 0.5)
     q$caveats$without_a_rate <- list()

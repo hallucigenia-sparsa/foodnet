@@ -410,8 +410,9 @@ with metabolite data."
     times too high. Now every culture is read at a single hour, biomass_start_h, the median of the experiments'
     window starts, interpolated on the log scale (a culture with nothing at or before it is left out), and the
     logs are averaged per experiment and then over experiments. phase_hours runs from that hour to the cultures'
-    mean window end and phase_growth_rates is each culture's log rise over it, averaged alike, so x0, the rate and
-    the length describe one trajectory (a review: with the rate from the old starts, a simulation grew E. coli to
+    mean window end and phase_growth_rates is the log rise from biomass_start to the cultures' abundance at their
+    windows' ends (logs averaged alike) over phase_hours, so x0, the rate and the length describe one trajectory
+    from the measured start to the measured end (a review: with the rate from the old starts, a simulation grew E. coli to
     1% of its measured biomass); biomass_change stays over each culture's own window, as the amounts are.
 
 ## Known limits

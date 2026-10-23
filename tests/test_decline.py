@@ -606,8 +606,9 @@ def test_biomass_start_is_every_culture_at_one_hour_averaged_as_logs():
     assert b["start_h"] == 2 and b["start"] == pytest.approx(math.exp((e1 + e2) / 2))
     # the phase on one trajectory from that hour: length to the mean end, rate the mean log rise over it
     assert b["hours"] == pytest.approx(6)
-    # and the rate that takes biomass_start to biomass_start + biomass_change in that time (one trajectory)
-    assert b["phase_rate"] == pytest.approx(math.log((b["start"] + b["change"]) / b["start"]) / 6)
+    # and the rate from that start to the cultures' mean abundance at their windows' ends, as logs, in that time
+    end = ((math.log(1e9) + math.log(4e9)) / 2 + math.log(9e8)) / 2
+    assert b["phase_rate"] == pytest.approx((end - (e1 + e2) / 2) / 6)
 
 
 def test_the_start_hour_is_the_median_over_experiments_and_a_zero_there_is_left_out():
@@ -641,3 +642,31 @@ def test_a_culture_with_nothing_at_the_start_hour_is_left_out_of_biomass_start()
     b = crm.biomass_changes(cultures, rows, "exponential")["t"]
     assert b["start"] == pytest.approx(1e5) and b["start_left_out"] == 2
 
+
+
+def test_a_taxon_with_no_culture_at_the_start_hour_still_exports(client):
+    # a review: every culture left out of biomass_start (a 0 at that hour) crashed the CRM export and the report
+    from foodnet.report import report_text
+    for rep in ("a1", "a2", "a3"):
+        client.contexts[client.bioreplicates[rep]["measurementContexts"][0]["id"]] = \
+            [(0, 0), (4, 10), (8, 100), (12, 1000), (24, 1000)]
+    r = run(client, report_rates=True)
+    b = r["biomass"]["ncbi:1"]
+    assert b["start"] is None and b["hours"] is None and b["phase_rate"] is None and b["start_left_out"] == 3
+    assert matrix.crm_package(r) and "Alpha alpha A1 (3 of 3)" in report_text(r)
+
+
+def test_the_phase_rate_runs_from_the_start_to_the_measured_end():
+    # a review: start plus the per-window change ended a stationary phase far from the curves' own end
+    import math
+    import types
+    cultures = [(i, types.SimpleNamespace(growth={"times": [0, 10, 20, 30], "values": v, "technique": "fc",
+                                                  "unit": ""}, taxon={"id": "t"}, experiment="E1"))
+                for i, v in enumerate(([1e9, 1e9, 5e8, 2.5e8], [1e9, 8e8, 4e8, 2e8]))]
+    rows = [{"culture": i, "phase": "stationary", "change": -1.0, "start": st, "end": 30, "cautions": []}
+            for i, st in enumerate((10, 20))]
+    b = crm.biomass_changes(cultures, rows, "stationary")["t"]
+    start_h = 15
+    ends = (math.log(2.5e8) + math.log(2e8)) / 2
+    starts = (math.log(math.sqrt(1e9 * 5e8)) + math.log(math.sqrt(8e8 * 4e8))) / 2
+    assert b["start_h"] == start_h and b["phase_rate"] == pytest.approx((ends - starts) / 15)
