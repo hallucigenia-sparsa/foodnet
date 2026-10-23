@@ -401,32 +401,51 @@ def biomass_changes(value_cultures, rows, phase: str) -> dict:
         # start, and averaged on the log scale (Karoline, 2026-10-23: "fix biomass_start first"; a review: an
         # arithmetic mean of abundances read at 0 h and at 4 h gave E. coli LF82 1.26e7 where its cultures held
         # 2.9e5 at 0 h, so a simulation started it about 40 times too high)
-        at_h = statistics.median(f["window_start"] for f in same)
-        logs = {}
+        # the median over experiments, each its own median, as the logs are averaged (a review)
+        by_exp_starts = {}
+        for f in same:
+            by_exp_starts.setdefault(f["experiment"], []).append(f["window_start"])
+        at_h = statistics.median(statistics.median(v) for v in by_exp_starts.values())
+        logs, slopes, ends = {}, {}, {}
         for f in same:
             x = _log_at(f["series"], at_h)
+            y = _log_at(f["series"], f["window_start"] + f["hours"])
             if x is not None:
                 logs.setdefault(f["experiment"], []).append(x)
+                end_h = f["window_start"] + f["hours"]
+                ends.setdefault(f["experiment"], []).append(end_h)
+                if y is not None and end_h > at_h:
+                    slopes.setdefault(f["experiment"], []).append((y - x) / (end_h - at_h))
         common = (math.exp(statistics.mean(statistics.mean(v) for v in logs.values())) if logs else None)
+        # the phase on one trajectory from that hour: its length to the cultures' mean end, and its mean specific
+        # growth rate, each culture's log rise from biomass_start_h to its window's end (a review: the start had
+        # moved to 0 h while the rate and the length still came from starts at 0 h and at 4 h, so a simulation
+        # from biomass_start grew E. coli LF82 to 1% of its measured biomass)
+        if ends:
+            hours = statistics.mean(statistics.mean(v) for v in ends.values()) - at_h
+        phase_rate = (statistics.mean(statistics.mean(v) for v in slopes.values()) if slopes else None)
         out[taxon] = {"change": change, "start": common, "start_h": at_h, "unit": unit, "hours": hours,
                       "n": len(same),
+                      # cultures whose curve gives nothing at biomass_start_h (a 0 there, or no sample by then)
+                      "start_left_out": len(same) - sum(len(v) for v in logs.values()),
                       # cultures of another unit, left out (a review: B. thetaiotaomicron's ungated copy, whose
                       # values the amounts hold, was left out of its biomass without a word)
                       "other_units_left_out": len(found) - len(same),
                       # the mean specific growth rate over the phase: a maximum rate below it cannot be right
-                      # (over each culture's own window, as the change is)
-                      "phase_rate": (math.log((start + change) / start) / hours
-                                     if start > 0 and start + change > 0 and hours > 0 else None)}
+                      "phase_rate": phase_rate}
     return out
 
 
 def _log_at(series, t: float):
     """The natural log of a growth curve's abundance at hour t, interpolated on the log scale between the samples
-    around it (the nearest sample outside them); None without a positive sample there."""
-    positive = [(u, math.log(v)) for u, v in series if v > 0]
-    if not positive:
+    around it (after the last sample, the last); None where it reads 0 at t, or has no positive sample at or before
+    t (a measured 0 has no log, and a later sample does not replace it; a review)."""
+    if any(u == t and v <= 0 for u, v in series):
         return None
-    if t <= positive[0][0]:
+    positive = [(u, math.log(v)) for u, v in series if v > 0]
+    if not positive or t < positive[0][0]:
+        return None           # nothing at or before t: a later, denser sample does not stand in (a review)
+    if t == positive[0][0]:
         return positive[0][1]
     if t >= positive[-1][0]:
         return positive[-1][1]

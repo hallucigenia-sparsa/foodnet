@@ -192,7 +192,7 @@ with metabolite data."
     refuses pooled media and the stationary phase unless allowed. 0.1.0's uptake shares remain as
     `scale = "shares"`.
     A final round found E. coli LF82's fitted rate (easylinear, 0.375 per hour) below the mean rate its own
-    curves show over the phase (0.65): the fitting window took in the plateau of a fast, sparsely sampled
+    curves show over the phase (0.65; about 1.0 since decision 34 reads it from one start): the fitting window took in the plateau of a fast, sparsely sampled
     curve, and a simulation grew it at half speed. The payload carries each taxon's phase mean rate, the page
     and R warn when it exceeds the fitted rate, and `growth = "phase_floor"` uses it there; the default stays
     the fitted rate (grownet's method, Karoline's choice of 2026-10-04).
@@ -404,12 +404,15 @@ with metabolite data."
     Karoline, 2026-10-23: "FC counts in study 2 are live counts; this still needs to be specified in mGrowthDB but
     you can treat them as such" (reading.KNOWN_GATES; to go once mGrowthDB records the gate).
 
-34. **biomass_start at one hour.** Karoline, 2026-10-23: "fix biomass_start first". It averaged each culture's
+34. **biomass_start at a single hour.** Karoline, 2026-10-23: "fix biomass_start first". It averaged each culture's
     abundance at its own window start, so cultures starting at 0 h and at 4 h mixed an inoculum with a culture
     100 times denser (E. coli LF82: 1.26e7 against 2.9e5 at 0 h), and as_miasim's x0 started E. coli about 40
-    times too high. Now every culture is read at one hour, biomass_start_h, the median of their windows' starts,
-    interpolated on the log scale, and the logs are averaged per experiment and then over experiments;
-    biomass_change and phase_growth_rates stay over each culture's own window, as the amounts are.
+    times too high. Now every culture is read at a single hour, biomass_start_h, the median of the experiments'
+    window starts, interpolated on the log scale (a culture with nothing at or before it is left out), and the
+    logs are averaged per experiment and then over experiments. phase_hours runs from that hour to the cultures'
+    mean window end and phase_growth_rates is each culture's log rise over it, averaged alike, so x0, the rate and
+    the length describe one trajectory (a review: with the rate from the old starts, a simulation grew E. coli to
+    1% of its measured biomass); biomass_change stays over each culture's own window, as the amounts are.
 
 ## Known limits
 

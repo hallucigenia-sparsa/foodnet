@@ -576,7 +576,7 @@
  ],
  "phase_growth_rates": [
   0.5756462732485114,
-  0.24450143783925912,
+  0.2445014378392591,
   null
  ],
  "biomass_replicates": [
@@ -919,7 +919,7 @@
    ],
    "phase_growth_rates": [
     0.0,
-    0.0,
+    1.3877787807814457e-17,
     null
    ],
    "electron_balance": [

@@ -224,7 +224,7 @@ amounts <- function(x, na = "stop", booleans_ok = FALSE) {
 #' The growth rate in it is foodnet's fitted maximum rate, or with `growth = "phase_floor"` at least the
 #' mean rate the taxon's own curves show over the phase. A maximum below that mean cannot be right: it comes
 #' from a fitting window that took in the plateau of a fast, sparsely sampled curve (E. coli LF82: 0.375
-#' fitted against 0.65 per hour over its phase), and it would grow the taxon too slowly. Such taxa are named in
+#' fitted against about 1.0 per hour over its phase), and it would grow the taxon too slowly. Such taxa are named in
 #' a warning.
 #'
 #' @param x CRM parameters from [foodnet_listen()] or [foodnet_crm()].
@@ -737,7 +737,8 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     refuse_caveats(x, allow)
     if (missing(x0) || is.null(x0)) {
         stop_foodnet("give x0, a starting abundance per taxon in the unit of its growth curve (x$biomass_unit); ",
-                     "x$biomass_start holds each taxon's own start. miaSim would otherwise draw them at random.")
+                     "x$biomass_start holds each taxon's abundance at x$biomass_start_h. miaSim would otherwise ",
+                     "draw them at random.")
     }
     if (missing(monod_constant) || is.null(monod_constant)) {
         stop_foodnet("give monod_constant, in mM (one number, or a taxa by resources matrix); foodnet measures ",
@@ -749,6 +750,17 @@ as_miasim <- function(x, x0, monod_constant, E = NULL, missing_rate = NULL, miss
     # "x0 needs one number per taxon" sent a user looking at x0)
     if (is.null(E)) suppressWarnings(crm_scale(x, growth))       # crm_efficiency() below says what it warns
     x0 <- if (!is.null(names(x0)) && all(x$taxa %in% names(x0))) x0[x$taxa] else x0
+    # one simulation starts every taxon at one time: biomass_start read at different hours does not (a review:
+    # in the stationary phase 8 to 36 h for five taxa)
+    hours <- unique(stats::na.omit(unname(x$biomass_start_h)))
+    if (length(hours) > 1) {
+        warning("x$biomass_start is read at different hours for these taxa (",
+                paste(sprintf("%s %g h", names(x$biomass_start_h), x$biomass_start_h)[!is.na(x$biomass_start_h)],
+                      collapse = ", "), "); one simulation starts them all at its time 0", call. = FALSE)
+    } else if (!is.null(x$biomass_start_h) && all(is.na(x$biomass_start_h)) && !all(is.na(x$biomass_start))) {
+        warning("these parameters come from a foodnet before 0.5.0, whose biomass_start averages abundances read at ",
+                "different hours; give x0 yourself or read the parameters with a newer foodnet", call. = FALSE)
+    }
     if (length(x0) != n) stop_foodnet("x0 needs one number per taxon (", n, "), in the order of crm$taxa or named")
     if (anyNA(x0)) stop_foodnet("x0 is NA for ", paste(x$taxa[is.na(x0)], collapse = ", "), ": give a starting ",
                                 "abundance, or leave the taxon out with crm_subset()")

@@ -508,7 +508,7 @@ def run_query(client, entries, settings: dict | None = None, index=None, progres
     warnings += _value_medium_warnings(rule, cultures, chosen, valued, taxa, rows, window)
     if slow:
         # a maximum rate below the mean over the phase cannot be right (a final review round: E. coli LF82,
-        # 0.375 per hour fitted against 0.65 over its phase)
+        # 0.375 per hour fitted against about 1.0 over its phase)
         warnings.append("The growth rate of " + ", ".join(slow) + " is below the mean rate its own curves show over "
                         "the phase: the fitted window took in its plateau (fast growth, sparse samples), so a model "
                         "would grow it too slowly. In R, as_miasim(growth = \"phase_floor\") uses the phase's mean "

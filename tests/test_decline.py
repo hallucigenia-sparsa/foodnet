@@ -587,11 +587,40 @@ def test_merged_genera_pool_every_strains_cultures_before_choosing_the_unit(clie
 
 def test_biomass_start_is_every_culture_at_one_hour_averaged_as_logs():
     # Karoline, 2026-10-23: "fix biomass_start first": cultures whose windows start at 0 h and at 4 h are all read
-    # at 0 h (the median start), not averaged as they stood at their own starts
+    # at one hour, the median of the experiments' starts, between samples on the log scale, and averaged as logs
+    # per experiment, then over experiments
+    import math
     import types
-    curve = {"times": [0, 4, 8, 12], "values": [3e5, 3e7, 3e8, 4e8], "technique": "fc", "unit": ""}
-    cultures = [(i, types.SimpleNamespace(growth=dict(curve), taxon={"id": "t"}, experiment="E1")) for i in range(3)]
-    rows = [{"culture": i, "phase": "exponential", "change": -1.0, "start": s, "end": 12, "cautions": []}
-            for i, s in enumerate((0, 0, 4))]
+
+    def culture(experiment, values):
+        return types.SimpleNamespace(growth={"times": [0, 4, 8, 12], "values": values, "technique": "fc", "unit": ""},
+                                     taxon={"id": "t"}, experiment=experiment)
+    cultures = list(enumerate([culture("E1", [1e5, 1e7, 1e9, 1e9]), culture("E1", [4e5, 4e7, 4e9, 4e9]),
+                               culture("E2", [9e5, 9e7, 9e8, 9e8])]))
+    starts = (2, 2, 2)                                  # between the 0 h and 4 h samples
+    rows = [{"culture": i, "phase": "exponential", "change": -1.0, "start": s, "end": 8, "cautions": []}
+            for i, s in enumerate(starts)]
     b = crm.biomass_changes(cultures, rows, "exponential")["t"]
-    assert b["start_h"] == 0 and b["start"] == pytest.approx(3e5)
+    e1 = (math.log(1e6) + math.log(4e6)) / 2          # each read at 2 h on the log scale: 1e6, 4e6
+    e2 = math.log(9e6)
+    assert b["start_h"] == 2 and b["start"] == pytest.approx(math.exp((e1 + e2) / 2))
+    # the phase on one trajectory from that hour: length to the mean end, rate the mean log rise over it
+    assert b["hours"] == pytest.approx(6)
+    rise = [(math.log(1e9) - math.log(1e6)) / 6, (math.log(4e9) - math.log(4e6)) / 6,
+            (math.log(9e8) - math.log(9e6)) / 6]
+    assert b["phase_rate"] == pytest.approx(((rise[0] + rise[1]) / 2 + rise[2]) / 2)
+
+
+def test_a_culture_with_nothing_at_the_start_hour_is_left_out_of_biomass_start():
+    import types
+    cultures = [(0, types.SimpleNamespace(growth={"times": [0, 4, 8], "values": [1e5, 1e7, 1e9], "technique": "fc",
+                                                  "unit": ""}, taxon={"id": "t"}, experiment="E1")),
+                (1, types.SimpleNamespace(growth={"times": [0, 4, 8], "values": [0, 1e7, 1e9], "technique": "fc",
+                                                  "unit": ""}, taxon={"id": "t"}, experiment="E2")),
+                (2, types.SimpleNamespace(growth={"times": [4, 8], "values": [1e7, 1e9], "technique": "fc",
+                                                  "unit": ""}, taxon={"id": "t"}, experiment="E3"))]
+    rows = [{"culture": i, "phase": "exponential", "change": -1.0, "start": 0, "end": 8, "cautions": []}
+            for i in range(3)]
+    b = crm.biomass_changes(cultures, rows, "exponential")["t"]
+    assert b["start"] == pytest.approx(1e5) and b["start_left_out"] == 2
+

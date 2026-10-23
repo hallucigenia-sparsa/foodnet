@@ -21,6 +21,6 @@ and multiply simulated ones by it (\code{\link{crm_unscale}}).
 The growth rate in it is foodnet's fitted maximum rate, or with \code{growth = "phase_floor"} at least the
 mean rate the taxon's own curves show over the phase. A maximum below that mean cannot be right: it comes
 from a fitting window that took in the plateau of a fast, sparsely sampled curve (E. coli LF82: 0.375
-fitted against 0.65 per hour over its phase), and it would grow the taxon too slowly. Such taxa are named in
+fitted against about 1.0 per hour over its phase), and it would grow the taxon too slowly. Such taxa are named in
 a warning.
 }
