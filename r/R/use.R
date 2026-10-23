@@ -563,7 +563,7 @@ crm_readme <- function(x, print = TRUE) {
 #' Write the parameters as files
 #'
 #' The files of foodnet's download, for the phase `x` holds: `consumed.csv`, `produced.csv` and their
-#' `evidence_*.csv`, `growth_rates.csv`, `decline_rates.csv` and `maintenance.csv` (from the release after foodnet 0.4.0), `initial_concentrations.csv`, `biomass.csv`, `intervals.csv` (the
+#' `evidence_*.csv`, `growth_rates.csv`, `decline_rates.csv` and `maintenance.csv` (from foodnet 0.5.0), `initial_concentrations.csv`, `biomass.csv`, `intervals.csv` (the
 #' hours each value was measured over) and `bounds.csv` (each amount's lowest and highest replicate), one row
 #' per cell with a phase column, `chemistry.csv` and `electron_balance.csv` (from foodnet 0.3.0, [crm_chemistry()]
 #' and [crm_electron_balance()], the latter with a phase column), and `README.txt`, which opens with the phase. After [crm_phase()] the

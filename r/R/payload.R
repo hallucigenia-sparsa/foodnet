@@ -217,24 +217,24 @@ as_foodnet_crm <- function(payload) {
              growth_rates = rates,
              growth_rate_unit = chr(payload$growth_rate_unit, "1/h"),
              growth_rate_detail = payload$growth_rate_detail,
-             # each taxon's decline from the end of its growth (1/h; NA: no usable decline), from the release
-             # after foodnet 0.4.0:
+             # each taxon's decline from the end of its growth (1/h; NA: no usable decline), from foodnet
+             # 0.5.0:
              # scatter, n, phase (death, or plateau: a lower bound) and window in decline_rate_detail
              decline_rates = if (is.null(payload$decline_rates)) NULL else per_taxon("decline_rates"),
              decline_rate_detail = payload$decline_rate_detail,
-             # the Pirt maintenance coefficient on the growth plateau, per taxon and resource (from the release
-             # after foodnet 0.4.0): a separate characteristic no builder here uses
+             # the Pirt maintenance coefficient on the growth plateau, per taxon and resource (from foodnet
+             # 0.5.0): a separate characteristic no builder here uses
              maintenance = if (is.null(payload$maintenance)) NULL else maintenance_frame(payload$maintenance),
              initial = initial,
              biomass_change = per_taxon("biomass_change"),
              biomass_start = per_taxon("biomass_start"),
-             # the hour biomass_start is read at (from the release after foodnet 0.4.0)
+             # the hour biomass_start is read at (from foodnet 0.5.0)
              biomass_start_h = per_taxon("biomass_start_h"),
              biomass_unit = units,
              phase_hours = per_taxon("phase_hours"),
              phase_growth_rates = per_taxon("phase_growth_rates"),
              # how many replicates the biomass of the CRM's own phase rests on, and how many of another unit it
-             # leaves out (from the release after foodnet 0.4.0; NA before)
+             # leaves out (from foodnet 0.5.0; NA before)
              biomass_replicates = per_taxon("biomass_replicates"),
              biomass_other_units_left_out = per_taxon("biomass_other_units_left_out"),
              phase = chr(payload$phase),
@@ -252,8 +252,8 @@ as_foodnet_crm <- function(payload) {
                             stationary_phase = isTRUE(caveats$stationary_phase),
                             whole_run = chr_vector(caveats$whole_run),
                             biomass_falls = chr_vector(caveats$biomass_falls),
-                            # growth curves of different techniques behind the rates or biomass (from the release
-                            # after foodnet 0.4.0; "" when one), and why a taxon has no decline rate
+                            # growth curves of different techniques behind the rates or biomass (from foodnet
+                            # 0.5.0; "" when one), and why a taxon has no decline rate
                             technique_mismatch = chr(caveats$technique_mismatch),
                             without_a_decline = unlist(caveats$without_a_decline),
                             caution_tiers = unlist(caveats$caution_tiers),
