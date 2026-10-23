@@ -171,8 +171,8 @@ CRM mode also gives each taxon's decline rate (`decline_rates.csv`): the loss of
 the end of its growth (the first sample at 90% of the rise, the rule that ends exponential growth) to the last
 sample (negative where it still creeps up), the mean over its replicates in one technique, with the scatter
 between replicates, the number of experiments they come from, the window, and whether the curves leave the
-plateau band or fall to zero (death) or stay on it (plateau). For anything but a viable count it bounds death
-from below: optical density and total counts keep dead cells until they lyse. Without a usable decline it is
+plateau band or fall to zero (death) or stay on it (plateau). For anything but a viable or live-gated count it
+bounds death from below: optical density and total counts keep dead cells until they lyse. Without a usable decline it is
 NA, not 0. Separately, it gives the Pirt maintenance coefficient (`maintenance.csv`), which nothing else uses:
 what each taxon took up of each compound per unit of biomass per hour on its growth plateau, with its scatter,
 experiments, window, the compound's concentration at the plateau's start and how many replicates had it below the

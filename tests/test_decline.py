@@ -440,3 +440,14 @@ def test_maintenance_says_how_much_the_biomass_changed_and_when_a_compound_ran_o
     m = found["ncbi:9"]["glc"]
     assert m["biomass_change"] == pytest.approx(-0.4) and m["below_limit_by_end"] == 1
     assert m["replicate_values"] == [pytest.approx(m["coefficient"])]
+
+
+def test_an_untagged_copy_of_a_live_count_is_named_live_and_one_of_a_dead_count_is_dropped():
+    # a review: the naming compared only against the curves kept, so an untagged copy of a dead count stayed
+    from foodnet import reading
+    times = [0, 4, 8]
+    live = {"times": times, "values": [1, 10, 100], "gate": "live"}
+    copy_of_live = {"times": times, "values": [1, 10, 100], "gate": ""}
+    copy_of_dead = {"times": times, "values": [0, 5, 50], "gate": ""}
+    kept = reading.name_gates([copy_of_dead, copy_of_live, live], [list(zip(times, [0, 5, 50], strict=True))])
+    assert kept == [copy_of_live, live] and copy_of_live["gate"] == "live"

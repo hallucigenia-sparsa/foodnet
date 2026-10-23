@@ -150,6 +150,24 @@ def _growth_rank(context: dict) -> tuple | None:
     return (level, kind)
 
 
+def name_gates(curves: list, dead: list) -> list:
+    """The growth curves with their cell gates named: a curve deposited without a gate that repeats a gated one
+    is that gate (study SMGDB00000007's per-strain counts are its live counts; Karoline, 2026-10-22: "As now, gate
+    named"), and one that repeats a dead count (`dead`: its [(time, value)] series) is no growth curve, as a
+    dead-gated one is not (Karoline: "Never"; a review: an untagged copy of a dead count slipped through)."""
+    dead_series = [([t for t, _ in d], [v for _, v in d]) for d in dead]
+    kept = []
+    for curve in curves:
+        if not curve["gate"]:
+            if (curve["times"], curve["values"]) in dead_series:
+                continue
+            same = [g["gate"] for g in curves if g["gate"] and g["values"] == curve["values"]
+                    and g["times"] == curve["times"]]
+            curve["gate"] = same[0] if same else ""
+        kept.append(curve)
+    return kept
+
+
 def _relative(unit: str) -> bool:
     return any(word in unit for word in ("%", "percent", "relative", "fraction", "proportion", "ratio"))
 
@@ -210,13 +228,14 @@ def cultures_of_experiment(client, exp: dict, identities: dict, excluded_metabol
                                        "level": (context.get("subject") or {}).get("type", ""),
                                        "unit": context.get("techniqueUnits") or context.get("techniqueType") or "",
                                        "gate": (context.get("techniqueCellType") or "").casefold()})
-        # a curve deposited without its cell gate that repeats a gated one is that gate (study SMGDB00000007's
-        # per-strain counts are its live counts; Karoline, 2026-10-22: "As now, gate named")
-        for curve in culture.curves:
-            if not curve["gate"]:
-                same = [g["gate"] for g in culture.curves if g["gate"] and g["values"] == curve["values"]
-                        and g["times"] == curve["times"]]
-                curve["gate"] = same[0] if same else ""
+        dead = []
+        for context in bio.get("measurementContexts", []):
+            if (context.get("techniqueCellType") or "").casefold() == "dead":
+                try:
+                    dead.append(_series(client, context["id"], factor))
+                except Exception:  # noqa: BLE001 - a dead count is only compared against, never used
+                    pass
+        culture.curves = name_gates(culture.curves, dead)
         culture.growth = culture.curves[0] if culture.curves else None
         if with_metabolites:
             for context in bio.get("measurementContexts", []):

@@ -33,9 +33,10 @@ FROM_SAME_MEDIUM = "another monoculture in the same medium"
 
 
 def technique(growth: dict) -> str:
-    """The measurement a growth curve is: technique and unit, and whether it counts the strain or the whole
-    culture ("fc Cells/mL (strain)", "od (culture)"), so rates and biomass from different techniques are not
-    mixed up (Karoline, 2026-10-22: "the measurement technique, to prevent mismatches across techniques")."""
+    """The measurement a growth curve is: technique, unit, its flow cytometry gate where it has one, and whether
+    it counts the strain or the whole culture ("fc Cells/mL live (strain)", "od (culture)"), so rates and biomass
+    from different techniques are not mixed up (Karoline, 2026-10-22: "the measurement technique, to prevent
+    mismatches across techniques")."""
     level = "strain" if growth.get("level") == "strain" else "culture"
     return f"{_curve_unit(growth)} ({level})"
 
