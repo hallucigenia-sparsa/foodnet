@@ -382,12 +382,12 @@ def maintenance_csv(result: dict) -> str:
                          m["n"], m["n_experiments"], f"{m['start_h']:.6g}", f"{m['end_h']:.6g}",
                          m["plateau_samples"], f"{m['start_mM']:.6g}", m["below_limit_replicates"],
                          m.get("below_limit_by_end", 0),
-                         NA if m.get("biomass_change") is None else f"{m['biomass_change']:.3g}",
+                         NA if m.get("biomass_relative_change") is None else f"{m['biomass_relative_change']:.3g}",
                          m.get("other_units_left_out", 0), " ".join(m["studies"])])
     first = "taxon [INCOMPLETE]" if result.get("errors") else "taxon"
     return _csv([first, "resource", "maintenance", "unit", "se", "sd", "replicates", "experiments", "start_h",
                  "end_h", "plateau_samples", "start_mM", "below_limit_replicates", "below_limit_by_end",
-                 "biomass_change", "other_units_left_out", "studies"], rows)
+                 "biomass_relative_change", "other_units_left_out", "studies"], rows)
 
 
 def maintenance_payload(result: dict) -> list:
@@ -593,13 +593,14 @@ DECLINE_TEXT = (
     "decline from below), else plateau. What it measures depends on the technique: "
     "plate counts and CFU count cells that divide, and a live-gated flow cytometry count (technique ... live) "
     "cells whose membranes exclude the stain: their decline measures the loss of membrane-intact cells "
-    "(stained dead, or lysed), which may stay in the vessel; optical density, total or ungated flow cytometry "
-    "counts, qPCR and 16S keep dead cells until they lyse, so for them the rate is a loss of counted biomass, "
+    "(stained dead, or lysed), which may stay in the vessel; optical density, total flow cytometry counts, "
+    "qPCR and 16S keep dead cells until they lyse (a flow cytometry count without a recorded gate may be either: "
+    "study SMGDB00000007's per-strain ones are live counts), so for them the rate is a loss of counted biomass, "
     "which bounds death from below, and on a plateau birth and death are "
     "confounded as well. fit_r2 is the median share of each replicate's log abundance the line explains; it means "
-    "something only where the decline is clearly not 0 (beyond its se): there a value below about 0.9 says the "
-    "curve is no single exponential decline (a crash, then a slower fall), and the rate averages the two; on a "
-    "flat plateau it is low by construction. "
+    "something only where the decline is clearly not 0 (beyond its se): there it falls both with curvature (a "
+    "crash, then a slower fall, which the rate averages) and with the scatter of the samples; on a flat plateau "
+    "it is low by construction. "
     "start_h and end_h are the "
     "replicates' mean start and end. A taxon without a usable "
     "decline (fewer than three "
@@ -615,11 +616,12 @@ MAINTENANCE_TEXT = (
     "is uptake, negative release; a change within the detection limit is 0. start_mM is the compound's median "
     "concentration at the plateau's start, and below_limit_replicates how many replicates had it below the "
     "detection limit then (used up, or never there): their 0 measures no maintenance demand. Per viable "
-    "biomass (plate counts, CFU, live-gated counts) the coefficient of an uptake bounds Pirt's m_s from above "
-    "where growth and death balance; per counted biomass that includes dead cells (optical density, total or "
-    "ungated counts, qPCR, 16S) it is lower by their share, so it bounds m_s in neither direction. Where the "
-    "taxon's decline is a death phase, the plateau is not balanced: biomass_change says how much the biomass "
-    "changed over the window (end over start, minus 1), and uptake then also feeds overflow and recycling of "
+    "biomass (plate counts, CFU; a live-gated count counts membrane-intact cells, which outlast culturable ones) "
+    "the coefficient of an uptake bounds Pirt's m_s from above where growth and death balance; per counted "
+    "biomass that includes dead cells (optical density, total counts, qPCR, 16S) it is lower by their share, so "
+    "it bounds m_s in neither direction. Where the "
+    "taxon's decline is a death phase, the plateau is not balanced: biomass_relative_change says how much the "
+    "biomass changed over the window (end over start, minus 1), and uptake then also feeds overflow and recycling of "
     "lysed cells. below_limit_by_end counts the replicates whose compound fell below the detection limit "
     "inside the window, where the coefficient averages the uptake over hours with nothing left to take up. The "
     "biomass is in the unit of the growth curves most of the taxon's cultures use (unit: mM per hour per that "

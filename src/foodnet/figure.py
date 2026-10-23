@@ -138,7 +138,10 @@ def tooltip(result: dict, taxon, met, phase: str, direction: str, evidence: str,
         limit = cell.get("limit") or result["settings"].get("detection_limit", 0.2)
         experiments = (f", {cell['n_experiments']} experiments" if (cell.get("n_experiments") or 0) > 1 else "")
         if evidence == "inconclusive":
-            lines.append(f"inconclusive: mean {cell['mean']:+.3g} mM"
+            # a merged genus whose taxa are all inconclusive has no mean (a review: the figure, the matrices zip
+            # and the page crashed on it, as in 0.4.0)
+            mean = "none" if cell["mean"] is None else f"{cell['mean']:+.3g} mM"
+            lines.append(f"inconclusive: mean {mean}"
                          + ("" if cell["sd"] is None else f" \u00b1 {cell['sd']:.2g}")
                          + f", {cell['n']} replicate(s){experiments}; they do not agree on a change beyond "
                          f"{limit:g} mM, or on none")

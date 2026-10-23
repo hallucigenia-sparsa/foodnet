@@ -489,7 +489,7 @@ maintenance_frame <- function(records) {
                start_mM = vapply(records, num, numeric(1), "start_mM"),
                below_limit_replicates = vapply(records, num, numeric(1), "below_limit_replicates"),
                below_limit_by_end = vapply(records, num, numeric(1), "below_limit_by_end"),
-               biomass_change = vapply(records, num, numeric(1), "biomass_change"),
+               biomass_relative_change = vapply(records, num, numeric(1), "biomass_relative_change"),
                other_units_left_out = vapply(records, num, numeric(1), "other_units_left_out"),
                biomass_unit = vapply(records, function(r) chr(r$biomass_unit), character(1)),
                studies = vapply(records, function(r) paste(unlist(r$studies), collapse = " "), character(1)),

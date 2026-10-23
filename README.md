@@ -174,10 +174,12 @@ between replicates, the number of experiments they come from, the window, and wh
 plateau band or fall to zero (death) or stay on it (plateau). For anything but a viable or live-gated count it
 bounds death from below: optical density and total counts keep dead cells until they lyse. Without a usable decline it is
 NA, not 0. Separately, it gives the Pirt maintenance coefficient (`maintenance.csv`), which nothing else uses:
-what each taxon took up of each compound per unit of biomass per hour on its growth plateau, with its scatter,
-experiments, window, the compound's concentration at the plateau's start and how many replicates had it below the
-detection limit then (used up, or never there: their 0 measures no demand). Of a duplicate deposit,
-the copy with the richer growth curve gives the growth rate, decline and maintenance.
+what each taxon took up of each compound per unit of biomass per hour on its growth plateau (from where the
+decline starts), with its scatter, experiments, window, the compound's concentration at the plateau's start, how
+many replicates had it below the detection limit then (used up, or never there: their 0 measures no demand) and
+by the window's end, and the biomass's relative change over the window (a death phase makes it fall). Of a
+duplicate deposit, the copy with the richer growth curve gives the growth rate, decline and maintenance. A flow
+cytometry count's gate (live, total) is part of its technique, and a dead count is never a growth curve.
 With the phase choice Both, the stationary phase (what changed after the end of exponential growth) comes
 too, beside the exponential one. Install the companion package once, at the version of your foodnet (the
 page and the help print the line for yours, which names the release), and miaSim for the simulations:

@@ -438,7 +438,7 @@ def test_maintenance_says_how_much_the_biomass_changed_and_when_a_compound_ran_o
     c.growth["times"] = [0, 4, 8, 12, 24]
     found, _ = crm.maintenance([c], 0.2, fraction=0.9)
     m = found["ncbi:9"]["glc"]
-    assert m["biomass_change"] == pytest.approx(-0.4) and m["below_limit_by_end"] == 1
+    assert m["biomass_relative_change"] == pytest.approx(-0.4) and m["below_limit_by_end"] == 1
     assert m["replicate_values"] == [pytest.approx(m["coefficient"])]
 
 
@@ -451,3 +451,44 @@ def test_an_untagged_copy_of_a_live_count_is_named_live_and_one_of_a_dead_count_
     copy_of_dead = {"times": times, "values": [0, 5, 50], "gate": ""}
     kept = reading.name_gates([copy_of_dead, copy_of_live, live], [list(zip(times, [0, 5, 50], strict=True))])
     assert kept == [copy_of_live, live] and copy_of_live["gate"] == "live"
+
+
+def test_a_genus_whose_taxa_are_all_inconclusive_draws_and_downloads(client):
+    # a review: a merged genus cell with no mean crashed the figure, the matrices zip and the page (as in 0.4.0)
+    from foodnet.figure import matrices_svg
+    r = run(client, merge_genera=True)
+    key = next(k for k, c in r["cells"].items() if c.get("n"))
+    r["cells"][key].update({"mean": None, "state": "inconclusive", "sd": None, "direction": None})
+    assert "<svg" in matrices_svg(r)
+    assert zipfile.ZipFile(io.BytesIO(matrix.pair_package(r))).namelist()
+
+
+def test_technique_mismatch_keys_on_technique_unit_and_gate_not_level():
+    r = {"names": {}, "rates": {"a": {"technique": "fc Cells/mL live (strain)"},
+                                "b": {"technique": "fc Cells/mL live (culture)"}}, "declines": {}, "biomass": {}}
+    assert matrix.technique_mismatch(r) == ""
+    r["rates"]["b"]["technique"] = "fc Cells/mL (culture)"
+    assert matrix.technique_mismatch(r).startswith("Growth curves of different techniques")
+
+
+def test_maintenance_csv_writes_the_relative_change_and_the_compounds_gone_in_the_window(client):
+    r = run(client, report_rates=True)
+    header, *rows = matrix.maintenance_csv(r).splitlines()
+    names = header.split(",")
+    alpha = next(row.split(",") for row in rows if row.startswith("Alpha alpha A1,glucose"))
+    assert alpha[names.index("biomass_relative_change")] == "0" and alpha[names.index("below_limit_by_end")] == "0"
+
+
+def test_a_compound_already_below_the_limit_at_the_start_is_not_counted_as_gone_in_the_window():
+    c = _plateau_culture("E1", (0.1, 0.0))
+    found, _ = crm.maintenance([c], 0.2)
+    assert found["ncbi:9"]["glc"]["below_limit_by_end"] == 0 and found["ncbi:9"]["glc"]["below_limit_replicates"] == 1
+
+
+def test_crm_json_keeps_each_replicates_decline_rate(client):
+    for i, rep in enumerate(("a1", "a2", "a3")):
+        client.contexts[client.bioreplicates[rep]["measurementContexts"][0]["id"]] = \
+            [(0, 1), (4, 10), (8, 100), (12, 1000), (24, 500 + 10 * i), (36, 250), (48, 125)]
+    p = matrix.crm_payload(run(client, report_rates=True))
+    rates_ = p["decline_rate_detail"]["Alpha alpha A1"]["replicate_rates"]
+    assert len(rates_) == 3 and sum(rates_) / 3 == pytest.approx(p["decline_rates"][p["taxa"].index("Alpha alpha A1")])

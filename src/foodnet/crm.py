@@ -226,7 +226,7 @@ def maintenance(value_cultures, limit: float, limits: dict | None = None,
     compound) pair `dropped` as a duplicate deposit (a review: one deposit counted twice). Per taxon: the
     cultures of the unit most of its cultures use (one unit for all its compounds), and per compound the mean
     with standard deviation, standard error, n, the experiments, the window, the fewest growth samples a
-    plateau holds, and the compound's mean concentration at the plateau's start: where it was below the
+    plateau holds, and the compound's median concentration at the plateau's start: where it was below the
     detection limit (below_limit_replicates; used up or never there), a 0 measures no demand (a
     review). On a plateau, growth and death may balance, so the coefficient bounds Pirt's m_s from above."""
     skipped, by_taxon = [], defaultdict(list)
@@ -265,7 +265,7 @@ def maintenance(value_cultures, limit: float, limits: dict | None = None,
                                           "end": end, "study": c.study, "experiment": c.experiment,
                                           "culture": c.label, "samples": samples, "at_start": at_start,
                                           "limit": lim, "gone_by_end": at_start >= lim > at_end,
-                                          "biomass_change": change})
+                                          "biomass_relative_change": change})
     for by_met in found.values():
         unit = _taxon_unit(by_met)
         for culture, other in sorted({(e["culture"], e["unit"]) for entries in by_met.values() for e in entries}):
@@ -307,8 +307,10 @@ def summarize_maintenance(found: dict) -> dict:
                 # culture that took it up)
                 "below_limit_replicates": gone,
                 "below_limit_by_end": sum(1 for e in same if e["gone_by_end"]),
-                "biomass_change": (statistics.mean(ch) if (ch := [e["biomass_change"] for e in same
-                                                                  if e["biomass_change"] is not None]) else None),
+                # end over start, minus 1: not biomass.csv's biomass_change, an amount in the curve's unit
+                "biomass_relative_change": (statistics.mean(ch) if (ch := [e["biomass_relative_change"] for e in same
+                                                                           if e["biomass_relative_change"] is not None])
+                                            else None),
                 # each replicate's own coefficient, so a spread set by the window's placement can be seen
                 "replicate_values": [e["value"] for e in same],
                 # cultures of this compound in another unit than the taxon's (or genus's) one (a review)

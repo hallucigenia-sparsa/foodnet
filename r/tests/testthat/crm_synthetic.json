@@ -147,7 +147,7 @@
    "start_mM": 4.0,
    "below_limit_replicates": 0,
    "below_limit_by_end": 0,
-   "biomass_change": 0.0,
+   "biomass_relative_change": 0.0,
    "replicate_values": [
     -7.500000000000003e-05,
     -8.333333333333337e-05,
@@ -174,7 +174,7 @@
    "start_mM": 2.0,
    "below_limit_replicates": 0,
    "below_limit_by_end": 0,
-   "biomass_change": 0.0,
+   "biomass_relative_change": 0.0,
    "replicate_values": [
     8.333333333333344e-05,
     9.166666666666664e-05,
@@ -201,7 +201,7 @@
    "start_mM": 3.0,
    "below_limit_replicates": 0,
    "below_limit_by_end": 0,
-   "biomass_change": 0.0,
+   "biomass_relative_change": 0.0,
    "replicate_values": [
     0.0,
     0.0
@@ -227,7 +227,7 @@
    "start_mM": 4.0,
    "below_limit_replicates": 0,
    "below_limit_by_end": 0,
-   "biomass_change": 0.0,
+   "biomass_relative_change": 0.0,
    "replicate_values": [
     0.0,
     0.0
