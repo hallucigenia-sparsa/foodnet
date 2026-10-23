@@ -188,7 +188,7 @@ page and the help print the line for yours, which names the release), and miaSim
 
 ```r
 install.packages(c("remotes", "BiocManager"))
-remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r", ref = "v0.5.0")
+remotes::install_github("hallucigenia-sparsa/foodnet", subdir = "r")
 BiocManager::install("miaSim")
 ```
 
